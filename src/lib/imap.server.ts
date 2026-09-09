@@ -22,9 +22,10 @@ let tagCounter = 0;
 async function run(socket: LineSocket, command: string) {
   const tag = `a${++tagCounter}`;
   socket.write(`${tag} ${command}\r\n`);
-  const response = await socket.readUntil((acc) =>
-    new RegExp(`^${tag} (OK|NO|BAD)`, "m").test(acc),
-  , 30000);
+  const response = await socket.readUntil(
+    (acc) => new RegExp(`^${tag} (OK|NO|BAD)`, "m").test(acc),
+    30000,
+  );
   const status = new RegExp(`^${tag} (OK|NO|BAD)([^\\n]*)`, "m").exec(response);
   if (status && status[1] !== "OK") {
     throw new Error(`Mail server refused ${command.split(" ")[0]}:${status[2] ?? ""}`);
