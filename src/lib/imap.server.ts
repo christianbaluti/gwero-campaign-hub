@@ -35,7 +35,7 @@ async function run(socket: LineSocket, command: string) {
 
 function headerValue(block: string, name: string) {
   const match = new RegExp(`^${name}:\\s*(.*(?:\\r?\\n[ \\t].*)*)`, "im").exec(block);
-  return match ? match[1].replace(/\r?\n[ \t]+/g, " ").trim() : "";
+  return match?.[1] ? match[1].replace(/\r?\n[ \t]+/g, " ").trim() : "";
 }
 
 export async function imapFetchRecent(config: ImapConfig, sinceDays = 14): Promise<ImapHeader[]> {
