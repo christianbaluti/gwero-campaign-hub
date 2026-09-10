@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProspectsRouteImport } from './routes/prospects'
 import { Route as ApiPublicTClickRouteImport } from './routes/api/public/t/click'
 import { Route as ApiPublicTOpenRouteImport } from './routes/api/public/t/open'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProspectsRoute = ProspectsRouteImport.update({
+  id: '/prospects',
+  path: '/prospects',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicTClickRoute = ApiPublicTClickRouteImport.update({
@@ -31,30 +37,39 @@ const ApiPublicTOpenRoute = ApiPublicTOpenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/prospects': typeof ProspectsRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/prospects': typeof ProspectsRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/prospects': typeof ProspectsRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/public/t/click' | '/api/public/t/open'
+  fullPaths: '/' | '/prospects' | '/api/public/t/click' | '/api/public/t/open'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/public/t/click' | '/api/public/t/open'
-  id: '__root__' | '/' | '/api/public/t/click' | '/api/public/t/open'
+  to: '/' | '/prospects' | '/api/public/t/click' | '/api/public/t/open'
+  id:
+    | '__root__'
+    | '/'
+    | '/prospects'
+    | '/api/public/t/click'
+    | '/api/public/t/open'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProspectsRoute: typeof ProspectsRoute
   ApiPublicTClickRoute: typeof ApiPublicTClickRoute
   ApiPublicTOpenRoute: typeof ApiPublicTOpenRoute
 }
@@ -66,6 +81,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prospects': {
+      id: '/prospects'
+      path: '/prospects'
+      fullPath: '/prospects'
+      preLoaderRoute: typeof ProspectsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/t/click': {
@@ -87,6 +109,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProspectsRoute: ProspectsRoute,
   ApiPublicTClickRoute: ApiPublicTClickRoute,
   ApiPublicTOpenRoute: ApiPublicTOpenRoute,
 }
