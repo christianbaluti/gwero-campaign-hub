@@ -14,6 +14,155 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          activity_type: string
+          body: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          occurred_at: string
+          updated_at: string
+        }
+        Insert: {
+          activity_type?: string
+          body: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          occurred_at?: string
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          body?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          occurred_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agreement_items: {
+        Row: {
+          agreement_id: string
+          created_at: string
+          description: string
+          id: string
+          quantity: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          agreement_id: string
+          created_at?: string
+          description: string
+          id?: string
+          quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          agreement_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agreement_items_agreement_id_fkey"
+            columns: ["agreement_id"]
+            isOneToOne: false
+            referencedRelation: "agreements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agreements: {
+        Row: {
+          agreement_type: string
+          auto_renew: boolean
+          billing_cycle: string
+          client_id: string
+          coverage_hours: string | null
+          created_at: string
+          currency: string
+          deal_id: string | null
+          end_date: string | null
+          id: string
+          notes: string | null
+          resolution_time_hours: number | null
+          response_time_hours: number | null
+          start_date: string | null
+          status: string
+          title: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          agreement_type?: string
+          auto_renew?: boolean
+          billing_cycle?: string
+          client_id: string
+          coverage_hours?: string | null
+          created_at?: string
+          currency?: string
+          deal_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          resolution_time_hours?: number | null
+          response_time_hours?: number | null
+          start_date?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          agreement_type?: string
+          auto_renew?: boolean
+          billing_cycle?: string
+          client_id?: string
+          coverage_hours?: string | null
+          created_at?: string
+          currency?: string
+          deal_id?: string | null
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          resolution_time_hours?: number | null
+          response_time_hours?: number | null
+          start_date?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agreements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agreements_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_recipients: {
         Row: {
           campaign_id: string
@@ -132,6 +281,125 @@ export type Database = {
             columns: ["mailbox_id"]
             isOneToOne: false
             referencedRelation: "mailboxes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          address: string | null
+          company: string | null
+          created_at: string
+          email: string | null
+          id: string
+          industry: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          prospect_id: string | null
+          status: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          prospect_id?: string | null
+          status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          company?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          industry?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          prospect_id?: string | null
+          status?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deals: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          currency: string
+          expected_close_date: string | null
+          id: string
+          notes: string | null
+          owner: string | null
+          probability: number
+          prospect_id: string | null
+          stage: string
+          title: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          currency?: string
+          expected_close_date?: string | null
+          id?: string
+          notes?: string | null
+          owner?: string | null
+          probability?: number
+          prospect_id?: string | null
+          stage?: string
+          title: string
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          currency?: string
+          expected_close_date?: string | null
+          id?: string
+          notes?: string | null
+          owner?: string | null
+          probability?: number
+          prospect_id?: string | null
+          stage?: string
+          title?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
             referencedColumns: ["id"]
           },
         ]
