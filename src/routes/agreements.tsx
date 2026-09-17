@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/agreements")({ component: AgreementsPage });
 function AgreementsPage() {
@@ -24,7 +24,7 @@ function AgreementsPage() {
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id,name").order("name");
+      const { data, error } = await db.from("clients").select("id,name").order("name");
       if (error) throw error;
       return data;
     },
@@ -32,7 +32,7 @@ function AgreementsPage() {
   const { data: agreements = [] } = useQuery({
     queryKey: ["agreements"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("agreements")
         .select("*, clients(name)")
         .order("created_at", { ascending: false });
@@ -43,7 +43,7 @@ function AgreementsPage() {
   const create = useMutation({
     mutationFn: async () => {
       if (!title.trim() || !clientId) throw new Error("Choose a client and enter a title.");
-      const { error } = await supabase
+      const { error } = await db
         .from("agreements")
         .insert({ title: title.trim(), client_id: clientId });
       if (error) throw error;

@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveMailboxCredentials, testMailbox } from "@/lib/crm.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/mailboxes")({ component: MailboxesPage });
 function MailboxesPage() {
@@ -30,11 +30,12 @@ function MailboxesPage() {
   const { data: mailboxes = [] } = useQuery({
     queryKey: ["mailboxes"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("mailboxes")
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
+      if (!data) throw new Error("Sending account was not saved");
       return data;
     },
   });
@@ -42,7 +43,7 @@ function MailboxesPage() {
     mutationFn: async () => {
       if (!form.name || !form.email || !form.smtpHost || !form.username || !form.password)
         throw new Error("Complete the required SMTP fields.");
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("mailboxes")
         .insert({
           name: form.name,
@@ -59,6 +60,7 @@ function MailboxesPage() {
         .select()
         .single();
       if (error) throw error;
+      if (!data) throw new Error("Sending account was not saved");
       await saveSecrets({
         data: { mailboxId: data.id, smtpPassword: form.password, imapPassword: form.password },
       });

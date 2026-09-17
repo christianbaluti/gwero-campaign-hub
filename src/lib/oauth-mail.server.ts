@@ -94,9 +94,9 @@ export async function finishMailOAuth(provider: OAuthProvider, request: Request)
   const email = profile.email || profile.mail || profile.userPrincipalName;
   if (!email)
     return redirectResult(origin, "error", "The account did not provide an email address");
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { serverDb } = await import("./db.server");
   const storedProvider = provider === "google" ? "gmail" : "outlook";
-  const { data: mailbox, error } = await supabaseAdmin
+  const { data: mailbox, error } = await serverDb
     .from("mailboxes")
     .upsert(
       {
@@ -112,7 +112,7 @@ export async function finishMailOAuth(provider: OAuthProvider, request: Request)
     .single();
   if (error || !mailbox)
     return redirectResult(origin, "error", error?.message || "Could not save mailbox");
-  await supabaseAdmin.from("mailbox_secrets").upsert(
+  await serverDb.from("mailbox_secrets").upsert(
     {
       mailbox_id: mailbox.id,
       oauth_access_token: tokens.access_token,

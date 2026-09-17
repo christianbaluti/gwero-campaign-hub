@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/clients")({ component: ClientsPage });
 
@@ -18,7 +18,7 @@ function ClientsPage() {
   const { data: clients = [] } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("clients")
         .select("*")
         .order("created_at", { ascending: false });
@@ -29,7 +29,7 @@ function ClientsPage() {
   const create = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error("Client name is required.");
-      const { error } = await supabase
+      const { error } = await db
         .from("clients")
         .insert({ name: name.trim(), email: email.trim() || null });
       if (error) throw error;

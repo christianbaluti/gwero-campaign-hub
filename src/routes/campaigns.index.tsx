@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ function CampaignsPage() {
   const { data: campaigns = [] } = useQuery({
     queryKey: ["campaigns"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("campaigns")
         .select("*, campaign_recipients(status)")
         .order("created_at", { ascending: false });
@@ -53,7 +53,7 @@ function CampaignsPage() {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("campaigns")
         .insert({ name: name || "Untitled campaign", subject: "", body_html: "" })
         .select()

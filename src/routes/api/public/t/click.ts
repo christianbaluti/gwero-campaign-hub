@@ -12,14 +12,14 @@ export const Route = createFileRoute("/api/public/t/click")({
 
         if (recipientId) {
           try {
-            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-            const { data: row } = await supabaseAdmin
+            const { serverDb } = await import("@/lib/db.server");
+            const { data: row } = await serverDb
               .from("campaign_recipients")
               .select("click_count, clicked_at")
               .eq("id", recipientId)
               .maybeSingle();
             if (row) {
-              await supabaseAdmin
+              await serverDb
                 .from("campaign_recipients")
                 .update({
                   click_count: (row.click_count ?? 0) + 1,

@@ -15,7 +15,9 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Copy `.env.example` to `.env` and provide your Supabase project values. Never commit service-role keys or mailbox passwords.
+Configure MySQL using `.env.example` as a guide, then create the schema with `npm run db:migrate` before starting the app. On macOS, the local MariaDB socket and your current account work by default. For hosted MySQL, set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` in a private `.env` file. Attachments are stored under `var/attachments` by default; back up that directory with the database. Never commit database credentials or mailbox passwords.
+
+Existing data in an earlier database is not automatically copied. Export and migrate it separately before retiring that database. Gmail and Microsoft OAuth also require their own provider credentials and redirect URI setup.
 
 ## Production
 

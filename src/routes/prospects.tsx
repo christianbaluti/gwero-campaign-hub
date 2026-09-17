@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +144,7 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await db
       .from("prospects")
       .upsert(mapped as never, { onConflict: "email" });
     setBusy(false);
@@ -234,7 +234,7 @@ function ProspectsPage() {
   const { data: prospects = [] } = useQuery({
     queryKey: ["prospects"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("prospects")
         .select("*")
         .order("created_at", { ascending: false });
@@ -245,7 +245,7 @@ function ProspectsPage() {
 
   const setStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("prospects").update({ status }).eq("id", id);
+      const { error } = await db.from("prospects").update({ status }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["prospects"] }),
@@ -253,7 +253,7 @@ function ProspectsPage() {
 
   const convert = useMutation({
     mutationFn: async (prospect: (typeof prospects)[number]) => {
-      const { error } = await supabase.from("clients").insert({
+      const { error } = await db.from("clients").insert({
         name: [prospect.first_name, prospect.last_name].filter(Boolean).join(" ") || prospect.email,
         company: prospect.company,
         email: prospect.email,
@@ -261,7 +261,7 @@ function ProspectsPage() {
         prospect_id: prospect.id,
       });
       if (error) throw error;
-      await supabase.from("prospects").update({ status: "client" }).eq("id", prospect.id);
+      await db.from("prospects").update({ status: "client" }).eq("id", prospect.id);
     },
     onSuccess: () => {
       toast.success("Prospect converted to a client.");
@@ -273,7 +273,7 @@ function ProspectsPage() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("prospects").delete().eq("id", id);
+      const { error } = await db.from("prospects").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["prospects"] }),
@@ -355,9 +355,9 @@ function ProspectsPage() {
               </TableBody>
             </Table>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
+          <div className="mt-4 text-xs text-muted-foreground">
             <Badge variant="secondary">{prospects.length}</Badge> prospects in total
-          </p>
+          </div>
         </CardContent>
       </Card>
     </AppShell>

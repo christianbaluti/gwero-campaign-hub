@@ -12,8 +12,8 @@ function appOrigin() {
 }
 
 async function admin() {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  return supabaseAdmin;
+  const { serverDb } = await import("./db.server");
+  return serverDb;
 }
 
 async function gatewayFetch(
@@ -225,14 +225,15 @@ export const sendCampaign = createServerFn({ method: "POST" })
       }>) ?? [];
     const attachments = [] as Array<{ filename: string; contentType: string; content: Uint8Array }>;
     for (const att of attachmentList) {
-      const { data: file } = await db.storage.from("attachments").download(att.path);
-      if (file) {
+      try {
+        const { readAttachment } = await import("./attachments.server");
+        const file = await readAttachment(att.path);
         attachments.push({
           filename: att.name,
           contentType: att.type || "application/octet-stream",
-          content: new Uint8Array(await file.arrayBuffer()),
+          content: new Uint8Array(file),
         });
-      }
+      } catch (error) { throw new Error(`Attachment ${att.name} is unavailable: ${String(error)}`); }
     }
 
     await db.from("campaigns").update({ status: "sending" }).eq("id", campaign.id);

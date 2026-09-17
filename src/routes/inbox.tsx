@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { syncReplies } from "@/lib/crm.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/inbox")({ component: InboxPage });
 function InboxPage() {
@@ -19,7 +19,7 @@ function InboxPage() {
   const { data: replies = [] } = useQuery({
     queryKey: ["replies"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("replies")
         .select("*, prospects(first_name,last_name,company), campaigns(name)")
         .order("received_at", { ascending: false });

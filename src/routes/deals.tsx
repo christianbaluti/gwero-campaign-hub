@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/deals")({ component: DealsPage });
 const stages = ["new", "qualified", "proposal", "negotiation", "won", "lost"] as const;
@@ -24,7 +24,7 @@ function DealsPage() {
   const { data: deals = [] } = useQuery({
     queryKey: ["deals"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("deals")
         .select("*, clients(name)")
         .order("created_at", { ascending: false });
@@ -35,7 +35,7 @@ function DealsPage() {
   const create = useMutation({
     mutationFn: async () => {
       if (!title.trim()) throw new Error("Deal title is required.");
-      const { error } = await supabase
+      const { error } = await db
         .from("deals")
         .insert({ title: title.trim(), value: Number(value) || 0 });
       if (error) throw error;
@@ -50,7 +50,7 @@ function DealsPage() {
   });
   const move = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
-      const { error } = await supabase.from("deals").update({ stage }).eq("id", id);
+      const { error } = await db.from("deals").update({ stage }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["deals"] }),

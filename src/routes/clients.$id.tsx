@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 
 export const Route = createFileRoute("/clients/$id")({ component: ClientDetail });
 
@@ -18,7 +18,7 @@ function ClientDetail() {
   const { data: client } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("*").eq("id", id).single();
+      const { data, error } = await db.from("clients").select("*").eq("id", id).single();
       if (error) throw error;
       return data;
     },
@@ -26,7 +26,7 @@ function ClientDetail() {
   const { data: deals = [] } = useQuery({
     queryKey: ["client-deals", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("deals")
         .select("*")
         .eq("client_id", id)
@@ -38,7 +38,7 @@ function ClientDetail() {
   const { data: agreements = [] } = useQuery({
     queryKey: ["client-agreements", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("agreements")
         .select("*")
         .eq("client_id", id)
@@ -50,7 +50,7 @@ function ClientDetail() {
   const { data: activities = [] } = useQuery({
     queryKey: ["activities", "client", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("activities")
         .select("*")
         .eq("entity_type", "client")
@@ -63,7 +63,7 @@ function ClientDetail() {
   const addNote = useMutation({
     mutationFn: async () => {
       if (!note.trim()) throw new Error("Write a note first.");
-      const { error } = await supabase
+      const { error } = await db
         .from("activities")
         .insert({ entity_type: "client", entity_id: id, activity_type: "note", body: note.trim() });
       if (error) throw error;

@@ -19,6 +19,7 @@ import { Route as ProspectsRouteImport } from './routes/prospects'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 import { Route as ApiOauthGoogleStartRouteImport } from './routes/api/oauth/google/start'
 import { Route as ApiOauthMicrosoftCallbackRouteImport } from './routes/api/oauth/microsoft/callback'
@@ -76,6 +77,11 @@ const ClientsIdRoute = ClientsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ClientsRoute,
 } as any)
+const ApiAttachmentsUploadRoute = ApiAttachmentsUploadRouteImport.update({
+  id: '/api/attachments/upload',
+  path: '/api/attachments/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOauthGoogleCallbackRoute = ApiOauthGoogleCallbackRouteImport.update({
   id: '/api/oauth/google/callback',
   path: '/api/oauth/google/callback',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
+  '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/campaigns/'
+    | '/api/attachments/upload'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/campaigns'
+    | '/api/attachments/upload'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/campaigns/'
+    | '/api/attachments/upload'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -230,6 +242,7 @@ export interface RootRouteChildren {
   ProspectsRoute: typeof ProspectsRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
+  ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
   ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
   ApiOauthGoogleStartRoute: typeof ApiOauthGoogleStartRoute
   ApiOauthMicrosoftCallbackRoute: typeof ApiOauthMicrosoftCallbackRoute
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClientsIdRouteImport
       parentRoute: typeof ClientsRoute
     }
+    '/api/attachments/upload': {
+      id: '/api/attachments/upload'
+      path: '/api/attachments/upload'
+      fullPath: '/api/attachments/upload'
+      preLoaderRoute: typeof ApiAttachmentsUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/oauth/google/callback': {
       id: '/api/oauth/google/callback'
       path: '/api/oauth/google/callback'
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProspectsRoute: ProspectsRoute,
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
+  ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,
   ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
   ApiOauthGoogleStartRoute: ApiOauthGoogleStartRoute,
   ApiOauthMicrosoftCallbackRoute: ApiOauthMicrosoftCallbackRoute,

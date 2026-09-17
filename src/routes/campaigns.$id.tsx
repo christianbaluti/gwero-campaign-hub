@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/lib/db";
 import { sendCampaign } from "@/lib/crm.functions";
 import { BASE_PLACEHOLDERS } from "@/lib/personalize";
 import { AppShell } from "@/components/AppShell";
@@ -59,7 +59,7 @@ function CampaignDetail() {
   const { data: campaign } = useQuery({
     queryKey: ["campaign", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("campaigns").select("*").eq("id", id).single();
+      const { data, error } = await db.from("campaigns").select("*").eq("id", id).single();
       if (error) throw error;
       return data;
     },
@@ -68,7 +68,7 @@ function CampaignDetail() {
   const { data: mailboxes = [] } = useQuery({
     queryKey: ["mailboxes"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("mailboxes").select("*").order("name");
+      const { data, error } = await db.from("mailboxes").select("*").order("name");
       if (error) throw error;
       return data;
     },
@@ -77,7 +77,7 @@ function CampaignDetail() {
   const { data: prospects = [] } = useQuery({
     queryKey: ["prospects"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("prospects")
         .select("*")
         .order("created_at", { ascending: false });
@@ -89,7 +89,7 @@ function CampaignDetail() {
   const { data: recipients = [] } = useQuery({
     queryKey: ["recipients", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("campaign_recipients")
         .select("*, prospects(email, first_name, last_name, company)")
         .eq("campaign_id", id);
@@ -130,7 +130,7 @@ function CampaignDetail() {
   const save = useMutation({
     mutationFn: async (extra?: { attachments?: Attachment[] }) => {
       const list = (extra?.attachments ?? attachments) as unknown;
-      const { error } = await supabase
+      const { error } = await db
         .from("campaigns")
         .update({
           name: form.name,
@@ -160,13 +160,13 @@ function CampaignDetail() {
   });
 
   async function uploadFile(file: File) {
-    const path = `${id}/${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from("attachments").upload(path, file);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    const next = [...attachments, { path, name: file.name, type: file.type, size: file.size }];
+    const formData = new FormData();
+    formData.set("campaignId", id);
+    formData.set("file", file);
+    const response = await fetch("/api/attachments/upload", { method: "POST", body: formData });
+    const result = await response.json() as Attachment & { error?: string };
+    if (!response.ok) { toast.error(result.error || "Upload failed"); return; }
+    const next = [...attachments, result];
     setAttachments(next);
     save.mutate({ attachments: next });
   }
@@ -179,7 +179,7 @@ function CampaignDetail() {
         .filter((p) => !existing.has(p.id))
         .map((p) => ({ campaign_id: id, prospect_id: p.id }));
       if (!rows.length) throw new Error("No new prospects to add.");
-      const { error } = await supabase.from("campaign_recipients").insert(rows);
+      const { error } = await db.from("campaign_recipients").insert(rows);
       if (error) throw error;
       return rows.length;
     },
@@ -416,7 +416,7 @@ function CampaignDetail() {
                             size="sm"
                             variant="ghost"
                             onClick={async () => {
-                              await supabase.from("campaign_recipients").delete().eq("id", r.id);
+                              await db.from("campaign_recipients").delete().eq("id", r.id);
                               void qc.invalidateQueries({ queryKey: ["recipients", id] });
                             }}
                           >
