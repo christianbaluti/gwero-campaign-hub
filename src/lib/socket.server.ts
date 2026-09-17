@@ -49,7 +49,10 @@ export class LineSocket {
     if (this.error) return Promise.reject(this.error);
     if (this.closed) return Promise.reject(new Error("Connection closed by server"));
     return new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Timed out waiting for the mail server")), timeoutMs);
+      const timer = setTimeout(
+        () => reject(new Error("Timed out waiting for the mail server")),
+        timeoutMs,
+      );
       this.waiters.push((chunk) => {
         clearTimeout(timer);
         if (this.error) reject(this.error);

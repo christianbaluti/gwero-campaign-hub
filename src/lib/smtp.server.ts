@@ -23,7 +23,9 @@ function b64(value: string) {
 }
 
 async function expect(socket: LineSocket, codes: number[], step: string) {
-  const res = await socket.readUntil((acc) => /^\d{3} [^\n]*\r?\n$/m.test(acc.split(/\r?\n/).filter(Boolean).slice(-1)[0] + "\n"));
+  const res = await socket.readUntil((acc) =>
+    /^\d{3} [^\n]*\r?\n$/m.test(acc.split(/\r?\n/).filter(Boolean).slice(-1)[0] + "\n"),
+  );
   const lines = res.trim().split(/\r?\n/);
   const last = lines[lines.length - 1] ?? "";
   const code = Number(last.slice(0, 3));
@@ -45,12 +47,22 @@ export async function smtpSend(config: SmtpConfig, mail: OutgoingMail): Promise<
 
   try {
     await expect(socket, [220], "Connecting");
-    let greeting = await cmd(socket, `EHLO ${(config.username.split("@")[1] || "localhost").trim()}`, [250], "Handshake");
+    let greeting = await cmd(
+      socket,
+      `EHLO ${(config.username.split("@")[1] || "localhost").trim()}`,
+      [250],
+      "Handshake",
+    );
 
     if (!config.secure && /STARTTLS/i.test(greeting)) {
       await cmd(socket, "STARTTLS", [220], "Starting TLS");
       socket = await upgradeTls(socket, config.host);
-      greeting = await cmd(socket, `EHLO ${(config.username.split("@")[1] || "localhost").trim()}`, [250], "Handshake");
+      greeting = await cmd(
+        socket,
+        `EHLO ${(config.username.split("@")[1] || "localhost").trim()}`,
+        [250],
+        "Handshake",
+      );
     }
 
     if (config.username) {
@@ -97,7 +109,12 @@ export async function smtpVerify(config: SmtpConfig): Promise<void> {
       greeting = await cmd(socket, `EHLO ${domain}`, [250], "Handshake");
     }
     if (/AUTH[^\n]*PLAIN/i.test(greeting)) {
-      await cmd(socket, `AUTH PLAIN ${b64(`\u0000${config.username}\u0000${config.password}`)}`, [235], "Sign in");
+      await cmd(
+        socket,
+        `AUTH PLAIN ${b64(`\u0000${config.username}\u0000${config.password}`)}`,
+        [235],
+        "Sign in",
+      );
     } else {
       await cmd(socket, "AUTH LOGIN", [334], "Sign in");
       await cmd(socket, b64(config.username), [334], "Sign in");

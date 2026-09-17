@@ -21,9 +21,15 @@ export const Route = createFileRoute("/campaigns/")({
   head: () => ({
     meta: [
       { title: "Campaigns | Gwero CRM" },
-      { name: "description", content: "Draft, send and measure mass email campaigns to your prospects." },
+      {
+        name: "description",
+        content: "Draft, send and measure mass email campaigns to your prospects.",
+      },
       { property: "og:title", content: "Campaigns | Gwero CRM" },
-      { property: "og:description", content: "Draft, send and measure mass email campaigns to your prospects." },
+      {
+        property: "og:description",
+        content: "Draft, send and measure mass email campaigns to your prospects.",
+      },
     ],
   }),
   component: CampaignsPage,

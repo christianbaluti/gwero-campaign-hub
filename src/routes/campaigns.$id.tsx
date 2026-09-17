@@ -14,7 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -29,9 +35,15 @@ export const Route = createFileRoute("/campaigns/$id")({
   head: () => ({
     meta: [
       { title: "Campaign editor | Gwero CRM" },
-      { name: "description", content: "Write your email, add attachments and recipients, then send." },
+      {
+        name: "description",
+        content: "Write your email, add attachments and recipients, then send.",
+      },
       { property: "og:title", content: "Campaign editor | Gwero CRM" },
-      { property: "og:description", content: "Write your email, add attachments and recipients, then send." },
+      {
+        property: "og:description",
+        content: "Write your email, add attachments and recipients, then send.",
+      },
     ],
   }),
   component: CampaignDetail,
@@ -124,8 +136,14 @@ function CampaignDetail() {
           name: form.name,
           subject: form.subject,
           body_html: form.body_html,
-          cc: form.cc.split(",").map((s) => s.trim()).filter(Boolean),
-          bcc: form.bcc.split(",").map((s) => s.trim()).filter(Boolean),
+          cc: form.cc
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          bcc: form.bcc
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
           mailbox_id: form.mailbox_id || null,
           track_opens: form.track_opens,
           track_clicks: form.track_clicks,
@@ -197,9 +215,7 @@ function CampaignDetail() {
   };
 
   const extraKeys = Array.from(
-    new Set(
-      prospects.flatMap((p) => Object.keys((p.extra as Record<string, unknown>) ?? {})),
-    ),
+    new Set(prospects.flatMap((p) => Object.keys((p.extra as Record<string, unknown>) ?? {}))),
   ).slice(0, 20);
 
   return (
@@ -232,7 +248,10 @@ function CampaignDetail() {
             <CardContent className="space-y-4 pt-6">
               <div className="space-y-1">
                 <Label>Campaign name</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Subject</Label>
@@ -254,11 +273,17 @@ function CampaignDetail() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label>CC (comma separated)</Label>
-                  <Input value={form.cc} onChange={(e) => setForm({ ...form, cc: e.target.value })} />
+                  <Input
+                    value={form.cc}
+                    onChange={(e) => setForm({ ...form, cc: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>BCC (comma separated)</Label>
-                  <Input value={form.bcc} onChange={(e) => setForm({ ...form, bcc: e.target.value })} />
+                  <Input
+                    value={form.bcc}
+                    onChange={(e) => setForm({ ...form, bcc: e.target.value })}
+                  />
                 </div>
               </div>
             </CardContent>

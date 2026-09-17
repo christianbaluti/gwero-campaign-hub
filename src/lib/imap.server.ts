@@ -42,11 +42,27 @@ export async function imapFetchRecent(config: ImapConfig, sinceDays = 14): Promi
   const socket = await connectTls(config.host, config.port);
   try {
     await socket.readUntil((acc) => /^\* OK/m.test(acc));
-    await run(socket, `LOGIN "${config.username.replace(/"/g, '\\"')}" "${config.password.replace(/"/g, '\\"')}"`);
+    await run(
+      socket,
+      `LOGIN "${config.username.replace(/"/g, '\\"')}" "${config.password.replace(/"/g, '\\"')}"`,
+    );
     await run(socket, "SELECT INBOX");
 
     const since = new Date(Date.now() - sinceDays * 86400000);
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const sinceStr = `${since.getUTCDate()}-${months[since.getUTCMonth()]}-${since.getUTCFullYear()}`;
     const searchRes = await run(socket, `UID SEARCH SINCE ${sinceStr}`);
     const uids = (/^\* SEARCH([^\r\n]*)/m.exec(searchRes)?.[1] ?? "")
@@ -86,7 +102,10 @@ export async function imapVerify(config: ImapConfig): Promise<void> {
   const socket = await connectTls(config.host, config.port);
   try {
     await socket.readUntil((acc) => /^\* OK/m.test(acc));
-    await run(socket, `LOGIN "${config.username.replace(/"/g, '\\"')}" "${config.password.replace(/"/g, '\\"')}"`);
+    await run(
+      socket,
+      `LOGIN "${config.username.replace(/"/g, '\\"')}" "${config.password.replace(/"/g, '\\"')}"`,
+    );
     await run(socket, "LOGOUT").catch(() => undefined);
   } finally {
     socket.end();

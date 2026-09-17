@@ -10,15 +10,50 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgreementsRouteImport } from './routes/agreements'
+import { Route as ClientsRouteImport } from './routes/clients'
+import { Route as DealsRouteImport } from './routes/deals'
+import { Route as InboxRouteImport } from './routes/inbox'
+import { Route as MailboxesRouteImport } from './routes/mailboxes'
 import { Route as ProspectsRouteImport } from './routes/prospects'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
+import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
+import { Route as ApiOauthGoogleStartRouteImport } from './routes/api/oauth/google/start'
+import { Route as ApiOauthMicrosoftCallbackRouteImport } from './routes/api/oauth/microsoft/callback'
+import { Route as ApiOauthMicrosoftStartRouteImport } from './routes/api/oauth/microsoft/start'
 import { Route as ApiPublicTClickRouteImport } from './routes/api/public/t/click'
 import { Route as ApiPublicTOpenRouteImport } from './routes/api/public/t/open'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgreementsRoute = AgreementsRouteImport.update({
+  id: '/agreements',
+  path: '/agreements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClientsRoute = ClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsRoute = DealsRouteImport.update({
+  id: '/deals',
+  path: '/deals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxRoute = InboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MailboxesRoute = MailboxesRouteImport.update({
+  id: '/mailboxes',
+  path: '/mailboxes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProspectsRoute = ProspectsRouteImport.update({
@@ -36,6 +71,32 @@ const CampaignsIdRoute = CampaignsIdRouteImport.update({
   path: '/campaigns/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientsIdRoute = ClientsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ClientsRoute,
+} as any)
+const ApiOauthGoogleCallbackRoute = ApiOauthGoogleCallbackRouteImport.update({
+  id: '/api/oauth/google/callback',
+  path: '/api/oauth/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOauthGoogleStartRoute = ApiOauthGoogleStartRouteImport.update({
+  id: '/api/oauth/google/start',
+  path: '/api/oauth/google/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOauthMicrosoftCallbackRoute =
+  ApiOauthMicrosoftCallbackRouteImport.update({
+    id: '/api/oauth/microsoft/callback',
+    path: '/api/oauth/microsoft/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOauthMicrosoftStartRoute = ApiOauthMicrosoftStartRouteImport.update({
+  id: '/api/oauth/microsoft/start',
+  path: '/api/oauth/microsoft/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicTClickRoute = ApiPublicTClickRouteImport.update({
   id: '/api/public/t/click',
   path: '/api/public/t/click',
@@ -49,26 +110,56 @@ const ApiPublicTOpenRoute = ApiPublicTOpenRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
+  '/clients': typeof ClientsRouteWithChildren
+  '/deals': typeof DealsRoute
+  '/inbox': typeof InboxRoute
+  '/mailboxes': typeof MailboxesRoute
   '/prospects': typeof ProspectsRoute
   '/campaigns/$id': typeof CampaignsIdRoute
+  '/clients/$id': typeof ClientsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
+  '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
+  '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
+  '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
+  '/clients': typeof ClientsRouteWithChildren
+  '/deals': typeof DealsRoute
+  '/inbox': typeof InboxRoute
+  '/mailboxes': typeof MailboxesRoute
   '/prospects': typeof ProspectsRoute
   '/campaigns/$id': typeof CampaignsIdRoute
+  '/clients/$id': typeof ClientsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
+  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
+  '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
+  '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
+  '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agreements': typeof AgreementsRoute
+  '/clients': typeof ClientsRouteWithChildren
+  '/deals': typeof DealsRoute
+  '/inbox': typeof InboxRoute
+  '/mailboxes': typeof MailboxesRoute
   '/prospects': typeof ProspectsRoute
   '/campaigns/$id': typeof CampaignsIdRoute
+  '/clients/$id': typeof ClientsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
+  '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
+  '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
+  '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
 }
@@ -76,34 +167,73 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agreements'
+    | '/clients'
+    | '/deals'
+    | '/inbox'
+    | '/mailboxes'
     | '/prospects'
     | '/campaigns/$id'
+    | '/clients/$id'
     | '/campaigns/'
+    | '/api/oauth/google/callback'
+    | '/api/oauth/google/start'
+    | '/api/oauth/microsoft/callback'
+    | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agreements'
+    | '/clients'
+    | '/deals'
+    | '/inbox'
+    | '/mailboxes'
     | '/prospects'
     | '/campaigns/$id'
+    | '/clients/$id'
     | '/campaigns'
+    | '/api/oauth/google/callback'
+    | '/api/oauth/google/start'
+    | '/api/oauth/microsoft/callback'
+    | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
   id:
     | '__root__'
     | '/'
+    | '/agreements'
+    | '/clients'
+    | '/deals'
+    | '/inbox'
+    | '/mailboxes'
     | '/prospects'
     | '/campaigns/$id'
+    | '/clients/$id'
     | '/campaigns/'
+    | '/api/oauth/google/callback'
+    | '/api/oauth/google/start'
+    | '/api/oauth/microsoft/callback'
+    | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgreementsRoute: typeof AgreementsRoute
+  ClientsRoute: typeof ClientsRouteWithChildren
+  DealsRoute: typeof DealsRoute
+  InboxRoute: typeof InboxRoute
+  MailboxesRoute: typeof MailboxesRoute
   ProspectsRoute: typeof ProspectsRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
+  ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
+  ApiOauthGoogleStartRoute: typeof ApiOauthGoogleStartRoute
+  ApiOauthMicrosoftCallbackRoute: typeof ApiOauthMicrosoftCallbackRoute
+  ApiOauthMicrosoftStartRoute: typeof ApiOauthMicrosoftStartRoute
   ApiPublicTClickRoute: typeof ApiPublicTClickRoute
   ApiPublicTOpenRoute: typeof ApiPublicTOpenRoute
 }
@@ -115,6 +245,41 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agreements': {
+      id: '/agreements'
+      path: '/agreements'
+      fullPath: '/agreements'
+      preLoaderRoute: typeof AgreementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/clients': {
+      id: '/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof ClientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals': {
+      id: '/deals'
+      path: '/deals'
+      fullPath: '/deals'
+      preLoaderRoute: typeof DealsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox': {
+      id: '/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof InboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mailboxes': {
+      id: '/mailboxes'
+      path: '/mailboxes'
+      fullPath: '/mailboxes'
+      preLoaderRoute: typeof MailboxesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/prospects': {
@@ -138,6 +303,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CampaignsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clients/$id': {
+      id: '/clients/$id'
+      path: '/$id'
+      fullPath: '/clients/$id'
+      preLoaderRoute: typeof ClientsIdRouteImport
+      parentRoute: typeof ClientsRoute
+    }
+    '/api/oauth/google/callback': {
+      id: '/api/oauth/google/callback'
+      path: '/api/oauth/google/callback'
+      fullPath: '/api/oauth/google/callback'
+      preLoaderRoute: typeof ApiOauthGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/google/start': {
+      id: '/api/oauth/google/start'
+      path: '/api/oauth/google/start'
+      fullPath: '/api/oauth/google/start'
+      preLoaderRoute: typeof ApiOauthGoogleStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/microsoft/callback': {
+      id: '/api/oauth/microsoft/callback'
+      path: '/api/oauth/microsoft/callback'
+      fullPath: '/api/oauth/microsoft/callback'
+      preLoaderRoute: typeof ApiOauthMicrosoftCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/oauth/microsoft/start': {
+      id: '/api/oauth/microsoft/start'
+      path: '/api/oauth/microsoft/start'
+      fullPath: '/api/oauth/microsoft/start'
+      preLoaderRoute: typeof ApiOauthMicrosoftStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/t/click': {
       id: '/api/public/t/click'
       path: '/api/public/t/click'
@@ -155,11 +355,31 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ClientsRouteChildren {
+  ClientsIdRoute: typeof ClientsIdRoute
+}
+
+const ClientsRouteChildren: ClientsRouteChildren = {
+  ClientsIdRoute: ClientsIdRoute,
+}
+
+const ClientsRouteWithChildren =
+  ClientsRoute._addFileChildren(ClientsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgreementsRoute: AgreementsRoute,
+  ClientsRoute: ClientsRouteWithChildren,
+  DealsRoute: DealsRoute,
+  InboxRoute: InboxRoute,
+  MailboxesRoute: MailboxesRoute,
   ProspectsRoute: ProspectsRoute,
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
+  ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
+  ApiOauthGoogleStartRoute: ApiOauthGoogleStartRoute,
+  ApiOauthMicrosoftCallbackRoute: ApiOauthMicrosoftCallbackRoute,
+  ApiOauthMicrosoftStartRoute: ApiOauthMicrosoftStartRoute,
   ApiPublicTClickRoute: ApiPublicTClickRoute,
   ApiPublicTOpenRoute: ApiPublicTOpenRoute,
 }

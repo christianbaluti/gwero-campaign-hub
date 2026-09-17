@@ -60,7 +60,12 @@ export function buildMime(options: {
   ].join("\r\n");
 
   if (!attachments.length) {
-    return [...headers, `Content-Type: multipart/alternative; boundary="${boundaryAlt}"`, "", altBody].join("\r\n");
+    return [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${boundaryAlt}"`,
+      "",
+      altBody,
+    ].join("\r\n");
   }
 
   const parts = [
@@ -81,5 +86,10 @@ export function buildMime(options: {
   }
   parts.push(`--${boundaryMixed}--`);
 
-  return [...headers, `Content-Type: multipart/mixed; boundary="${boundaryMixed}"`, "", parts.join("\r\n")].join("\r\n");
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${boundaryMixed}"`,
+    "",
+    parts.join("\r\n"),
+  ].join("\r\n");
 }

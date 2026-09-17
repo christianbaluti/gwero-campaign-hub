@@ -16,7 +16,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -34,7 +40,10 @@ export const Route = createFileRoute("/prospects")({
       { title: "Prospects | Gwero CRM" },
       { name: "description", content: "Import prospect lists from Excel and track their status." },
       { property: "og:title", content: "Prospects | Gwero CRM" },
-      { property: "og:description", content: "Import prospect lists from Excel and track their status." },
+      {
+        property: "og:description",
+        content: "Import prospect lists from Excel and track their status.",
+      },
     ],
   }),
   component: ProspectsPage,

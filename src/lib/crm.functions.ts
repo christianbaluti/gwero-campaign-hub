@@ -2,8 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { personalize, htmlToText } from "./personalize";
 
-const GATEWAY = "https://connector-gateway.lovable.dev";
-
 type Json = Record<string, unknown>;
 
 function appOrigin() {
@@ -18,27 +16,97 @@ async function admin() {
   return supabaseAdmin;
 }
 
+async function gatewayFetch(
+  provider: string,
+  secret: {
+    mailbox_id: string;
+    oauth_access_token?: string | null;
+    oauth_refresh_token?: string | null;
+    oauth_expires_at?: string | null;
+  },
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  let accessToken = secret.oauth_access_token;
+  if (!accessToken) throw new Error("Reconnect this OAuth mailbox from Sending accounts.");
+  if (
+    secret.oauth_refresh_token &&
+    (!secret.oauth_expires_at || new Date(secret.oauth_expires_at).getTime() < Date.now() + 60_000)
+  ) {
+    const google = provider === "gmail" || provider === "google";
+    const clientId = process.env[google ? "GOOGLE_OAUTH_CLIENT_ID" : "MICROSOFT_OAUTH_CLIENT_ID"];
+    const clientSecret =
+      process.env[google ? "GOOGLE_OAUTH_CLIENT_SECRET" : "MICROSOFT_OAUTH_CLIENT_SECRET"];
+    if (!clientId || !clientSecret) throw new Error("OAuth server credentials are missing.");
+    const tokenUrl = google
+      ? "https://oauth2.googleapis.com/token"
+      : "https://login.microsoftonline.com/common/oauth2/v2.0/token";
+    const body = new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: secret.oauth_refresh_token,
+      grant_type: "refresh_token",
+    });
+    if (!google)
+      body.set("scope", "openid email profile offline_access User.Read Mail.Read Mail.Send");
+    const refreshed = await fetch(tokenUrl, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    if (!refreshed.ok) throw new Error("OAuth session expired. Reconnect this mailbox.");
+    const tokens = (await refreshed.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+    accessToken = tokens.access_token;
+    const db = await admin();
+    await db
+      .from("mailbox_secrets")
+      .update({
+        oauth_access_token: accessToken,
+        oauth_refresh_token: tokens.refresh_token || secret.oauth_refresh_token,
+        oauth_expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+      } as never)
+      .eq("mailbox_id", secret.mailbox_id);
+  }
+  const base =
+    provider === "gmail" || provider === "google"
+      ? "https://gmail.googleapis.com"
+      : "https://graph.microsoft.com/v1.0";
+  const headers = new Headers(init?.headers);
+  headers.set("authorization", `Bearer ${accessToken}`);
+  return fetch(`${base}${path}`, { ...init, headers });
+}
+
 /* ------------------------------------------------------------------ */
 /* Mailbox credentials                                                 */
 /* ------------------------------------------------------------------ */
 
 export const saveMailboxCredentials = createServerFn({ method: "POST" })
-  .inputValidator((data: { mailboxId: string; smtpPassword?: string; imapPassword?: string }) => data)
+  .validator((data: { mailboxId: string; smtpPassword?: string; imapPassword?: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
     const patch: Json = { mailbox_id: data.mailboxId, updated_at: new Date().toISOString() };
-    if (data.smtpPassword) patch['smtp_password'] = data.smtpPassword;
-    if (data.imapPassword) patch['imap_password'] = data.imapPassword;
-    const { error } = await db.from("mailbox_secrets").upsert(patch as never, { onConflict: "mailbox_id" });
+    if (data.smtpPassword) patch["smtp_password"] = data.smtpPassword;
+    if (data.imapPassword) patch["imap_password"] = data.imapPassword;
+    const { error } = await db
+      .from("mailbox_secrets")
+      .upsert(patch as never, { onConflict: "mailbox_id" });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const testMailbox = createServerFn({ method: "POST" })
-  .inputValidator((data: { mailboxId: string }) => data)
+  .validator((data: { mailboxId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
-    const { data: mailbox, error } = await db.from("mailboxes").select("*").eq("id", data.mailboxId).single();
+    const { data: mailbox, error } = await db
+      .from("mailboxes")
+      .select("*")
+      .eq("id", data.mailboxId)
+      .single();
     if (error || !mailbox) throw new Error("Mailbox not found");
 
     const results: string[] = [];
@@ -68,11 +136,19 @@ export const testMailbox = createServerFn({ method: "POST" })
         results.push("Inbox (IMAP) works");
       }
     } else {
-      const key = connectorKey(mailbox.provider);
-      if (!key) throw new Error("This account type is not connected yet.");
-      const res = await gatewayFetch(mailbox.provider, profilePath(mailbox.provider));
-      if (!res.ok) throw new Error(`${await res.text()}`);
-      results.push("Connected account works");
+      const { data: secret } = await db
+        .from("mailbox_secrets")
+        .select("*")
+        .eq("mailbox_id", mailbox.id)
+        .maybeSingle();
+      if (!secret) throw new Error("OAuth credentials not found. Reconnect this account.");
+      const path =
+        mailbox.provider === "google" || mailbox.provider === "gmail"
+          ? "/gmail/v1/users/me/profile"
+          : "/me";
+      const response = await gatewayFetch(mailbox.provider, secret, path);
+      if (!response.ok) throw new Error("Connected account check failed.");
+      results.push("OAuth connection works");
     }
 
     await db
@@ -83,42 +159,16 @@ export const testMailbox = createServerFn({ method: "POST" })
   });
 
 /* ------------------------------------------------------------------ */
-/* Connector helpers (Gmail / Outlook)                                 */
-/* ------------------------------------------------------------------ */
-
-function connectorKey(provider: string) {
-  if (provider === "gmail") return process.env["GOOGLE_MAIL_API_KEY"];
-  if (provider === "outlook") return process.env["MICROSOFT_OUTLOOK_API_KEY"];
-  return undefined;
-}
-
-function connectorId(provider: string) {
-  return provider === "gmail" ? "google_mail" : "microsoft_outlook";
-}
-
-function profilePath(provider: string) {
-  return provider === "gmail" ? "/gmail/v1/users/me/profile" : "/me";
-}
-
-async function gatewayFetch(provider: string, path: string, init?: RequestInit) {
-  const key = connectorKey(provider);
-  const lovableKey = process.env["LOVABLE_API_KEY"];
-  if (!key || !lovableKey) {
-    throw new Error(
-      "This mail account is not connected yet. Connect it from the Mailboxes page first.",
-    );
-  }
-  const headers = new Headers(init?.headers);
-  headers.set("Authorization", `Bearer ${lovableKey}`);
-  headers.set("X-Connection-Api-Key", key);
-  return fetch(`${GATEWAY}/${connectorId(provider)}${path}`, { ...init, headers });
-}
-
-/* ------------------------------------------------------------------ */
 /* Sending a campaign                                                  */
 /* ------------------------------------------------------------------ */
 
-function trackHtml(html: string, recipientId: string, origin: string, opens: boolean, clicks: boolean) {
+function trackHtml(
+  html: string,
+  recipientId: string,
+  origin: string,
+  opens: boolean,
+  clicks: boolean,
+) {
   let out = html;
   if (clicks) {
     out = out.replace(/href="(https?:\/\/[^"]+)"/gi, (_m, url: string) => {
@@ -132,7 +182,7 @@ function trackHtml(html: string, recipientId: string, origin: string, opens: boo
 }
 
 export const sendCampaign = createServerFn({ method: "POST" })
-  .inputValidator((data: { campaignId: string }) => data)
+  .validator((data: { campaignId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
     const origin = appOrigin();
@@ -145,7 +195,11 @@ export const sendCampaign = createServerFn({ method: "POST" })
     if (cErr || !campaign) throw new Error("Campaign not found");
     if (!campaign.mailbox_id) throw new Error("Pick a sending account for this campaign first.");
 
-    const { data: mailbox } = await db.from("mailboxes").select("*").eq("id", campaign.mailbox_id).single();
+    const { data: mailbox } = await db
+      .from("mailboxes")
+      .select("*")
+      .eq("id", campaign.mailbox_id)
+      .single();
     if (!mailbox) throw new Error("Sending account not found");
 
     const { data: secret } = await db
@@ -163,11 +217,12 @@ export const sendCampaign = createServerFn({ method: "POST" })
     if (!recipients?.length) throw new Error("No pending recipients in this campaign.");
 
     // Load attachments once.
-    const attachmentList = (campaign.attachments as unknown as Array<{
-      path: string;
-      name: string;
-      type?: string;
-    }>) ?? [];
+    const attachmentList =
+      (campaign.attachments as unknown as Array<{
+        path: string;
+        name: string;
+        type?: string;
+      }>) ?? [];
     const attachments = [] as Array<{ filename: string; contentType: string; content: Uint8Array }>;
     for (const att of attachmentList) {
       const { data: file } = await db.storage.from("attachments").download(att.path);
@@ -187,7 +242,9 @@ export const sendCampaign = createServerFn({ method: "POST" })
     let failed = 0;
 
     for (const recipient of recipients) {
-      const prospect = recipient.prospects as unknown as Parameters<typeof personalize>[1] & { email: string };
+      const prospect = recipient.prospects as unknown as Parameters<typeof personalize>[1] & {
+        email: string;
+      };
       try {
         if (!prospect?.email) throw new Error("Prospect has no email address");
         const subject = personalize(campaign.subject, prospect);
@@ -238,14 +295,14 @@ export const sendCampaign = createServerFn({ method: "POST" })
             .replace(/\+/g, "-")
             .replace(/\//g, "_")
             .replace(/=+$/, "");
-          const res = await gatewayFetch("gmail", "/gmail/v1/users/me/messages/send", {
+          const res = await gatewayFetch("gmail", secret!, "/gmail/v1/users/me/messages/send", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ raw: encoded }),
           });
           if (!res.ok) throw new Error(await res.text());
         } else {
-          const res = await gatewayFetch("outlook", "/me/sendMail", {
+          const res = await gatewayFetch("outlook", secret!, "/me/sendMail", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -253,8 +310,12 @@ export const sendCampaign = createServerFn({ method: "POST" })
                 subject,
                 body: { contentType: "HTML", content: html },
                 toRecipients: [{ emailAddress: { address: prospect.email } }],
-                ccRecipients: (campaign.cc ?? []).map((a: string) => ({ emailAddress: { address: a } })),
-                bccRecipients: (campaign.bcc ?? []).map((a: string) => ({ emailAddress: { address: a } })),
+                ccRecipients: (campaign.cc ?? []).map((a: string) => ({
+                  emailAddress: { address: a },
+                })),
+                bccRecipients: (campaign.bcc ?? []).map((a: string) => ({
+                  emailAddress: { address: a },
+                })),
                 attachments: attachments.map((a) => ({
                   "@odata.type": "#microsoft.graph.fileAttachment",
                   name: a.filename,
@@ -269,7 +330,12 @@ export const sendCampaign = createServerFn({ method: "POST" })
 
         await db
           .from("campaign_recipients")
-          .update({ status: "sent", sent_at: new Date().toISOString(), error: null, message_id: messageId })
+          .update({
+            status: "sent",
+            sent_at: new Date().toISOString(),
+            error: null,
+            message_id: messageId,
+          })
           .eq("id", recipient.id);
         await db
           .from("prospects")
@@ -313,15 +379,21 @@ export const syncReplies = createServerFn({ method: "POST" }).handler(async () =
 
   let imported = 0;
   for (const mailbox of mailboxes) {
-    const messages: Array<{ id: string; from: string; subject: string; snippet: string; date: string }> = [];
+    const messages: Array<{
+      id: string;
+      from: string;
+      subject: string;
+      snippet: string;
+      date: string;
+    }> = [];
     try {
+      const { data: secret } = await db
+        .from("mailbox_secrets")
+        .select("*")
+        .eq("mailbox_id", mailbox.id)
+        .maybeSingle();
       if (mailbox.provider === "smtp") {
         if (!mailbox.imap_host) continue;
-        const { data: secret } = await db
-          .from("mailbox_secrets")
-          .select("*")
-          .eq("mailbox_id", mailbox.id)
-          .maybeSingle();
         const { imapFetchRecent } = await import("./imap.server");
         const headers = await imapFetchRecent({
           host: mailbox.imap_host,
@@ -339,12 +411,17 @@ export const syncReplies = createServerFn({ method: "POST" }).handler(async () =
           });
         }
       } else if (mailbox.provider === "gmail") {
-        const res = await gatewayFetch("gmail", "/gmail/v1/users/me/messages?q=newer_than:14d%20in:inbox&maxResults=50");
+        const res = await gatewayFetch(
+          "gmail",
+          secret!,
+          "/gmail/v1/users/me/messages?q=newer_than:14d%20in:inbox&maxResults=50",
+        );
         if (!res.ok) throw new Error(await res.text());
         const list = (await res.json()) as { messages?: Array<{ id: string }> };
         for (const item of list.messages ?? []) {
           const detail = await gatewayFetch(
             "gmail",
+            secret!,
             `/gmail/v1/users/me/messages/${item.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
           );
           if (!detail.ok) continue;
@@ -359,12 +436,15 @@ export const syncReplies = createServerFn({ method: "POST" }).handler(async () =
             from: parseAddress(header("from")),
             subject: header("subject"),
             snippet: msg.snippet ?? "",
-            date: header("date") ? new Date(header("date")).toISOString() : new Date().toISOString(),
+            date: header("date")
+              ? new Date(header("date")).toISOString()
+              : new Date().toISOString(),
           });
         }
       } else {
         const res = await gatewayFetch(
           "outlook",
+          secret!,
           "/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,bodyPreview,receivedDateTime",
         );
         if (!res.ok) throw new Error(await res.text());
@@ -433,7 +513,9 @@ export const syncReplies = createServerFn({ method: "POST" }).handler(async () =
     } catch (error) {
       await db
         .from("mailboxes")
-        .update({ last_status: `Inbox check failed: ${String((error as Error).message).slice(0, 200)}` })
+        .update({
+          last_status: `Inbox check failed: ${String((error as Error).message).slice(0, 200)}`,
+        })
         .eq("id", mailbox.id);
     }
   }
