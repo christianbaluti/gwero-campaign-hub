@@ -144,9 +144,7 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
       return;
     }
 
-    const { error } = await db
-      .from("prospects")
-      .upsert(mapped as never, { onConflict: "email" });
+    const { error } = await db.from("prospects").upsert(mapped as never, { onConflict: "email" });
     setBusy(false);
     if (error) {
       toast.error(error.message);

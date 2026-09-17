@@ -233,7 +233,9 @@ export const sendCampaign = createServerFn({ method: "POST" })
           contentType: att.type || "application/octet-stream",
           content: new Uint8Array(file),
         });
-      } catch (error) { throw new Error(`Attachment ${att.name} is unavailable: ${String(error)}`); }
+      } catch (error) {
+        throw new Error(`Attachment ${att.name} is unavailable: ${String(error)}`);
+      }
     }
 
     await db.from("campaigns").update({ status: "sending" }).eq("id", campaign.id);

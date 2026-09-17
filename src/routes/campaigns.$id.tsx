@@ -164,8 +164,11 @@ function CampaignDetail() {
     formData.set("campaignId", id);
     formData.set("file", file);
     const response = await fetch("/api/attachments/upload", { method: "POST", body: formData });
-    const result = await response.json() as Attachment & { error?: string };
-    if (!response.ok) { toast.error(result.error || "Upload failed"); return; }
+    const result = (await response.json()) as Attachment & { error?: string };
+    if (!response.ok) {
+      toast.error(result.error || "Upload failed");
+      return;
+    }
     const next = [...attachments, result];
     setAttachments(next);
     save.mutate({ attachments: next });

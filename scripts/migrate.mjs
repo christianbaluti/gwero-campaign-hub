@@ -13,10 +13,15 @@ const options = {
 };
 const connection = await mysql.createConnection(options);
 try {
-  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await connection.query(
+    `CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+  );
   await connection.query(`USE \`${database}\``);
   const schema = readFileSync(resolve("database/schema.sql"), "utf8");
-  for (const statement of schema.split(";").map((s) => s.trim()).filter(Boolean)) {
+  for (const statement of schema
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)) {
     await connection.query(statement);
   }
   console.log(`MySQL schema ready: ${database}`);
