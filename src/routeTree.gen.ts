@@ -11,14 +11,21 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgreementsRouteImport } from './routes/agreements'
+import { Route as BidsRouteImport } from './routes/bids'
 import { Route as ClientsRouteImport } from './routes/clients'
+import { Route as CostSheetsRouteImport } from './routes/cost-sheets'
 import { Route as DealsRouteImport } from './routes/deals'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as MailboxesRouteImport } from './routes/mailboxes'
+import { Route as MarketingRouteImport } from './routes/marketing'
+import { Route as PrequalificationsRouteImport } from './routes/prequalifications'
 import { Route as ProspectsRouteImport } from './routes/prospects'
+import { Route as QuotationsRouteImport } from './routes/quotations'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
+import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
+import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
 import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 import { Route as ApiOauthGoogleStartRouteImport } from './routes/api/oauth/google/start'
@@ -37,9 +44,19 @@ const AgreementsRoute = AgreementsRouteImport.update({
   path: '/agreements',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BidsRoute = BidsRouteImport.update({
+  id: '/bids',
+  path: '/bids',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClientsRoute = ClientsRouteImport.update({
   id: '/clients',
   path: '/clients',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CostSheetsRoute = CostSheetsRouteImport.update({
+  id: '/cost-sheets',
+  path: '/cost-sheets',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DealsRoute = DealsRouteImport.update({
@@ -57,9 +74,24 @@ const MailboxesRoute = MailboxesRouteImport.update({
   path: '/mailboxes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MarketingRoute = MarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrequalificationsRoute = PrequalificationsRouteImport.update({
+  id: '/prequalifications',
+  path: '/prequalifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProspectsRoute = ProspectsRouteImport.update({
   id: '/prospects',
   path: '/prospects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuotationsRoute = QuotationsRouteImport.update({
+  id: '/quotations',
+  path: '/quotations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
@@ -76,6 +108,16 @@ const ClientsIdRoute = ClientsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => ClientsRoute,
+} as any)
+const CostSheetsIdRoute = CostSheetsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => CostSheetsRoute,
+} as any)
+const QuotationsIdRoute = QuotationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => QuotationsRoute,
 } as any)
 const ApiAttachmentsUploadRoute = ApiAttachmentsUploadRouteImport.update({
   id: '/api/attachments/upload',
@@ -117,13 +159,20 @@ const ApiPublicTOpenRoute = ApiPublicTOpenRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
+  '/bids': typeof BidsRoute
   '/clients': typeof ClientsRouteWithChildren
+  '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
   '/inbox': typeof InboxRoute
   '/mailboxes': typeof MailboxesRoute
+  '/marketing': typeof MarketingRoute
+  '/prequalifications': typeof PrequalificationsRoute
   '/prospects': typeof ProspectsRoute
+  '/quotations': typeof QuotationsRouteWithChildren
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
+  '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
@@ -136,13 +185,20 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
+  '/bids': typeof BidsRoute
   '/clients': typeof ClientsRouteWithChildren
+  '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
   '/inbox': typeof InboxRoute
   '/mailboxes': typeof MailboxesRoute
+  '/marketing': typeof MarketingRoute
+  '/prequalifications': typeof PrequalificationsRoute
   '/prospects': typeof ProspectsRoute
+  '/quotations': typeof QuotationsRouteWithChildren
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
+  '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
@@ -156,13 +212,20 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
+  '/bids': typeof BidsRoute
   '/clients': typeof ClientsRouteWithChildren
+  '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
   '/inbox': typeof InboxRoute
   '/mailboxes': typeof MailboxesRoute
+  '/marketing': typeof MarketingRoute
+  '/prequalifications': typeof PrequalificationsRoute
   '/prospects': typeof ProspectsRoute
+  '/quotations': typeof QuotationsRouteWithChildren
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
+  '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
@@ -177,13 +240,20 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/agreements'
+    | '/bids'
     | '/clients'
+    | '/cost-sheets'
     | '/deals'
     | '/inbox'
     | '/mailboxes'
+    | '/marketing'
+    | '/prequalifications'
     | '/prospects'
+    | '/quotations'
     | '/campaigns/$id'
     | '/clients/$id'
+    | '/cost-sheets/$id'
+    | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
     | '/api/oauth/google/callback'
@@ -196,13 +266,20 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/agreements'
+    | '/bids'
     | '/clients'
+    | '/cost-sheets'
     | '/deals'
     | '/inbox'
     | '/mailboxes'
+    | '/marketing'
+    | '/prequalifications'
     | '/prospects'
+    | '/quotations'
     | '/campaigns/$id'
     | '/clients/$id'
+    | '/cost-sheets/$id'
+    | '/quotations/$id'
     | '/campaigns'
     | '/api/attachments/upload'
     | '/api/oauth/google/callback'
@@ -215,13 +292,20 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/agreements'
+    | '/bids'
     | '/clients'
+    | '/cost-sheets'
     | '/deals'
     | '/inbox'
     | '/mailboxes'
+    | '/marketing'
+    | '/prequalifications'
     | '/prospects'
+    | '/quotations'
     | '/campaigns/$id'
     | '/clients/$id'
+    | '/cost-sheets/$id'
+    | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
     | '/api/oauth/google/callback'
@@ -235,11 +319,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgreementsRoute: typeof AgreementsRoute
+  BidsRoute: typeof BidsRoute
   ClientsRoute: typeof ClientsRouteWithChildren
+  CostSheetsRoute: typeof CostSheetsRouteWithChildren
   DealsRoute: typeof DealsRoute
   InboxRoute: typeof InboxRoute
   MailboxesRoute: typeof MailboxesRoute
+  MarketingRoute: typeof MarketingRoute
+  PrequalificationsRoute: typeof PrequalificationsRoute
   ProspectsRoute: typeof ProspectsRoute
+  QuotationsRoute: typeof QuotationsRouteWithChildren
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
@@ -267,11 +356,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgreementsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bids': {
+      id: '/bids'
+      path: '/bids'
+      fullPath: '/bids'
+      preLoaderRoute: typeof BidsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/clients': {
       id: '/clients'
       path: '/clients'
       fullPath: '/clients'
       preLoaderRoute: typeof ClientsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cost-sheets': {
+      id: '/cost-sheets'
+      path: '/cost-sheets'
+      fullPath: '/cost-sheets'
+      preLoaderRoute: typeof CostSheetsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deals': {
@@ -295,11 +398,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MailboxesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/marketing': {
+      id: '/marketing'
+      path: '/marketing'
+      fullPath: '/marketing'
+      preLoaderRoute: typeof MarketingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prequalifications': {
+      id: '/prequalifications'
+      path: '/prequalifications'
+      fullPath: '/prequalifications'
+      preLoaderRoute: typeof PrequalificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/prospects': {
       id: '/prospects'
       path: '/prospects'
       fullPath: '/prospects'
       preLoaderRoute: typeof ProspectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quotations': {
+      id: '/quotations'
+      path: '/quotations'
+      fullPath: '/quotations'
+      preLoaderRoute: typeof QuotationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns/': {
@@ -322,6 +446,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/clients/$id'
       preLoaderRoute: typeof ClientsIdRouteImport
       parentRoute: typeof ClientsRoute
+    }
+    '/cost-sheets/$id': {
+      id: '/cost-sheets/$id'
+      path: '/$id'
+      fullPath: '/cost-sheets/$id'
+      preLoaderRoute: typeof CostSheetsIdRouteImport
+      parentRoute: typeof CostSheetsRoute
+    }
+    '/quotations/$id': {
+      id: '/quotations/$id'
+      path: '/$id'
+      fullPath: '/quotations/$id'
+      preLoaderRoute: typeof QuotationsIdRouteImport
+      parentRoute: typeof QuotationsRoute
     }
     '/api/attachments/upload': {
       id: '/api/attachments/upload'
@@ -386,14 +524,43 @@ const ClientsRouteChildren: ClientsRouteChildren = {
 const ClientsRouteWithChildren =
   ClientsRoute._addFileChildren(ClientsRouteChildren)
 
+interface CostSheetsRouteChildren {
+  CostSheetsIdRoute: typeof CostSheetsIdRoute
+}
+
+const CostSheetsRouteChildren: CostSheetsRouteChildren = {
+  CostSheetsIdRoute: CostSheetsIdRoute,
+}
+
+const CostSheetsRouteWithChildren = CostSheetsRoute._addFileChildren(
+  CostSheetsRouteChildren,
+)
+
+interface QuotationsRouteChildren {
+  QuotationsIdRoute: typeof QuotationsIdRoute
+}
+
+const QuotationsRouteChildren: QuotationsRouteChildren = {
+  QuotationsIdRoute: QuotationsIdRoute,
+}
+
+const QuotationsRouteWithChildren = QuotationsRoute._addFileChildren(
+  QuotationsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgreementsRoute: AgreementsRoute,
+  BidsRoute: BidsRoute,
   ClientsRoute: ClientsRouteWithChildren,
+  CostSheetsRoute: CostSheetsRouteWithChildren,
   DealsRoute: DealsRoute,
   InboxRoute: InboxRoute,
   MailboxesRoute: MailboxesRoute,
+  MarketingRoute: MarketingRoute,
+  PrequalificationsRoute: PrequalificationsRoute,
   ProspectsRoute: ProspectsRoute,
+  QuotationsRoute: QuotationsRouteWithChildren,
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,
