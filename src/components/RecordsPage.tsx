@@ -122,8 +122,8 @@ function FieldInput({
         <SelectContent>
           <SelectItem value="none">None</SelectItem>
           {refRows.map((r) => (
-            <SelectItem key={String(r.id)} value={String(r.id)}>
-              {String(r[labelKey] ?? r.id)}
+            <SelectItem key={String(r["id"])} value={String(r["id"])}>
+              {String(r[labelKey] ?? r["id"])}
             </SelectItem>
           ))}
         </SelectContent>
@@ -290,7 +290,7 @@ export function RecordsTable({
                 </tr>
               ) : (
                 filtered.map((row) => (
-                  <tr key={String(row.id)} className="border-b border-border last:border-0">
+                  <tr key={String(row["id"])} className="border-b border-border last:border-0">
                     {columns.map((c, i) => (
                       <td key={c.key} className={`px-4 py-3 ${c.className ?? ""}`}>
                         {i === 0 && detailTo ? (
@@ -311,7 +311,7 @@ export function RecordsTable({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => remove.mutate(String(row.id))}
+                        onClick={() => remove.mutate(String(row["id"]))}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

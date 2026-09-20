@@ -33,9 +33,9 @@ export function ModulePage({
         isLoading={isLoading}
         columns={columns}
         fields={fields}
-        searchKeys={searchKeys}
-        createLabel={createLabel}
-        detailTo={detailTo}
+        {...(createLabel ? { createLabel } : {})}
+        {...(detailTo ? { detailTo } : {})}
+        {...(searchKeys ? { searchKeys } : {})}
       />
     </AppShell>
   );
