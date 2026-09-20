@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Users,
@@ -27,60 +28,62 @@ import {
   Receipt,
 } from "lucide-react";
 
+const nav = <T extends string>(to: T, label: string, icon: LucideIcon) => ({ to, label, icon });
+
 const navGroups = [
   {
     label: "Overview",
-    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard }],
+    items: [nav("/", "Dashboard", LayoutDashboard)],
   },
   {
     label: "Sales",
     items: [
-      { to: "/clients", label: "Clients", icon: Building2 },
-      { to: "/prospects", label: "Prospects", icon: Users },
-      { to: "/campaigns", label: "Campaigns", icon: Send },
-      { to: "/inbox", label: "Replies", icon: Inbox },
-      { to: "/deals", label: "Deals", icon: Handshake },
-      { to: "/quotations", label: "Quotations", icon: FileText },
-      { to: "/cost-sheets", label: "Cost sheets", icon: Calculator },
-      { to: "/marketing", label: "Marketing", icon: Megaphone },
+      nav("/clients", "Clients", Building2),
+      nav("/prospects", "Prospects", Users),
+      nav("/campaigns", "Campaigns", Send),
+      nav("/inbox", "Replies", Inbox),
+      nav("/deals", "Deals", Handshake),
+      nav("/quotations", "Quotations", FileText),
+      nav("/cost-sheets", "Cost sheets", Calculator),
+      nav("/marketing", "Marketing", Megaphone),
     ],
   },
   {
     label: "Bidding",
     items: [
-      { to: "/bids", label: "Bids", icon: Gavel },
-      { to: "/prequalifications", label: "EOI / Prequalification", icon: BadgeCheck },
-      { to: "/rfps", label: "RFPs", icon: FileQuestion },
-      { to: "/rfqs", label: "RFQs", icon: FileInput },
+      nav("/bids", "Bids", Gavel),
+      nav("/prequalifications", "EOI / Prequalification", BadgeCheck),
+      nav("/rfps", "RFPs", FileQuestion),
+      nav("/rfqs", "RFQs", FileInput),
     ],
   },
   {
     label: "Delivery",
     items: [
-      { to: "/projects", label: "Projects", icon: FolderKanban },
-      { to: "/jobs", label: "Jobs", icon: Wrench },
-      { to: "/tasks", label: "Tasks & Activities", icon: ListChecks },
-      { to: "/procurement", label: "Procurement", icon: ShoppingCart },
+      nav("/projects", "Projects", FolderKanban),
+      nav("/jobs", "Jobs", Wrench),
+      nav("/tasks", "Tasks & Activities", ListChecks),
+      nav("/procurement", "Procurement", ShoppingCart),
     ],
   },
   {
     label: "People",
     items: [
-      { to: "/recruitment", label: "Recruitment", icon: UserPlus },
-      { to: "/hr", label: "HR", icon: IdCard },
-      { to: "/payroll", label: "Payroll", icon: Wallet },
+      nav("/recruitment", "Recruitment", UserPlus),
+      nav("/hr", "HR", IdCard),
+      nav("/payroll", "Payroll", Wallet),
     ],
   },
   {
     label: "Business",
     items: [
-      { to: "/documents", label: "Documents", icon: Files },
-      { to: "/finance", label: "Finance & Accounts", icon: Receipt },
-      { to: "/agreements", label: "Agreements & SLAs", icon: FileSignature },
-      { to: "/mailboxes", label: "Sending accounts", icon: Mail },
+      nav("/documents", "Documents", Files),
+      nav("/finance", "Finance & Accounts", Receipt),
+      nav("/agreements", "Agreements & SLAs", FileSignature),
+      nav("/mailboxes", "Sending accounts", Mail),
     ],
   },
-] as const;
+];
 
 const allItems = navGroups.flatMap((g) => g.items);
 
