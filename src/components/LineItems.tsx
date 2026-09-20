@@ -76,11 +76,7 @@ export function LineItems({
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .from(table as any)
-        .delete()
-        .eq("id" as any, id);
+      const { error } = await db.from(table as "tasks").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: key }),

@@ -26,9 +26,13 @@ import {
   IdCard,
   Wallet,
   Receipt,
+  Search,
+  Bell,
+  CircleHelp,
 } from "lucide-react";
 
-const nav = <T extends string>(to: T, label: string, icon: LucideIcon) => ({ to, label, icon });
+type NavItem = { to: string; label: string; icon: LucideIcon };
+const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
 
 const navGroups = [
   {
@@ -99,15 +103,18 @@ export function AppShell({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
-        <div className="flex h-16 items-center gap-2 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
+    <div className="flex min-h-screen bg-[#faf9fd]">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-violet-100 bg-white md:flex">
+        <div className="flex h-20 items-center gap-3 px-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#5b21b6] text-sm font-black text-white shadow-lg shadow-violet-200">
             G
           </div>
-          <span className="font-display text-lg font-semibold">Gwero OS</span>
+          <div>
+            <span className="font-display text-xl font-bold text-[#28104f]">Gwero</span>
+            <p className="text-[11px] font-medium text-violet-500">Operations system</p>
+          </div>
         </div>
-        <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-2">
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-3">
           {navGroups.map((group) => (
             <div key={group.label} className="space-y-1">
               <p className="px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -116,12 +123,12 @@ export function AppShell({
               {group.items.map((item) => (
                 <Link
                   key={item.to}
-                  to={item.to}
+                  to={item.to as never}
                   activeOptions={{ exact: item.to === "/" }}
-                  className="flex items-center gap-3 rounded-full px-4 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+                  className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-800"
                   activeProps={{
                     className:
-                      "flex items-center gap-3 rounded-full px-4 py-2 text-sm font-medium bg-sidebar-accent text-sidebar-accent-foreground",
+                      "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold bg-violet-100 text-violet-800",
                   }}
                 >
                   <item.icon className="h-4 w-4" />
@@ -131,24 +138,46 @@ export function AppShell({
             </div>
           ))}
         </nav>
-        <p className="px-6 py-4 text-xs text-muted-foreground">MSP business operations</p>
+        <div className="m-4 rounded-2xl bg-gradient-to-br from-[#f5efff] to-[#ede4ff] p-4">
+          <p className="font-semibold text-[#321568]">Build better business.</p>
+          <p className="mt-1 text-xs leading-5 text-violet-600">One connected operating system.</p>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex flex-col gap-3 border-b border-border bg-card px-6 py-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="font-display text-2xl font-semibold">{title}</h1>
-            {description ? (
-              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            ) : null}
+        <header className="flex min-h-20 items-center gap-4 border-b border-violet-100 bg-white px-5 md:px-8">
+          <div className="relative hidden max-w-xl flex-1 lg:block">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-50"
+              placeholder="Search across Gwero OS…"
+            />
           </div>
-          {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+          <div className="ml-auto flex items-center gap-2">
+            <button aria-label="Help" className="rounded-xl p-2 text-slate-500 hover:bg-violet-50">
+              <CircleHelp className="size-5" />
+            </button>
+            <button
+              aria-label="Notifications"
+              className="relative rounded-xl p-2 text-slate-500 hover:bg-violet-50"
+            >
+              <Bell className="size-5" />
+              <span className="absolute right-1.5 top-1.5 size-2 rounded-full border border-white bg-rose-500" />
+            </button>
+            <div className="ml-2 grid size-9 place-items-center rounded-full bg-violet-100 text-xs font-bold text-violet-800">
+              GA
+            </div>
+            <div className="hidden sm:block">
+              <p className="text-xs font-semibold">Gwero Admin</p>
+              <p className="text-[10px] text-muted-foreground">Business operations</p>
+            </div>
+          </div>
         </header>
         <div className="flex gap-1 overflow-x-auto border-b border-border bg-card px-3 py-2 md:hidden">
           {allItems.map((item) => (
             <Link
               key={item.to}
-              to={item.to}
+              to={item.to as never}
               activeOptions={{ exact: item.to === "/" }}
               className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium text-muted-foreground"
               activeProps={{
@@ -160,7 +189,22 @@ export function AppShell({
             </Link>
           ))}
         </div>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 md:p-7">
+          <div className="mx-auto max-w-[1500px]">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="font-display text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
+                  {title}
+                </h1>
+                {description ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+                ) : null}
+              </div>
+              {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+            </div>
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   );

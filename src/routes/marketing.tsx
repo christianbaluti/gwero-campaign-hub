@@ -8,7 +8,10 @@ export const Route = createFileRoute("/marketing")({
       { title: "Marketing | Gwero OS" },
       { name: "description", content: "Plan marketing activities, budget, spend and leads." },
       { property: "og:title", content: "Marketing | Gwero OS" },
-      { property: "og:description", content: "Plan marketing activities, budget, spend and leads." },
+      {
+        property: "og:description",
+        content: "Plan marketing activities, budget, spend and leads.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

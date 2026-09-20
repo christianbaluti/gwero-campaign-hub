@@ -1,420 +1,288 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowUpRight,
-  BarChart3,
-  Bell,
-  ChevronDown,
-  CircleHelp,
-  ContactRound,
-  FileUp,
-  Inbox,
-  LayoutDashboard,
-  Mail,
-  Menu,
-  MoreHorizontal,
+  ArrowRight,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  CircleDollarSign,
+  ClipboardCheck,
+  FileText,
+  FolderKanban,
+  Megaphone,
   Plus,
-  Search,
   Send,
-  Settings,
-  Sparkles,
-  Target,
   Users,
-  X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AppShell, money } from "@/components/AppShell";
+import { db } from "@/lib/db";
+import type { LucideIcon } from "lucide-react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
-export const Route = createFileRoute("/")({
-  component: Index,
-});
+export const Route = createFileRoute("/")({ component: Dashboard });
+type Metric = {
+  label: string;
+  value: number;
+  hint: string;
+  to: string;
+  icon: typeof Users;
+  tone: string;
+};
 
-const campaigns = [
-  {
-    name: "Q3 Partnership Outreach",
-    audience: "Technology Leaders",
-    sent: 284,
-    open: 68,
-    reply: 12,
-    status: "Active",
-  },
-  {
-    name: "SME Growth Programme",
-    audience: "Malawi SMEs",
-    sent: 196,
-    open: 61,
-    reply: 9,
-    status: "Active",
-  },
-  {
-    name: "August Follow-up",
-    audience: "Warm prospects",
-    sent: 83,
-    open: 74,
-    reply: 18,
-    status: "Completed",
-  },
-];
+async function loadDashboard() {
+  const [
+    clientResult,
+    projectResult,
+    taskResult,
+    bidResult,
+    quoteResult,
+    campaignResult,
+    employeeResult,
+    invoiceResult,
+  ] = await Promise.all([
+    db.from("clients").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("projects").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("tasks").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("bids").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("quotations").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("campaigns").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("employees").select("*").order("created_at", { ascending: false }).limit(8),
+    db.from("invoices").select("*").order("created_at", { ascending: false }).limit(8),
+  ]);
+  const failed = [
+    clientResult,
+    projectResult,
+    taskResult,
+    bidResult,
+    quoteResult,
+    campaignResult,
+    employeeResult,
+    invoiceResult,
+  ].find((result) => result.error);
+  if (failed?.error) throw new Error(failed.error.message);
+  const clients = clientResult.data,
+    projects = projectResult.data,
+    tasks = taskResult.data,
+    bids = bidResult.data,
+    quotations = quoteResult.data,
+    campaigns = campaignResult.data,
+    employees = employeeResult.data,
+    invoices = invoiceResult.data;
+  return { clients, projects, tasks, bids, quotations, campaigns, employees, invoices };
+}
 
-const nav = [
-  ["Overview", LayoutDashboard],
-  ["Prospects", ContactRound],
-  ["Campaigns", Send],
-  ["Inbox", Inbox],
-  ["Analytics", BarChart3],
-  ["Mailboxes", Mail],
-] as const;
-
-function Index() {
-  const [active, setActive] = useState("Overview");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [composer, setComposer] = useState(false);
-  const filtered = useMemo(
-    () =>
-      campaigns.filter((c) =>
-        `${c.name} ${c.audience}`.toLowerCase().includes(query.toLowerCase()),
-      ),
-    [query],
-  );
-
+function Dashboard() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["gwero-os-dashboard"],
+    queryFn: loadDashboard,
+  });
+  const openTasks = data?.tasks.filter((t) => t.status !== "done").length ?? 0;
+  const activeProjects =
+    data?.projects.filter((p) => !["completed", "cancelled"].includes(p.status)).length ?? 0;
+  const openBids =
+    data?.bids.filter((b) => !["won", "lost", "withdrawn"].includes(b.status)).length ?? 0;
+  const outstanding =
+    data?.invoices.reduce(
+      (sum, i) => sum + Math.max(0, Number(i.amount) - Number(i.paid_amount)),
+      0,
+    ) ?? 0;
+  const metrics: Metric[] = [
+    {
+      label: "Active clients",
+      value: data?.clients.filter((c) => c.status === "active").length ?? 0,
+      hint: "relationships in progress",
+      to: "/clients",
+      icon: Building2,
+      tone: "bg-violet-50 text-violet-700",
+    },
+    {
+      label: "Active projects",
+      value: activeProjects,
+      hint: "delivery workspaces",
+      to: "/projects",
+      icon: FolderKanban,
+      tone: "bg-indigo-50 text-indigo-700",
+    },
+    {
+      label: "Open tasks",
+      value: openTasks,
+      hint: "items needing action",
+      to: "/tasks",
+      icon: ClipboardCheck,
+      tone: "bg-amber-50 text-amber-700",
+    },
+    {
+      label: "Open bids",
+      value: openBids,
+      hint: "opportunities in pipeline",
+      to: "/bids",
+      icon: BriefcaseBusiness,
+      tone: "bg-emerald-50 text-emerald-700",
+    },
+  ];
   return (
-    <div className="min-h-screen bg-[#f6f8fb] text-slate-950">
-      {mobileOpen && (
-        <button
-          aria-label="Close navigation"
-          className="fixed inset-0 z-30 bg-slate-950/30 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}
-      >
-        <div className="flex h-20 items-center gap-3 border-b border-slate-100 px-6">
-          <div className="grid size-10 place-items-center rounded-xl bg-blue-600 text-lg font-black text-white shadow-lg shadow-blue-200">
-            G
+    <AppShell
+      title="Good morning, Gwero team"
+      description="Here is what is happening across the business today."
+    >
+      <div className="space-y-6">
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error.message}
           </div>
-          <div>
-            <p className="text-lg font-bold leading-5">Gwero</p>
-            <p className="text-xs font-medium text-slate-400">Campaign Hub</p>
+        ) : null}
+        <section className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-r from-[#f8f4ff] via-white to-[#f4edff] p-6 md:p-8">
+          <div className="relative z-10 max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[.2em] text-violet-600">
+              Gwero OS · Business operations
+            </p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[#21143f] md:text-4xl">
+              One workspace. Every moving part.
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+              Move opportunities from sourcing and bids through delivery, people, procurement and
+              finance.
+            </p>
           </div>
-          <button className="ml-auto lg:hidden" onClick={() => setMobileOpen(false)}>
-            <X className="size-5" />
-          </button>
-        </div>
-        <nav className="flex-1 space-y-1 p-4">
-          <p className="px-3 pb-2 pt-2 text-[11px] font-bold uppercase tracking-[.16em] text-slate-400">
-            Workspace
-          </p>
-          {nav.map(([label, Icon]) => (
-            <button
-              key={label}
-              onClick={() => {
-                setActive(label);
-                setMobileOpen(false);
-              }}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${active === label ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"}`}
-            >
-              <Icon className="size-[18px]" />
-              {label}
-              {label === "Inbox" && (
-                <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] text-white">
-                  7
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-        <div className="border-t border-slate-100 p-4">
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-            <Settings className="size-[18px]" />
-            Settings
-          </button>
-          <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-            <div className="grid size-9 place-items-center rounded-full bg-slate-900 text-xs font-bold text-white">
-              GG
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">Gwero Team</p>
-              <p className="truncate text-xs text-slate-400">Administrator</p>
-            </div>
-            <ChevronDown className="size-4 text-slate-400" />
+          <div className="absolute -right-10 -top-16 size-56 rounded-full bg-violet-200/50" />
+          <div className="absolute right-36 top-14 size-28 rounded-full bg-fuchsia-100/60" />
+        </section>
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">Your workspace today</h2>
+            <span className="text-xs text-muted-foreground">
+              {isLoading ? "Updating…" : "Live from MySQL"}
+            </span>
           </div>
-        </div>
-      </aside>
-
-      <main className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-20 items-center gap-4 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur md:px-8">
-          <button
-            className="rounded-lg border border-slate-200 p-2 lg:hidden"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="size-5" />
-          </button>
-          <div className="relative hidden max-w-md flex-1 sm:block">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50"
-              placeholder="Search campaigns and prospects…"
-            />
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              aria-label="Help"
-              className="rounded-lg p-2.5 text-slate-500 hover:bg-slate-100"
-            >
-              <CircleHelp className="size-5" />
-            </button>
-            <button
-              aria-label="Notifications"
-              className="relative rounded-lg p-2.5 text-slate-500 hover:bg-slate-100"
-            >
-              <Bell className="size-5" />
-              <span className="absolute right-2 top-2 size-2 rounded-full border-2 border-white bg-rose-500" />
-            </button>
-            <button
-              onClick={() => setComposer(true)}
-              className="ml-1 inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
-            >
-              <Plus className="size-4" />
-              <span className="hidden sm:inline">New campaign</span>
-            </button>
-          </div>
-        </header>
-
-        <div className="mx-auto max-w-[1500px] p-4 md:p-8">
-          <section className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <p className="mb-1 text-sm font-semibold text-blue-600">Tuesday, 9 September</p>
-              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                Good morning, Gwero team
-              </h1>
-              <p className="mt-2 text-sm text-slate-500">
-                Here’s how your outreach is performing today.
-              </p>
-            </div>
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold shadow-sm hover:bg-slate-50">
-              <FileUp className="size-4" />
-              Import prospects
-            </button>
-          </section>
-
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {(
-              [
-                ["Total prospects", "1,248", "+84 this month", Users, "blue"],
-                ["Emails sent", "563", "+12.4%", Send, "violet"],
-                ["Average open rate", "67.2%", "+5.8%", Target, "emerald"],
-                ["Replies received", "74", "13.1% reply rate", Inbox, "amber"],
-              ] as const
-            ).map(([label, value, detail, Icon]) => (
-              <div
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {metrics.map(({ label, value, hint, to, icon: Icon, tone }) => (
+              <Link
                 key={label}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,.04)]"
+                to={to as never}
+                className="group rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500">{label}</p>
-                    <p className="mt-3 text-3xl font-bold tracking-tight">{value}</p>
-                  </div>
-                  <div className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
+                  <span className={`grid size-11 place-items-center rounded-2xl ${tone}`}>
                     <Icon className="size-5" />
-                  </div>
+                  </span>
+                  <ArrowRight className="size-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-violet-600" />
                 </div>
-                <p className="mt-4 text-xs font-semibold text-emerald-600">{detail}</p>
-              </div>
+                <p className="mt-4 text-3xl font-bold text-[#21143f]">{isLoading ? "—" : value}</p>
+                <p className="mt-1 text-sm font-semibold">{label}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+              </Link>
             ))}
-          </section>
-
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]">
-              <div className="flex items-center justify-between border-b border-slate-100 p-5">
-                <div>
-                  <h2 className="font-bold">Campaign performance</h2>
-                  <p className="mt-1 text-xs text-slate-400">Recent outreach activity</p>
-                </div>
-                <button className="text-sm font-semibold text-blue-600">View all</button>
+          </div>
+        </section>
+        <section className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
+          <div className="rounded-2xl border bg-card shadow-sm">
+            <div className="flex items-center justify-between border-b p-5">
+              <div>
+                <h2 className="font-bold">Needs your attention</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Open work across teams</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[620px] text-left">
-                  <thead>
-                    <tr className="bg-slate-50/70 text-[11px] uppercase tracking-wider text-slate-400">
-                      <th className="px-5 py-3 font-bold">Campaign</th>
-                      <th className="px-4 py-3 font-bold">Sent</th>
-                      <th className="px-4 py-3 font-bold">Open rate</th>
-                      <th className="px-4 py-3 font-bold">Replies</th>
-                      <th className="px-4 py-3 font-bold">Status</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((c) => (
-                      <tr key={c.name} className="border-t border-slate-100 text-sm">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold">{c.name}</p>
-                          <p className="mt-1 text-xs text-slate-400">{c.audience}</p>
-                        </td>
-                        <td className="px-4 py-4 font-medium">{c.sent}</td>
-                        <td className="px-4 py-4">
-                          <span className="font-semibold">{c.open}%</span>
-                          <div className="mt-1.5 h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className="h-full rounded-full bg-blue-500"
-                              style={{ width: `${c.open}%` }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 font-medium">{c.reply}%</td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${c.status === "Active" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"}`}
-                          >
-                            {c.status}
-                          </span>
-                        </td>
-                        <td className="pr-4">
-                          <button className="rounded-lg p-2 hover:bg-slate-50">
-                            <MoreHorizontal className="size-4 text-slate-400" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <Link to="/tasks" className="text-sm font-semibold text-violet-700">
+                View all
+              </Link>
             </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,.04)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="font-bold">Recent activity</h2>
-                  <p className="mt-1 text-xs text-slate-400">Latest engagement</p>
-                </div>
-                <button className="rounded-lg p-2 hover:bg-slate-50">
-                  <MoreHorizontal className="size-4" />
-                </button>
-              </div>
-              <div className="mt-5 space-y-5">
-                {[
-                  [
-                    "TN",
-                    "Thoko Nyirenda replied",
-                    "Q3 Partnership Outreach",
-                    "8 min ago",
-                    "emerald",
-                  ],
-                  ["CM", "Chikondi Mbewe opened", "SME Growth Programme", "24 min ago", "blue"],
-                  [
-                    "FM",
-                    "Frank Moyo clicked a link",
-                    "Q3 Partnership Outreach",
-                    "1 hr ago",
-                    "violet",
-                  ],
-                  ["AG", "Agnes Gondwe replied", "August Follow-up", "3 hrs ago", "amber"],
-                ].map(([initials, action, campaign, time]) => (
-                  <div key={action} className="flex gap-3">
-                    <div className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
-                      {initials}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{action}</p>
-                      <p className="truncate text-xs text-slate-400">{campaign}</p>
-                    </div>
-                    <span className="whitespace-nowrap text-[11px] text-slate-400">{time}</span>
+            <div className="divide-y">
+              {(data?.tasks.slice(0, 6) ?? []).map((task) => (
+                <Link
+                  to="/tasks"
+                  key={task.id}
+                  className="flex items-center gap-4 p-4 transition hover:bg-violet-50/40"
+                >
+                  <span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-700">
+                    <ClipboardCheck className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">{task.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {task.assignee || "Unassigned"} · {task.entity_type}
+                    </p>
                   </div>
-                ))}
-              </div>
-              <button className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-50 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100">
-                Open inbox <ArrowUpRight className="size-4" />
-              </button>
-            </div>
-          </section>
-
-          <section className="mt-6 rounded-2xl bg-gradient-to-r from-blue-700 to-indigo-700 p-6 text-white shadow-lg shadow-blue-100 md:flex md:items-center md:justify-between">
-            <div className="flex gap-4">
-              <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/15">
-                <Sparkles className="size-5" />
-              </div>
-              <div>
-                <h2 className="font-bold">Ready for your next conversation?</h2>
-                <p className="mt-1 max-w-xl text-sm text-blue-100">
-                  Import a prospect list, personalise your message, and start a campaign in minutes.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setComposer(true)}
-              className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-blue-700 md:mt-0"
-            >
-              Create campaign <ArrowUpRight className="size-4" />
-            </button>
-          </section>
-        </div>
-      </main>
-
-      {composer && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-bold">Create a campaign</h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Set up the basics. You can add recipients next.
-                </p>
-              </div>
-              <button
-                onClick={() => setComposer(false)}
-                className="rounded-lg p-2 hover:bg-slate-100"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-            <div className="mt-6 space-y-4">
-              <label className="block text-sm font-semibold">
-                Campaign name
-                <input
-                  autoFocus
-                  className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
-                  placeholder="e.g. September partner outreach"
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                Email subject
-                <input
-                  className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
-                  placeholder="A quick introduction from Gwero"
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                Audience
-                <select className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 font-normal outline-none">
-                  <option>All prospects</option>
-                  <option>New prospects</option>
-                  <option>Warm prospects</option>
-                </select>
-              </label>
-            </div>
-            <div className="mt-7 flex justify-end gap-3">
-              <button
-                onClick={() => setComposer(false)}
-                className="h-10 rounded-xl border border-slate-200 px-4 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setComposer(false)}
-                className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-bold text-white"
-              >
-                Save draft
-              </button>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs capitalize text-slate-600">
+                    {task.status.replace("_", " ")}
+                  </span>
+                </Link>
+              ))}
+              {!isLoading && !data?.tasks.length ? (
+                <div className="p-10 text-center text-sm text-muted-foreground">
+                  No open work yet. Create a task to get the team moving.
+                </div>
+              ) : null}
             </div>
           </div>
-        </div>
-      )}
-    </div>
+          <div className="space-y-6">
+            <div className="rounded-2xl border bg-card p-5 shadow-sm">
+              <h2 className="font-bold">Quick actions</h2>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {(
+                  [
+                    ["/quotations", "Quotation", FileText],
+                    ["/projects", "Project", FolderKanban],
+                    ["/tasks", "Task", ClipboardCheck],
+                    ["/campaigns", "Campaign", Send],
+                  ] as Array<[string, string, LucideIcon]>
+                ).map(([to, label, Icon]) => (
+                  <Link
+                    key={String(to)}
+                    to={to as never}
+                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border bg-[#fbf9ff] text-sm font-semibold text-[#321568] transition hover:border-violet-300 hover:bg-violet-50"
+                  >
+                    <Icon className="size-5" />
+                    <span>
+                      <Plus className="mr-1 inline size-3" />
+                      {label as string}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border bg-card p-5 shadow-sm">
+              <h2 className="font-bold">Financial snapshot</h2>
+              <div className="mt-4 flex items-center gap-4">
+                <span className="grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <CircleDollarSign className="size-6" />
+                </span>
+                <div>
+                  <p className="text-2xl font-bold">{money(outstanding, "MWK")}</p>
+                  <p className="text-xs text-muted-foreground">Outstanding on recent invoices</p>
+                </div>
+              </div>
+              <Link
+                to="/finance"
+                className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold"
+              >
+                Open finance <ArrowRight className="size-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2 className="mb-3 text-lg font-bold">Explore Gwero OS</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {(
+              [
+                ["/marketing", "Marketing", Megaphone],
+                ["/recruitment", "Recruitment", Users],
+                ["/hr", "HR", Users],
+                ["/payroll", "Payroll", CalendarDays],
+                ["/procurement", "Procurement", BriefcaseBusiness],
+                ["/documents", "Documents", FileText],
+              ] as Array<[string, string, LucideIcon]>
+            ).map(([to, label, Icon]) => (
+              <Link
+                key={String(to)}
+                to={to as never}
+                className="flex items-center gap-3 rounded-xl border bg-card p-4 text-sm font-semibold transition hover:border-violet-300 hover:text-violet-700"
+              >
+                <Icon className="size-5 text-violet-600" />
+                {label as string}
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
+    </AppShell>
   );
 }

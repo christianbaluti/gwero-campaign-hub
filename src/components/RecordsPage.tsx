@@ -208,11 +208,7 @@ export function RecordsTable({
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await db
-        .from(table as any)
-        .delete()
-        .eq("id" as any, id);
+      const { error } = await db.from(table as "tasks").delete().eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -303,7 +299,7 @@ export function RecordsTable({
                         ) : c.render ? (
                           c.render(row)
                         ) : (
-                          (String(row[c.key] ?? "") || "—")
+                          String(row[c.key] ?? "") || "—"
                         )}
                       </td>
                     ))}

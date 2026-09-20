@@ -159,15 +159,15 @@ export interface Quotation {
   id: string;
   quote_number: string;
   title: string;
-  client_id: string|null;
-  deal_id: string|null;
+  client_id: string | null;
+  deal_id: string | null;
   status: string;
   currency: string;
-  issue_date: string|null;
-  valid_until: string|null;
+  issue_date: string | null;
+  valid_until: string | null;
   tax_rate: number;
   discount: number;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -183,45 +183,45 @@ export interface QuotationItem {
 export interface Project {
   id: string;
   name: string;
-  code: string|null;
-  client_id: string|null;
-  manager: string|null;
+  code: string | null;
+  client_id: string | null;
+  manager: string | null;
   status: string;
-  start_date: string|null;
-  end_date: string|null;
+  start_date: string | null;
+  end_date: string | null;
   budget: number;
   currency: string;
   progress: number;
-  description: string|null;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Bid {
   id: string;
-  reference: string|null;
+  reference: string | null;
   title: string;
-  buyer: string|null;
-  client_id: string|null;
+  buyer: string | null;
+  client_id: string | null;
   status: string;
-  closing_date: string|null;
-  submission_date: string|null;
+  closing_date: string | null;
+  submission_date: string | null;
   value: number;
   currency: string;
   bond_amount: number;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface CostSheet {
   id: string;
   name: string;
-  client_id: string|null;
-  quotation_id: string|null;
-  bid_id: string|null;
-  project_id: string|null;
+  client_id: string | null;
+  quotation_id: string | null;
+  bid_id: string | null;
+  project_id: string | null;
   status: string;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -239,15 +239,15 @@ export interface CostSheetItem {
 export interface Job {
   id: string;
   title: string;
-  client_id: string|null;
-  project_id: string|null;
+  client_id: string | null;
+  project_id: string | null;
   job_type: string;
-  assignee: string|null;
+  assignee: string | null;
   priority: string;
   status: string;
-  scheduled_date: string|null;
-  completed_at: string|null;
-  notes: string|null;
+  scheduled_date: string | null;
+  completed_at: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -255,36 +255,36 @@ export interface Task {
   id: string;
   title: string;
   entity_type: string;
-  entity_id: string|null;
-  assignee: string|null;
+  entity_id: string | null;
+  assignee: string | null;
   priority: string;
   status: string;
-  due_date: string|null;
-  notes: string|null;
+  due_date: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Supplier {
   id: string;
   name: string;
-  contact_name: string|null;
-  email: string|null;
-  phone: string|null;
-  category: string|null;
-  notes: string|null;
+  contact_name: string | null;
+  email: string | null;
+  phone: string | null;
+  category: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface PurchaseOrder {
   id: string;
   po_number: string;
-  supplier_id: string|null;
-  project_id: string|null;
+  supplier_id: string | null;
+  project_id: string | null;
   status: string;
-  order_date: string|null;
-  expected_date: string|null;
+  order_date: string | null;
+  expected_date: string | null;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -300,31 +300,31 @@ export interface PurchaseOrderItem {
 }
 export interface Prequalification {
   id: string;
-  reference: string|null;
+  reference: string | null;
   buyer: string;
-  category: string|null;
+  category: string | null;
   submission_type: string;
   status: string;
-  submitted_date: string|null;
-  valid_until: string|null;
-  outcome: string|null;
-  notes: string|null;
+  submitted_date: string | null;
+  valid_until: string | null;
+  outcome: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Request {
   id: string;
-  reference: string|null;
+  reference: string | null;
   title: string;
-  issuer: string|null;
-  client_id: string|null;
+  issuer: string | null;
+  client_id: string | null;
   request_type: string;
   status: string;
-  received_date: string|null;
-  due_date: string|null;
+  received_date: string | null;
+  due_date: string | null;
   value: number;
   currency: string;
-  scope: string|null;
+  scope: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -333,13 +333,13 @@ export interface MarketingActivity {
   name: string;
   channel: string;
   status: string;
-  start_date: string|null;
-  end_date: string|null;
+  start_date: string | null;
+  end_date: string | null;
   budget: number;
   spend: number;
   leads: number;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -348,86 +348,86 @@ export interface Document {
   title: string;
   category: string;
   entity_type: string;
-  entity_id: string|null;
-  owner: string|null;
-  version: string|null;
-  file_url: string|null;
-  issue_date: string|null;
-  expiry_date: string|null;
-  notes: string|null;
+  entity_id: string | null;
+  owner: string | null;
+  version: string | null;
+  file_url: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Vacancy {
   id: string;
   title: string;
-  department: string|null;
+  department: string | null;
   employment_type: string;
   status: string;
   openings: number;
-  location: string|null;
-  closing_date: string|null;
-  description: string|null;
+  location: string | null;
+  closing_date: string | null;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Applicant {
   id: string;
-  vacancy_id: string|null;
+  vacancy_id: string | null;
   full_name: string;
-  email: string|null;
-  phone: string|null;
+  email: string | null;
+  phone: string | null;
   stage: string;
   rating: number;
-  resume_url: string|null;
-  notes: string|null;
+  resume_url: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Employee {
   id: string;
-  employee_number: string|null;
+  employee_number: string | null;
   full_name: string;
-  email: string|null;
-  phone: string|null;
-  job_title: string|null;
-  department: string|null;
+  email: string | null;
+  phone: string | null;
+  job_title: string | null;
+  department: string | null;
   employment_type: string;
   status: string;
-  start_date: string|null;
-  end_date: string|null;
+  start_date: string | null;
+  end_date: string | null;
   base_salary: number;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface LeaveRequest {
   id: string;
-  employee_id: string|null;
+  employee_id: string | null;
   leave_type: string;
-  start_date: string|null;
-  end_date: string|null;
+  start_date: string | null;
+  end_date: string | null;
   days: number;
   status: string;
-  reason: string|null;
+  reason: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface PayrollRun {
   id: string;
   period: string;
-  pay_date: string|null;
+  pay_date: string | null;
   status: string;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface PayrollItem {
   id: string;
   payroll_run_id: string;
-  employee_id: string|null;
+  employee_id: string | null;
   gross: number;
   allowances: number;
   deductions: number;
@@ -439,17 +439,17 @@ export interface PayrollItem {
 export interface Invoice {
   id: string;
   invoice_number: string;
-  client_id: string|null;
-  quotation_id: string|null;
-  project_id: string|null;
+  client_id: string | null;
+  quotation_id: string | null;
+  project_id: string | null;
   status: string;
-  issue_date: string|null;
-  due_date: string|null;
+  issue_date: string | null;
+  due_date: string | null;
   amount: number;
   tax: number;
   paid_amount: number;
   currency: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -457,24 +457,24 @@ export interface Expense {
   id: string;
   description: string;
   category: string;
-  vendor: string|null;
+  vendor: string | null;
   amount: number;
   currency: string;
-  expense_date: string|null;
-  project_id: string|null;
+  expense_date: string | null;
+  project_id: string | null;
   status: string;
-  notes: string|null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }
 export interface Payment {
   id: string;
-  invoice_id: string|null;
+  invoice_id: string | null;
   amount: number;
   currency: string;
-  paid_at: string|null;
-  method: string|null;
-  reference: string|null;
+  paid_at: string | null;
+  method: string | null;
+  reference: string | null;
   created_at: string;
   updated_at: string;
 }
