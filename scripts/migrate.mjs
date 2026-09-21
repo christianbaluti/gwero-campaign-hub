@@ -48,6 +48,21 @@ try {
     .split(";")
     .map((value) => value.trim())
     .filter(Boolean)) {
+    const addColumn = statement.match(
+      /^ALTER TABLE\s+`?([a-zA-Z0-9_]+)`?\s+ADD COLUMN IF NOT EXISTS\s+`?([a-zA-Z0-9_]+)`?\s+([\s\S]+)$/i,
+    );
+    if (addColumn) {
+      const [, table, column, definition] = addColumn;
+      const [existing] = await connection.execute(
+        "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1",
+        [database, table, column],
+      );
+      if (existing.length) continue;
+      await connection.query(
+        `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`,
+      );
+      continue;
+    }
     await connection.query(statement);
   }
   console.log(`MySQL schema ready: ${database}`);
