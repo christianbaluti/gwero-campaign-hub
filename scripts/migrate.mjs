@@ -58,9 +58,7 @@ try {
         [database, table, column],
       );
       if (existing.length) continue;
-      await connection.query(
-        `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`,
-      );
+      await connection.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
       continue;
     }
     await connection.query(statement);
