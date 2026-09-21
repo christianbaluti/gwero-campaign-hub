@@ -69,6 +69,13 @@
   --shadow-raised: var(--shadow-raised);
 }
 
+.gwero-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #c4b5fd transparent;
+}
+.gwero-scrollbar::-webkit-scrollbar { width: 7px; }
+.gwero-scrollbar::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 999px; }
+
 :root {
   --radius: 0.75rem;
   --font-display: "Google Sans", "Product Sans", Roboto, system-ui, sans-serif;

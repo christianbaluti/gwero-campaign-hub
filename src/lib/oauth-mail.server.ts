@@ -21,18 +21,23 @@ const config = {
   },
 } as const;
 
-function env(provider: OAuthProvider) {
+async function env(provider: OAuthProvider) {
   const item = config[provider];
-  const clientId = process.env[item.clientId];
-  const clientSecret = process.env[item.clientSecret];
+  const { getSecret } = await import("./settings.server");
+  const clientId = await getSecret(
+    provider === "google" ? "google_oauth_client_id" : "microsoft_oauth_client_id",
+  );
+  const clientSecret = await getSecret(
+    provider === "google" ? "google_oauth_client_secret" : "microsoft_oauth_client_secret",
+  );
   if (!clientId || !clientSecret)
     throw new Error(
       `${provider === "google" ? "Google" : "Microsoft"} OAuth is not configured on the server.`,
     );
   return { ...item, clientId, clientSecret };
 }
-export function beginMailOAuth(provider: OAuthProvider, request: Request) {
-  const item = env(provider);
+export async function beginMailOAuth(provider: OAuthProvider, request: Request) {
+  const item = await env(provider);
   const origin = new URL(request.url).origin;
   const state = randomBytes(24).toString("hex");
   const redirectUri = `${origin}/api/oauth/${provider}/callback`;
@@ -53,7 +58,7 @@ export function beginMailOAuth(provider: OAuthProvider, request: Request) {
   });
 }
 export async function finishMailOAuth(provider: OAuthProvider, request: Request) {
-  const item = env(provider);
+  const item = await env(provider);
   const url = new URL(request.url);
   const origin = url.origin;
   const code = url.searchParams.get("code");
@@ -127,7 +132,7 @@ function redirectResult(origin: string, key: string, value: string) {
   return new Response(null, {
     status: 302,
     headers: {
-      location: `${origin}/mailboxes?${key}=${encodeURIComponent(value)}`,
+      location: `${origin}/settings?${key}=${encodeURIComponent(value)}`,
       "set-cookie":
         "gwero_oauth_google=; Path=/; HttpOnly; Max-Age=0, gwero_oauth_microsoft=; Path=/; HttpOnly; Max-Age=0",
     },

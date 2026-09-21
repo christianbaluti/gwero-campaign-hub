@@ -8,10 +8,14 @@
     "build": "vite build",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "vite build --mode development",
+    "prestart": "npm run db:migrate",
     "start": "node dist/server/index.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."
+  },
+  "engines": {
+    "node": "22.x"
   },
   "overrides": {
     "rolldown": "1.2.1"

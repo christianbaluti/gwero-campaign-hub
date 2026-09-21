@@ -34,9 +34,13 @@ async function gatewayFetch(
     (!secret.oauth_expires_at || new Date(secret.oauth_expires_at).getTime() < Date.now() + 60_000)
   ) {
     const google = provider === "gmail" || provider === "google";
-    const clientId = process.env[google ? "GOOGLE_OAUTH_CLIENT_ID" : "MICROSOFT_OAUTH_CLIENT_ID"];
-    const clientSecret =
-      process.env[google ? "GOOGLE_OAUTH_CLIENT_SECRET" : "MICROSOFT_OAUTH_CLIENT_SECRET"];
+    const { getSecret } = await import("./settings.server");
+    const clientId = await getSecret(
+      google ? "google_oauth_client_id" : "microsoft_oauth_client_id",
+    );
+    const clientSecret = await getSecret(
+      google ? "google_oauth_client_secret" : "microsoft_oauth_client_secret",
+    );
     if (!clientId || !clientSecret) throw new Error("OAuth server credentials are missing.");
     const tokenUrl = google
       ? "https://oauth2.googleapis.com/token"

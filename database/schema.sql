@@ -305,3 +305,101 @@ CREATE TABLE IF NOT EXISTS payments (
   KEY payments_invoice_idx (invoice_id),
   CONSTRAINT payments_invoice_fk FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  id CHAR(36) PRIMARY KEY, setting_key VARCHAR(120) NOT NULL, setting_group VARCHAR(60) NOT NULL,
+  setting_value LONGTEXT, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY system_settings_key (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_secrets (
+  id CHAR(36) PRIMARY KEY, secret_key VARCHAR(120) NOT NULL, encrypted_value LONGTEXT NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY app_secrets_key (secret_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS email_templates (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, event_key VARCHAR(120) NOT NULL,
+  subject TEXT NOT NULL, body_html LONGTEXT NOT NULL, is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY email_templates_event (event_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS roles (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(120) NOT NULL, description TEXT,
+  is_system BOOLEAN NOT NULL DEFAULT FALSE, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY roles_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS permissions (
+  id CHAR(36) PRIMARY KEY, permission_key VARCHAR(160) NOT NULL, name VARCHAR(160) NOT NULL,
+  module VARCHAR(80) NOT NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY permissions_key (permission_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS role_permissions (
+  id CHAR(36) PRIMARY KEY, role_id CHAR(36) NOT NULL, permission_id CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY role_permission_unique (role_id, permission_id),
+  CONSTRAINT role_permissions_role_fk FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+  CONSTRAINT role_permissions_permission_fk FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS system_users (
+  id CHAR(36) PRIMARY KEY, full_name VARCHAR(255) NOT NULL, email VARCHAR(320) NOT NULL,
+  role_id CHAR(36), status VARCHAR(40) NOT NULL DEFAULT 'invited',
+  last_login_at DATETIME(3), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY system_users_email (email),
+  CONSTRAINT system_users_role_fk FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS prospect_categories (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, description TEXT, offerings TEXT,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY prospect_categories_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS category_id CHAR(36) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS website VARCHAR(500) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS linkedin_url VARCHAR(500) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS fit_score INT NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS fit_reason TEXT NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS last_contact_at DATETIME(3) NULL;
+
+CREATE TABLE IF NOT EXISTS prospect_interactions (
+  id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,
+  interaction_type VARCHAR(60) NOT NULL DEFAULT 'note', direction VARCHAR(20) NOT NULL DEFAULT 'internal',
+  subject VARCHAR(255), body LONGTEXT NOT NULL, occurred_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY prospect_interactions_prospect (prospect_id),
+  CONSTRAINT prospect_interactions_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS ai_prospect_searches (
+  id CHAR(36) PRIMARY KEY, prompt LONGTEXT NOT NULL, search_context LONGTEXT,
+  results_json LONGTEXT NOT NULL, status VARCHAR(40) NOT NULL DEFAULT 'completed',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO roles (id, name, description, is_system) VALUES
+  (UUID(), 'Administrator', 'Full system administration', TRUE),
+  (UUID(), 'Sales Manager', 'Manage prospects, clients, campaigns and deals', TRUE),
+  (UUID(), 'Team Member', 'Standard operational access', TRUE);
+
+INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES
+  (UUID(), 'settings.manage', 'Manage settings', 'Settings'),
+  (UUID(), 'users.manage', 'Manage users and roles', 'Settings'),
+  (UUID(), 'prospects.view', 'View prospects', 'Prospects'),
+  (UUID(), 'prospects.manage', 'Create and update prospects', 'Prospects'),
+  (UUID(), 'prospects.convert', 'Convert prospects to clients', 'Prospects'),
+  (UUID(), 'campaigns.manage', 'Manage campaigns', 'Campaigns'),
+  (UUID(), 'clients.manage', 'Manage clients', 'Clients');
+
+INSERT IGNORE INTO role_permissions (id, role_id, permission_id)
+SELECT UUID(), r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'Administrator';

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import type { TableName } from "@/lib/db.types";
 
 export type Row = Record<string, unknown>;
@@ -208,7 +209,10 @@ export function RecordsTable({
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from(table as "tasks").delete().eq("id", id);
+      const { error } = await db
+        .from(table as "tasks")
+        .delete()
+        .eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -304,13 +308,15 @@ export function RecordsTable({
                       </td>
                     ))}
                     <td className="px-4 py-3">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => remove.mutate(String(row["id"]))}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <ConfirmAction
+                        title="Delete record?"
+                        onConfirm={() => remove.mutateAsync(String(row["id"]))}
+                        trigger={
+                          <Button variant="ghost" size="icon" aria-label="Delete record">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        }
+                      />
                     </td>
                   </tr>
                 ))

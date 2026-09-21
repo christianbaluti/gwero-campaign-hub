@@ -21,4 +21,4 @@ dist/
 coverage/
 
 # Private campaign attachments
-var/attachments/
+var/

@@ -20,7 +20,6 @@ import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as HrRouteImport } from './routes/hr'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as JobsRouteImport } from './routes/jobs'
-import { Route as MailboxesRouteImport } from './routes/mailboxes'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as PrequalificationsRouteImport } from './routes/prequalifications'
@@ -31,11 +30,14 @@ import { Route as QuotationsRouteImport } from './routes/quotations'
 import { Route as RecruitmentRouteImport } from './routes/recruitment'
 import { Route as RfpsRouteImport } from './routes/rfps'
 import { Route as RfqsRouteImport } from './routes/rfqs'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
 import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
+import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
 import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
@@ -100,11 +102,6 @@ const JobsRoute = JobsRouteImport.update({
   path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MailboxesRoute = MailboxesRouteImport.update({
-  id: '/mailboxes',
-  path: '/mailboxes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MarketingRoute = MarketingRouteImport.update({
   id: '/marketing',
   path: '/marketing',
@@ -155,9 +152,19 @@ const RfqsRoute = RfqsRouteImport.update({
   path: '/rfqs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TasksRoute = TasksRouteImport.update({
   id: '/tasks',
   path: '/tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
@@ -179,6 +186,11 @@ const CostSheetsIdRoute = CostSheetsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => CostSheetsRoute,
+} as any)
+const ProspectsIdRoute = ProspectsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ProspectsRoute,
 } as any)
 const QuotationsIdRoute = QuotationsIdRouteImport.update({
   id: '/$id',
@@ -234,21 +246,23 @@ export interface FileRoutesByFullPath {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
-  '/mailboxes': typeof MailboxesRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
-  '/prospects': typeof ProspectsRoute
+  '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
   '/rfps': typeof RfpsRoute
   '/rfqs': typeof RfqsRoute
+  '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/api/health': typeof ApiHealthRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prospects/$id': typeof ProspectsIdRoute
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -271,21 +285,23 @@ export interface FileRoutesByTo {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
-  '/mailboxes': typeof MailboxesRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
-  '/prospects': typeof ProspectsRoute
+  '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
   '/rfps': typeof RfpsRoute
   '/rfqs': typeof RfqsRoute
+  '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/api/health': typeof ApiHealthRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prospects/$id': typeof ProspectsIdRoute
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -309,21 +325,23 @@ export interface FileRoutesById {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
-  '/mailboxes': typeof MailboxesRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
-  '/prospects': typeof ProspectsRoute
+  '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
   '/rfps': typeof RfpsRoute
   '/rfqs': typeof RfqsRoute
+  '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/api/health': typeof ApiHealthRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prospects/$id': typeof ProspectsIdRoute
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -348,7 +366,6 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
-    | '/mailboxes'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -359,10 +376,13 @@ export interface FileRouteTypes {
     | '/recruitment'
     | '/rfps'
     | '/rfqs'
+    | '/settings'
     | '/tasks'
+    | '/api/health'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prospects/$id'
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
@@ -385,7 +405,6 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
-    | '/mailboxes'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -396,10 +415,13 @@ export interface FileRouteTypes {
     | '/recruitment'
     | '/rfps'
     | '/rfqs'
+    | '/settings'
     | '/tasks'
+    | '/api/health'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prospects/$id'
     | '/quotations/$id'
     | '/campaigns'
     | '/api/attachments/upload'
@@ -422,7 +444,6 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
-    | '/mailboxes'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -433,10 +454,13 @@ export interface FileRouteTypes {
     | '/recruitment'
     | '/rfps'
     | '/rfqs'
+    | '/settings'
     | '/tasks'
+    | '/api/health'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prospects/$id'
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
@@ -460,18 +484,19 @@ export interface RootRouteChildren {
   HrRoute: typeof HrRoute
   InboxRoute: typeof InboxRoute
   JobsRoute: typeof JobsRoute
-  MailboxesRoute: typeof MailboxesRoute
   MarketingRoute: typeof MarketingRoute
   PayrollRoute: typeof PayrollRoute
   PrequalificationsRoute: typeof PrequalificationsRoute
   ProcurementRoute: typeof ProcurementRoute
   ProjectsRoute: typeof ProjectsRoute
-  ProspectsRoute: typeof ProspectsRoute
+  ProspectsRoute: typeof ProspectsRouteWithChildren
   QuotationsRoute: typeof QuotationsRouteWithChildren
   RecruitmentRoute: typeof RecruitmentRoute
   RfpsRoute: typeof RfpsRoute
   RfqsRoute: typeof RfqsRoute
+  SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
+  ApiHealthRoute: typeof ApiHealthRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
@@ -562,13 +587,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/mailboxes': {
-      id: '/mailboxes'
-      path: '/mailboxes'
-      fullPath: '/mailboxes'
-      preLoaderRoute: typeof MailboxesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/marketing': {
       id: '/marketing'
       path: '/marketing'
@@ -639,11 +657,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RfqsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tasks': {
       id: '/tasks'
       path: '/tasks'
       fullPath: '/tasks'
       preLoaderRoute: typeof TasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns/': {
@@ -673,6 +705,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/cost-sheets/$id'
       preLoaderRoute: typeof CostSheetsIdRouteImport
       parentRoute: typeof CostSheetsRoute
+    }
+    '/prospects/$id': {
+      id: '/prospects/$id'
+      path: '/$id'
+      fullPath: '/prospects/$id'
+      preLoaderRoute: typeof ProspectsIdRouteImport
+      parentRoute: typeof ProspectsRoute
     }
     '/quotations/$id': {
       id: '/quotations/$id'
@@ -756,6 +795,18 @@ const CostSheetsRouteWithChildren = CostSheetsRoute._addFileChildren(
   CostSheetsRouteChildren,
 )
 
+interface ProspectsRouteChildren {
+  ProspectsIdRoute: typeof ProspectsIdRoute
+}
+
+const ProspectsRouteChildren: ProspectsRouteChildren = {
+  ProspectsIdRoute: ProspectsIdRoute,
+}
+
+const ProspectsRouteWithChildren = ProspectsRoute._addFileChildren(
+  ProspectsRouteChildren,
+)
+
 interface QuotationsRouteChildren {
   QuotationsIdRoute: typeof QuotationsIdRoute
 }
@@ -780,18 +831,19 @@ const rootRouteChildren: RootRouteChildren = {
   HrRoute: HrRoute,
   InboxRoute: InboxRoute,
   JobsRoute: JobsRoute,
-  MailboxesRoute: MailboxesRoute,
   MarketingRoute: MarketingRoute,
   PayrollRoute: PayrollRoute,
   PrequalificationsRoute: PrequalificationsRoute,
   ProcurementRoute: ProcurementRoute,
   ProjectsRoute: ProjectsRoute,
-  ProspectsRoute: ProspectsRoute,
+  ProspectsRoute: ProspectsRouteWithChildren,
   QuotationsRoute: QuotationsRouteWithChildren,
   RecruitmentRoute: RecruitmentRoute,
   RfpsRoute: RfpsRoute,
   RfqsRoute: RfqsRoute,
+  SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,
+  ApiHealthRoute: ApiHealthRoute,
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,

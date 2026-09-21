@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { sendCampaign } from "@/lib/crm.functions";
 import { BASE_PLACEHOLDERS } from "@/lib/personalize";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -415,16 +416,19 @@ function CampaignDetail() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={async () => {
+                          <ConfirmAction
+                            title="Remove campaign recipient?"
+                            description="This person will no longer receive this campaign."
+                            onConfirm={async () => {
                               await db.from("campaign_recipients").delete().eq("id", r.id);
                               void qc.invalidateQueries({ queryKey: ["recipients", id] });
                             }}
-                          >
-                            Remove
-                          </Button>
+                            trigger={
+                              <Button size="sm" variant="destructive">
+                                Remove
+                              </Button>
+                            }
+                          />
                         </TableCell>
                       </TableRow>
                     );

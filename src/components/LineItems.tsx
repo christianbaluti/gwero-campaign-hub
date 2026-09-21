@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { db } from "@/lib/db";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import type { TableName } from "@/lib/db.types";
 
 export type ItemField = {
@@ -76,7 +77,10 @@ export function LineItems({
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from(table as "tasks").delete().eq("id", id);
+      const { error } = await db
+        .from(table as "tasks")
+        .delete()
+        .eq("id", id);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: key }),
@@ -110,13 +114,15 @@ export function LineItems({
                     </td>
                   ))}
                   <td className="px-2 py-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove.mutate(String(r["id"]))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <ConfirmAction
+                      title="Delete line item?"
+                      onConfirm={() => remove.mutateAsync(String(r["id"]))}
+                      trigger={
+                        <Button variant="ghost" size="icon" aria-label="Delete line item">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                   </td>
                 </tr>
               ))}

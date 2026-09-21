@@ -12,6 +12,12 @@ export interface Prospect {
   notes: string | null;
   extra: Record<string, unknown>;
   source_file: string | null;
+  category_id: string | null;
+  website: string | null;
+  linkedin_url: string | null;
+  fit_score: number | null;
+  fit_reason: string | null;
+  last_contact_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -479,6 +485,89 @@ export interface Payment {
   updated_at: string;
 }
 
+export interface SystemSetting {
+  id: string;
+  setting_key: string;
+  setting_group: string;
+  setting_value: Json;
+  created_at: string;
+  updated_at: string;
+}
+export interface AppSecret {
+  id: string;
+  secret_key: string;
+  encrypted_value: string;
+  created_at: string;
+  updated_at: string;
+}
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  event_key: string;
+  subject: string;
+  body_html: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface Role {
+  id: string;
+  name: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface Permission {
+  id: string;
+  permission_key: string;
+  name: string;
+  module: string;
+  created_at: string;
+}
+export interface RolePermission {
+  id: string;
+  role_id: string;
+  permission_id: string;
+  created_at: string;
+}
+export interface SystemUser {
+  id: string;
+  full_name: string;
+  email: string;
+  role_id: string | null;
+  status: string;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface ProspectCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  offerings: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface ProspectInteraction {
+  id: string;
+  prospect_id: string;
+  interaction_type: string;
+  direction: string;
+  subject: string | null;
+  body: string;
+  occurred_at: string;
+  created_at: string;
+}
+export interface AiProspectSearch {
+  id: string;
+  prompt: string;
+  search_context: string | null;
+  results_json: Json;
+  status: string;
+  created_at: string;
+}
+
 export interface Tables {
   prospects: Prospect;
   clients: Client;
@@ -515,6 +604,16 @@ export interface Tables {
   invoices: Invoice;
   expenses: Expense;
   payments: Payment;
+  system_settings: SystemSetting;
+  app_secrets: AppSecret;
+  email_templates: EmailTemplate;
+  roles: Role;
+  permissions: Permission;
+  role_permissions: RolePermission;
+  system_users: SystemUser;
+  prospect_categories: ProspectCategory;
+  prospect_interactions: ProspectInteraction;
+  ai_prospect_searches: AiProspectSearch;
 }
 export type TableName = keyof Tables;
 export type AppRow<K extends TableName> = Tables[K] & {
