@@ -22,3 +22,6 @@ coverage/
 
 # Private campaign attachments
 var/
+
+# Local database migration and deployment artifacts
+.deployment/
