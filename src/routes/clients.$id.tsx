@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/db";
+import { ConfirmAction } from "@/components/ConfirmAction";
+import { normalizePhone } from "@/lib/contact-normalization";
 
 export const Route = createFileRoute("/clients/$id")({ component: ClientDetail });
 
@@ -15,6 +17,13 @@ function ClientDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const [note, setNote] = useState("");
+  const [contact, setContact] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    job_title: "",
+  });
   const { data: client } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
@@ -60,6 +69,18 @@ function ClientDetail() {
       return data;
     },
   });
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["client-contacts", id],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("client_contacts")
+        .select("*")
+        .eq("client_id", id)
+        .order("is_primary", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
   const addNote = useMutation({
     mutationFn: async () => {
       if (!note.trim()) throw new Error("Write a note first.");
@@ -75,6 +96,36 @@ function ClientDetail() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const addContact = useMutation({
+    mutationFn: async () => {
+      if (!contact.first_name.trim() && !contact.last_name.trim() && !contact.email.trim()) {
+        throw new Error("Add a contact name or email address.");
+      }
+      const normalizedPhone = normalizePhone(contact.phone);
+      const { error } = await db.from("client_contacts").insert({
+        client_id: id,
+        first_name: contact.first_name.trim() || null,
+        last_name: contact.last_name.trim() || null,
+        email: contact.email.trim().toLowerCase() || null,
+        phone: normalizedPhone || null,
+        raw_phone: contact.phone.trim() || null,
+        job_title: contact.job_title.trim() || null,
+        is_primary: contacts.length === 0,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setContact({ first_name: "", last_name: "", email: "", phone: "", job_title: "" });
+      toast.success("Contact person added.");
+      void qc.invalidateQueries({ queryKey: ["client-contacts", id] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const removeContact = async (contactId: string) => {
+    const { error } = await db.from("client_contacts").delete().eq("id", contactId);
+    if (error) throw new Error(error.message);
+    void qc.invalidateQueries({ queryKey: ["client-contacts", id] });
+  };
   return (
     <AppShell
       title={client?.name ?? "Client"}
@@ -89,13 +140,103 @@ function ClientDetail() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Contact</CardTitle>
+              <CardTitle>Company profile</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
+              {client?.logo_path ? (
+                <img
+                  src={client.logo_path}
+                  alt={`${client.company || client.name} logo`}
+                  className="mb-4 h-20 w-full rounded-xl border bg-white object-contain p-3"
+                />
+              ) : null}
               <p>{client?.email || "No email"}</p>
               <p>{client?.phone || "No phone"}</p>
               <p>{client?.website || "No website"}</p>
               <p className="text-muted-foreground">{client?.address || "No address"}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact people</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  placeholder="First name"
+                  value={contact.first_name}
+                  onChange={(event) =>
+                    setContact((old) => ({ ...old, first_name: event.target.value }))
+                  }
+                />
+                <Input
+                  placeholder="Last name"
+                  value={contact.last_name}
+                  onChange={(event) =>
+                    setContact((old) => ({ ...old, last_name: event.target.value }))
+                  }
+                />
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={contact.email}
+                  onChange={(event) => setContact((old) => ({ ...old, email: event.target.value }))}
+                />
+                <Input
+                  placeholder="Phone number"
+                  value={contact.phone}
+                  onChange={(event) => setContact((old) => ({ ...old, phone: event.target.value }))}
+                />
+                <Input
+                  className="sm:col-span-2"
+                  placeholder="Job title"
+                  value={contact.job_title}
+                  onChange={(event) =>
+                    setContact((old) => ({ ...old, job_title: event.target.value }))
+                  }
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => addContact.mutate()}
+                disabled={addContact.isPending}
+              >
+                Add contact person
+              </Button>
+              <div className="space-y-2">
+                {contacts.map((person) => (
+                  <div
+                    key={person.id}
+                    className="flex items-start justify-between gap-3 rounded-xl border p-3 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        {[person.first_name, person.last_name].filter(Boolean).join(" ") ||
+                          person.email ||
+                          "Unnamed contact"}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {[person.job_title, person.email, person.phone || person.raw_phone]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    </div>
+                    <ConfirmAction
+                      title="Delete contact person?"
+                      description="This removes the contact from this client."
+                      onConfirm={() => removeContact(person.id)}
+                      trigger={
+                        <Button size="sm" variant="ghost">
+                          Delete
+                        </Button>
+                      }
+                    />
+                  </div>
+                ))}
+                {!contacts.length ? (
+                  <p className="text-sm text-muted-foreground">No contact people yet.</p>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
           <Card>

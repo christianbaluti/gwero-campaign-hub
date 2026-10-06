@@ -34,6 +34,12 @@ import {
   saveProviderSecrets,
   saveSystemSettings,
 } from "@/lib/settings.functions";
+import {
+  createRole,
+  deleteSystemUser,
+  saveSystemUser,
+  setRolePermission,
+} from "@/lib/auth.functions";
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage });
 
@@ -68,6 +74,7 @@ function SettingsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["settings-overview"],
     queryFn: () => getSettingsOverview(),
+    placeholderData: (previous) => previous,
   });
   const values = Object.fromEntries(
     (data?.settings ?? []).map((item: { setting_key: string; setting_value: unknown }) => [
@@ -75,7 +82,7 @@ function SettingsPage() {
       String(item.setting_value ?? ""),
     ]),
   );
-  if (isLoading)
+  if (isLoading || !data)
     return (
       <AppShell title="Settings">
         <p className="text-muted-foreground">Loading settings…</p>
@@ -105,26 +112,26 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="email">
           <EmailTab
-            configured={data!.configured}
+            configured={data.configured}
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
         <TabsContent value="templates">
           <TemplatesTab
-            templates={data!.templates}
+            templates={data.templates}
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
         <TabsContent value="ai">
           <AiTab
             initial={values}
-            configured={data!.configured.openai}
+            configured={data.configured.openai}
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
         <TabsContent value="access">
           <AccessTab
-            data={data!}
+            data={data}
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
@@ -608,31 +615,46 @@ function AccessTab({
   data: Awaited<ReturnType<typeof getSettingsOverview>>;
   refresh: () => void;
 }) {
-  const [user, setUser] = useState({ full_name: "", email: "", role_id: "", status: "invited" });
+  const [user, setUser] = useState({
+    full_name: "",
+    email: "",
+    role_id: "",
+    status: "active",
+    password: "",
+  });
   const [editingUser, setEditingUser] = useState<{
     id: string;
     full_name: string;
     email: string;
     role_id: string;
     status: string;
+    password: string;
   } | null>(null);
   const [role, setRole] = useState({ name: "", description: "" });
   const addUser = async () => {
-    const { error } = await db
-      .from("system_users")
-      .insert({ ...user, role_id: user.role_id || null });
-    if (error) {
-      toast.error(error.message);
+    try {
+      await saveSystemUser({
+        data: {
+          fullName: user.full_name,
+          email: user.email,
+          roleId: user.role_id || null,
+          status: user.status,
+          password: user.password,
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not add user.");
       return;
     }
     toast.success("User added.");
-    setUser({ full_name: "", email: "", role_id: "", status: "invited" });
+    setUser({ full_name: "", email: "", role_id: "", status: "active", password: "" });
     refresh();
   };
   const addRole = async () => {
-    const { error } = await db.from("roles").insert({ ...role, is_system: false });
-    if (error) {
-      toast.error(error.message);
+    try {
+      await createRole({ data: role });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create role.");
       return;
     }
     toast.success("Role created.");
@@ -641,17 +663,19 @@ function AccessTab({
   };
   const updateUser = async () => {
     if (!editingUser) return;
-    const { error } = await db
-      .from("system_users")
-      .update({
-        full_name: editingUser.full_name,
-        email: editingUser.email,
-        role_id: editingUser.role_id || null,
-        status: editingUser.status,
-      })
-      .eq("id", editingUser.id);
-    if (error) {
-      toast.error(error.message);
+    try {
+      await saveSystemUser({
+        data: {
+          id: editingUser.id,
+          fullName: editingUser.full_name,
+          email: editingUser.email,
+          roleId: editingUser.role_id || null,
+          status: editingUser.status,
+          ...(editingUser.password ? { password: editingUser.password } : {}),
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update user.");
       return;
     }
     toast.success("User updated.");
@@ -659,35 +683,21 @@ function AccessTab({
     refresh();
   };
   const deleteUser = async (id: string) => {
-    const { error } = await db.from("system_users").delete().eq("id", id);
-    if (error) {
-      toast.error(error.message);
+    try {
+      await deleteSystemUser({ data: { id } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete user.");
       throw error;
     }
     toast.success("User deleted.");
     refresh();
   };
   const togglePermission = async (roleId: string, permissionId: string, enabled: boolean) => {
-    if (enabled) {
-      const { error } = await db
-        .from("role_permissions")
-        .insert({ role_id: roleId, permission_id: permissionId });
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-    } else {
-      const match = data.rolePermissions.find(
-        (item: { role_id: string; permission_id: string }) =>
-          item.role_id === roleId && item.permission_id === permissionId,
-      );
-      if (match) {
-        const { error } = await db.from("role_permissions").delete().eq("id", match.id);
-        if (error) {
-          toast.error(error.message);
-          return;
-        }
-      }
+    try {
+      await setRolePermission({ data: { roleId, permissionId, enabled } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update permission.");
+      return;
     }
     refresh();
   };
@@ -697,7 +707,8 @@ function AccessTab({
         <CardHeader>
           <CardTitle>System users</CardTitle>
           <CardDescription>
-            Assign each person one role. Invitations become active when authentication is connected.
+            Assign each person one role and an initial password. Active users can sign in
+            immediately.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -712,6 +723,13 @@ function AccessTab({
               type="email"
               value={user.email}
               onChange={(v) => setUser((o) => ({ ...o, email: v }))}
+            />
+            <Field
+              label="Initial password"
+              type="password"
+              value={user.password}
+              placeholder="At least 10 characters"
+              onChange={(v) => setUser((o) => ({ ...o, password: v }))}
             />
             <div className="space-y-2">
               <Label>Role</Label>
@@ -732,7 +750,10 @@ function AccessTab({
               </Select>
             </div>
           </div>
-          <Button onClick={() => void addUser()} disabled={!user.full_name || !user.email}>
+          <Button
+            onClick={() => void addUser()}
+            disabled={!user.full_name || !user.email || !user.role_id || user.password.length < 10}
+          >
             Add user
           </Button>
           <div className="divide-y rounded-xl border">
@@ -753,6 +774,9 @@ function AccessTab({
                     <Badge variant="outline">
                       {data.roles.find((r: { id: string }) => r.id === u.role_id)?.name || u.status}
                     </Badge>
+                    {u.id === data.currentUserId ? (
+                      <Badge variant="secondary">Current user</Badge>
+                    ) : null}
                     <Button
                       size="sm"
                       variant="outline"
@@ -763,6 +787,7 @@ function AccessTab({
                           email: u.email,
                           role_id: u.role_id || "",
                           status: u.status,
+                          password: "",
                         })
                       }
                     >
@@ -772,8 +797,13 @@ function AccessTab({
                       title="Delete system user?"
                       description={`Remove ${u.full_name} (${u.email}) from Gwero OS?`}
                       onConfirm={() => deleteUser(u.id)}
+                      disabled={u.id === data.currentUserId}
                       trigger={
-                        <Button size="sm" variant="destructive">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={u.id === data.currentUserId}
+                        >
                           Delete
                         </Button>
                       }
@@ -871,6 +901,7 @@ function AccessTab({
                 <Label>Role</Label>
                 <Select
                   value={editingUser.role_id || "none"}
+                  disabled={editingUser.id === data.currentUserId}
                   onValueChange={(v) =>
                     setEditingUser((old) =>
                       old ? { ...old, role_id: v === "none" ? "" : v } : old,
@@ -890,10 +921,18 @@ function AccessTab({
                   </SelectContent>
                 </Select>
               </div>
+              <Field
+                label="New password (optional)"
+                type="password"
+                value={editingUser.password}
+                placeholder="Leave blank to keep the current password"
+                onChange={(v) => setEditingUser((old) => (old ? { ...old, password: v } : old))}
+              />
               <div className="space-y-2">
                 <Label>Status</Label>
                 <Select
                   value={editingUser.status}
+                  disabled={editingUser.id === data.currentUserId}
                   onValueChange={(v) =>
                     setEditingUser((old) => (old ? { ...old, status: v } : old))
                   }

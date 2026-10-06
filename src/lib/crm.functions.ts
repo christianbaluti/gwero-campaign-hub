@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { personalize, htmlToText } from "./personalize";
+import { authMiddleware } from "./auth.middleware";
 
 type Json = Record<string, unknown>;
 
@@ -89,6 +90,7 @@ async function gatewayFetch(
 /* ------------------------------------------------------------------ */
 
 export const saveMailboxCredentials = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((data: { mailboxId: string; smtpPassword?: string; imapPassword?: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -103,6 +105,7 @@ export const saveMailboxCredentials = createServerFn({ method: "POST" })
   });
 
 export const testMailbox = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((data: { mailboxId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -186,6 +189,7 @@ function trackHtml(
 }
 
 export const sendCampaign = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((data: { campaignId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -376,156 +380,320 @@ function parseAddress(value: string) {
   return (match?.[1] ?? value).trim().toLowerCase();
 }
 
-export const syncReplies = createServerFn({ method: "POST" }).handler(async () => {
-  const db = await admin();
-  const { data: mailboxes } = await db.from("mailboxes").select("*");
-  if (!mailboxes?.length) return { imported: 0, checked: 0 };
+type GooglePayload = {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: GooglePayload[];
+};
 
-  const { data: prospects } = await db.from("prospects").select("id, email");
-  const byEmail = new Map((prospects ?? []).map((p) => [p.email.toLowerCase(), p.id]));
+function decodeGoogleBody(payload?: GooglePayload): string {
+  if (!payload) return "";
+  const own = payload.body?.data
+    ? Buffer.from(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+        "utf8",
+      )
+    : "";
+  if (own && payload.mimeType === "text/plain") return own;
+  const parts = payload.parts ?? [];
+  const plain = parts.map(decodeGoogleBody).find(Boolean);
+  if (plain) return plain;
+  return own && payload.mimeType === "text/html" ? htmlToText(own) : "";
+}
 
-  let imported = 0;
-  for (const mailbox of mailboxes) {
-    const messages: Array<{
-      id: string;
-      from: string;
+export const sendProspectEmail = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (data: {
+      prospectId: string;
+      contactId: string;
+      mailboxId: string;
       subject: string;
-      snippet: string;
-      date: string;
-    }> = [];
-    try {
-      const { data: secret } = await db
-        .from("mailbox_secrets")
-        .select("*")
-        .eq("mailbox_id", mailbox.id)
-        .maybeSingle();
-      if (mailbox.provider === "smtp") {
-        if (!mailbox.imap_host) continue;
-        const { imapFetchRecent } = await import("./imap.server");
-        const headers = await imapFetchRecent({
-          host: mailbox.imap_host,
-          port: mailbox.imap_port ?? 993,
-          username: mailbox.imap_username ?? mailbox.smtp_username ?? "",
-          password: secret?.imap_password ?? secret?.smtp_password ?? "",
-        });
-        for (const h of headers) {
-          messages.push({
-            id: `${mailbox.id}:${h.messageId || h.uid}`,
-            from: parseAddress(h.from),
-            subject: h.subject,
-            snippet: h.subject,
-            date: h.date ? new Date(h.date).toISOString() : new Date().toISOString(),
-          });
-        }
-      } else if (mailbox.provider === "gmail") {
-        const res = await gatewayFetch(
-          "gmail",
-          secret!,
-          "/gmail/v1/users/me/messages?q=newer_than:14d%20in:inbox&maxResults=50",
+      body: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    const db = await admin();
+    const { data: contact } = await db
+      .from("prospect_contacts")
+      .select("*")
+      .eq("id", data.contactId)
+      .eq("prospect_id", data.prospectId)
+      .maybeSingle();
+    if (!contact?.email) throw new Error("This contact does not have an email address.");
+    const { data: mailbox } = await db
+      .from("mailboxes")
+      .select("*")
+      .eq("id", data.mailboxId)
+      .maybeSingle();
+    if (!mailbox) throw new Error("Choose a configured sending account.");
+    const { data: secret } = await db
+      .from("mailbox_secrets")
+      .select("*")
+      .eq("mailbox_id", mailbox.id)
+      .maybeSingle();
+    const subject = data.subject.trim();
+    const body = data.body.trim();
+    if (!subject || !body) throw new Error("Add both a subject and message.");
+    const html = `<div style="white-space:pre-wrap">${body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+    const messageId = `<${crypto.randomUUID()}@gwero-crm>`;
+    const { buildMime } = await import("./mime.server");
+    const raw = buildMime({
+      from: mailbox.from_email,
+      fromName: mailbox.from_name,
+      to: contact.email,
+      subject,
+      html,
+      text: body,
+      messageId,
+    });
+    if (mailbox.provider === "smtp") {
+      const { smtpSend } = await import("./smtp.server");
+      await smtpSend(
+        {
+          host: mailbox.smtp_host ?? "",
+          port: mailbox.smtp_port ?? 587,
+          secure: mailbox.smtp_secure,
+          username: mailbox.smtp_username ?? "",
+          password: secret?.smtp_password ?? "",
+        },
+        {
+          from: mailbox.from_email,
+          envelopeFrom: mailbox.from_email,
+          to: contact.email,
+          cc: [],
+          bcc: [],
+          raw,
+        },
+      );
+    } else if (mailbox.provider === "gmail" || mailbox.provider === "google") {
+      const encoded = Buffer.from(raw, "utf8")
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/, "");
+      const response = await gatewayFetch("gmail", secret!, "/gmail/v1/users/me/messages/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ raw: encoded }),
+      });
+      if (!response.ok)
+        throw new Error("Gmail could not send this message. Reconnect the mailbox and try again.");
+    } else {
+      const response = await gatewayFetch("outlook", secret!, "/me/sendMail", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            subject,
+            body: { contentType: "HTML", content: html },
+            toRecipients: [{ emailAddress: { address: contact.email } }],
+          },
+        }),
+      });
+      if (!response.ok)
+        throw new Error(
+          "Microsoft 365 could not send this message. Reconnect the mailbox and try again.",
         );
-        if (!res.ok) throw new Error(await res.text());
-        const list = (await res.json()) as { messages?: Array<{ id: string }> };
-        for (const item of list.messages ?? []) {
-          const detail = await gatewayFetch(
+    }
+    const { error } = await db.from("prospect_interactions").insert({
+      prospect_id: data.prospectId,
+      contact_id: data.contactId,
+      interaction_type: "email",
+      direction: "outbound",
+      subject,
+      body,
+    });
+    if (error)
+      throw new Error(
+        `Email sent, but its conversation record could not be saved: ${error.message}`,
+      );
+    await db
+      .from("prospects")
+      .update({ last_contact_at: new Date().toISOString() })
+      .eq("id", data.prospectId);
+    return { ok: true };
+  });
+
+export const syncReplies = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const db = await admin();
+    const { data: mailboxes } = await db.from("mailboxes").select("*");
+    if (!mailboxes?.length) return { imported: 0, checked: 0 };
+
+    const { data: prospects } = await db.from("prospects").select("id, email");
+    const { data: contacts } = await db.from("prospect_contacts").select("id, prospect_id, email");
+    const byEmail = new Map(
+      (prospects ?? []).map((p) => [
+        p.email.toLowerCase(),
+        { prospectId: p.id, contactId: null as string | null },
+      ]),
+    );
+    for (const contact of contacts ?? [])
+      if (contact.email)
+        byEmail.set(contact.email.toLowerCase(), {
+          prospectId: contact.prospect_id,
+          contactId: contact.id,
+        });
+
+    let imported = 0;
+    for (const mailbox of mailboxes) {
+      const messages: Array<{
+        id: string;
+        from: string;
+        subject: string;
+        snippet: string;
+        body: string;
+        date: string;
+      }> = [];
+      try {
+        const { data: secret } = await db
+          .from("mailbox_secrets")
+          .select("*")
+          .eq("mailbox_id", mailbox.id)
+          .maybeSingle();
+        if (mailbox.provider === "smtp") {
+          if (!mailbox.imap_host) continue;
+          const { imapFetchRecent } = await import("./imap.server");
+          const headers = await imapFetchRecent({
+            host: mailbox.imap_host,
+            port: mailbox.imap_port ?? 993,
+            username: mailbox.imap_username ?? mailbox.smtp_username ?? "",
+            password: secret?.imap_password ?? secret?.smtp_password ?? "",
+          });
+          for (const h of headers) {
+            messages.push({
+              id: `${mailbox.id}:${h.messageId || h.uid}`,
+              from: parseAddress(h.from),
+              subject: h.subject,
+              snippet: h.subject,
+              body: h.subject,
+              date: h.date ? new Date(h.date).toISOString() : new Date().toISOString(),
+            });
+          }
+        } else if (mailbox.provider === "gmail") {
+          const res = await gatewayFetch(
             "gmail",
             secret!,
-            `/gmail/v1/users/me/messages/${item.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+            "/gmail/v1/users/me/messages?q=newer_than:14d%20in:inbox&maxResults=50",
           );
-          if (!detail.ok) continue;
-          const msg = (await detail.json()) as {
-            snippet?: string;
-            payload?: { headers?: Array<{ name: string; value: string }> };
-          };
-          const header = (name: string) =>
-            msg.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value ?? "";
-          messages.push({
-            id: `${mailbox.id}:${item.id}`,
-            from: parseAddress(header("from")),
-            subject: header("subject"),
-            snippet: msg.snippet ?? "",
-            date: header("date")
-              ? new Date(header("date")).toISOString()
-              : new Date().toISOString(),
-          });
-        }
-      } else {
-        const res = await gatewayFetch(
-          "outlook",
-          secret!,
-          "/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,bodyPreview,receivedDateTime",
-        );
-        if (!res.ok) throw new Error(await res.text());
-        const list = (await res.json()) as {
-          value?: Array<{
-            id: string;
-            subject: string;
-            bodyPreview: string;
-            receivedDateTime: string;
-            from?: { emailAddress?: { address?: string } };
-          }>;
-        };
-        for (const m of list.value ?? []) {
-          messages.push({
-            id: `${mailbox.id}:${m.id}`,
-            from: (m.from?.emailAddress?.address ?? "").toLowerCase(),
-            subject: m.subject,
-            snippet: m.bodyPreview,
-            date: m.receivedDateTime,
-          });
-        }
-      }
-
-      for (const message of messages) {
-        const prospectId = byEmail.get(message.from);
-        if (!prospectId) continue;
-        const { data: recipientRow } = await db
-          .from("campaign_recipients")
-          .select("id, campaign_id")
-          .eq("prospect_id", prospectId)
-          .eq("status", "sent")
-          .order("sent_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { error } = await db.from("replies").insert({
-          mailbox_id: mailbox.id,
-          prospect_id: prospectId,
-          campaign_id: recipientRow?.campaign_id ?? null,
-          from_email: message.from,
-          subject: message.subject,
-          snippet: message.snippet?.slice(0, 500),
-          received_at: message.date,
-          external_id: message.id,
-        });
-        if (!error) {
-          imported++;
-          if (recipientRow) {
-            await db
-              .from("campaign_recipients")
-              .update({ replied_at: message.date })
-              .eq("id", recipientRow.id);
+          if (!res.ok) throw new Error(await res.text());
+          const list = (await res.json()) as { messages?: Array<{ id: string }> };
+          for (const item of list.messages ?? []) {
+            const detail = await gatewayFetch(
+              "gmail",
+              secret!,
+              `/gmail/v1/users/me/messages/${item.id}?format=full`,
+            );
+            if (!detail.ok) continue;
+            const msg = (await detail.json()) as {
+              snippet?: string;
+              payload?: {
+                headers?: Array<{ name: string; value: string }>;
+                mimeType?: string;
+                body?: { data?: string };
+                parts?: Array<unknown>;
+              };
+            };
+            const header = (name: string) =>
+              msg.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value ?? "";
+            messages.push({
+              id: `${mailbox.id}:${item.id}`,
+              from: parseAddress(header("from")),
+              subject: header("subject"),
+              snippet: msg.snippet ?? "",
+              body: decodeGoogleBody(msg.payload as GooglePayload) || msg.snippet || "",
+              date: header("date")
+                ? new Date(header("date")).toISOString()
+                : new Date().toISOString(),
+            });
           }
-          await db
-            .from("prospects")
-            .update({ status: "replied", updated_at: new Date().toISOString() })
-            .eq("id", prospectId)
-            .in("status", ["new", "contacted"]);
+        } else {
+          const res = await gatewayFetch(
+            "outlook",
+            secret!,
+            "/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,body,bodyPreview,receivedDateTime",
+          );
+          if (!res.ok) throw new Error(await res.text());
+          const list = (await res.json()) as {
+            value?: Array<{
+              id: string;
+              subject: string;
+              bodyPreview: string;
+              body?: { content?: string; contentType?: string };
+              receivedDateTime: string;
+              from?: { emailAddress?: { address?: string } };
+            }>;
+          };
+          for (const m of list.value ?? []) {
+            messages.push({
+              id: `${mailbox.id}:${m.id}`,
+              from: (m.from?.emailAddress?.address ?? "").toLowerCase(),
+              subject: m.subject,
+              snippet: m.bodyPreview,
+              body:
+                m.body?.contentType === "html" || m.body?.contentType === "HTML"
+                  ? htmlToText(m.body.content || "")
+                  : m.body?.content || m.bodyPreview,
+              date: m.receivedDateTime,
+            });
+          }
         }
+
+        for (const message of messages) {
+          const match = byEmail.get(message.from);
+          if (!match) continue;
+          const { prospectId, contactId } = match;
+          const { data: recipientRow } = await db
+            .from("campaign_recipients")
+            .select("id, campaign_id")
+            .eq("prospect_id", prospectId)
+            .eq("status", "sent")
+            .order("sent_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const { error } = await db.from("replies").insert({
+            mailbox_id: mailbox.id,
+            prospect_id: prospectId,
+            contact_id: contactId,
+            campaign_id: recipientRow?.campaign_id ?? null,
+            from_email: message.from,
+            subject: message.subject,
+            snippet: message.snippet?.slice(0, 500),
+            body: message.body,
+            received_at: message.date,
+            external_id: message.id,
+          });
+          if (!error) {
+            imported++;
+            if (recipientRow) {
+              await db
+                .from("campaign_recipients")
+                .update({ replied_at: message.date })
+                .eq("id", recipientRow.id);
+            }
+            await db
+              .from("prospects")
+              .update({ status: "replied", updated_at: new Date().toISOString() })
+              .eq("id", prospectId)
+              .in("status", ["new", "contacted"]);
+          }
+        }
+
+        await db
+          .from("mailboxes")
+          .update({ last_sync_at: new Date().toISOString(), last_status: "Inbox checked" })
+          .eq("id", mailbox.id);
+      } catch (error) {
+        await db
+          .from("mailboxes")
+          .update({
+            last_status: `Inbox check failed: ${String((error as Error).message).slice(0, 200)}`,
+          })
+          .eq("id", mailbox.id);
       }
-
-      await db
-        .from("mailboxes")
-        .update({ last_sync_at: new Date().toISOString(), last_status: "Inbox checked" })
-        .eq("id", mailbox.id);
-    } catch (error) {
-      await db
-        .from("mailboxes")
-        .update({
-          last_status: `Inbox check failed: ${String((error as Error).message).slice(0, 200)}`,
-        })
-        .eq("id", mailbox.id);
     }
-  }
 
-  return { imported, checked: mailboxes.length };
-});
+    return { imported, checked: mailboxes.length };
+  });

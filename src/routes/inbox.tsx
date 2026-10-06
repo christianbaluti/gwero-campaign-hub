@@ -28,7 +28,9 @@ function InboxPage() {
     },
   });
   const shown = replies.filter((r) =>
-    `${r.from_email} ${r.subject} ${r.snippet}`.toLowerCase().includes(search.toLowerCase()),
+    `${r.from_email} ${r.subject} ${r.body || r.snippet}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
   );
   async function runSync() {
     setBusy(true);
@@ -74,7 +76,9 @@ function InboxPage() {
                   {new Date(r.received_at).toLocaleString()}
                 </time>
               </div>
-              <p className="mt-3 text-sm">{r.snippet || "No preview available."}</p>
+              <p className="mt-3 whitespace-pre-wrap text-sm">
+                {r.body || r.snippet || "No preview available."}
+              </p>
             </article>
           ))}
           {shown.length === 0 ? (

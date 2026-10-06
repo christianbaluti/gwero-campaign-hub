@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "deploy:build": "npm run db:migrate && npm run build",
     "db:migrate": "node scripts/migrate.mjs",
+    "contacts:import": "node --experimental-strip-types scripts/import-contacts.mjs",
+    "contacts:logos": "node scripts/enrich-prospect-logos.mjs",
+    "prospects:categorize": "node scripts/categorize-prospects.mjs",
     "build:dev": "vite build --mode development",
     "prestart": "npm run db:migrate",
     "start": "node dist/server/index.mjs",

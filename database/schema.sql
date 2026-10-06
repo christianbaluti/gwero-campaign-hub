@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS replies (
   CONSTRAINT replies_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE SET NULL,
   CONSTRAINT replies_campaign_fk FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS body LONGTEXT NULL;
 
 CREATE TABLE IF NOT EXISTS quotations (
   id CHAR(36) PRIMARY KEY, quote_number VARCHAR(60) NOT NULL, title VARCHAR(255) NOT NULL,
@@ -358,6 +360,15 @@ CREATE TABLE IF NOT EXISTS system_users (
   CONSTRAINT system_users_role_fk FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password_hash TEXT NULL;
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id CHAR(36) PRIMARY KEY, user_id CHAR(36) NOT NULL, token_hash CHAR(64) NOT NULL,
+  expires_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY auth_sessions_token (token_hash), KEY auth_sessions_user (user_id),
+  CONSTRAINT auth_sessions_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS prospect_categories (
   id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, description TEXT, offerings TEXT,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -371,6 +382,37 @@ ALTER TABLE prospects ADD COLUMN IF NOT EXISTS linkedin_url VARCHAR(500) NULL;
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS fit_score INT NULL;
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS fit_reason TEXT NULL;
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS last_contact_at DATETIME(3) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS logo_path VARCHAR(500) NULL;
+ALTER TABLE prospects MODIFY COLUMN logo_path LONGTEXT NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(255) NULL;
+
+CREATE TABLE IF NOT EXISTS prospect_contacts (
+  id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,
+  first_name VARCHAR(255), last_name VARCHAR(255), email VARCHAR(320), phone VARCHAR(40),
+  gender VARCHAR(40), job_title VARCHAR(255), is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY prospect_contacts_email (email),
+  KEY prospect_contacts_prospect (prospect_id),
+  CONSTRAINT prospect_contacts_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
+
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_path VARCHAR(500) NULL;
+
+CREATE TABLE IF NOT EXISTS client_contacts (
+  id CHAR(36) PRIMARY KEY, client_id CHAR(36) NOT NULL,
+  first_name VARCHAR(255), last_name VARCHAR(255), email VARCHAR(320), phone VARCHAR(40),
+  gender VARCHAR(40), job_title VARCHAR(255), is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY client_contacts_email (email),
+  KEY client_contacts_client (client_id),
+  CONSTRAINT client_contacts_client_fk FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
 
 CREATE TABLE IF NOT EXISTS prospect_interactions (
   id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,
@@ -380,6 +422,9 @@ CREATE TABLE IF NOT EXISTS prospect_interactions (
   KEY prospect_interactions_prospect (prospect_id),
   CONSTRAINT prospect_interactions_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE prospect_interactions ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
 
 CREATE TABLE IF NOT EXISTS ai_prospect_searches (
   id CHAR(36) PRIMARY KEY, prompt LONGTEXT NOT NULL, search_context LONGTEXT,

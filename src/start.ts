@@ -24,6 +24,33 @@ const csrfMiddleware = createCsrfMiddleware({
   filter: (ctx) => ctx.handlerType === "serverFn",
 });
 
+const pageAuthMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const url = new URL(request.url);
+  const publicPath =
+    url.pathname === "/login" ||
+    url.pathname === "/api/health" ||
+    url.pathname.startsWith("/api/public/") ||
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith("/@") ||
+    url.pathname === "/favicon.ico" ||
+    url.pathname === "/robots.txt";
+  const isPageRequest =
+    request.method === "GET" && request.headers.get("accept")?.includes("text/html");
+  if (!publicPath && isPageRequest) {
+    const { currentUser } = await import("./lib/auth.server");
+    if (!(await currentUser())) {
+      const login = new URL("/login", url);
+      login.searchParams.set("next", `${url.pathname}${url.search}`);
+      return Response.redirect(login, 302);
+    }
+  }
+  if (url.pathname === "/login" && isPageRequest) {
+    const { currentUser } = await import("./lib/auth.server");
+    if (await currentUser()) return Response.redirect(new URL("/", url), 302);
+  }
+  return next();
+});
+
 export const startInstance = createStart(() => ({
-  requestMiddleware: [errorMiddleware, csrfMiddleware],
+  requestMiddleware: [errorMiddleware, pageAuthMiddleware, csrfMiddleware],
 }));

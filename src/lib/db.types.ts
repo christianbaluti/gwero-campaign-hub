@@ -18,6 +18,8 @@ export interface Prospect {
   fit_score: number | null;
   fit_reason: string | null;
   last_contact_at: string | null;
+  logo_path: string | null;
+  canonical_key: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +35,7 @@ export interface Client {
   address: string | null;
   notes: string | null;
   prospect_id: string | null;
+  logo_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -152,10 +155,12 @@ export interface Reply {
   id: string;
   mailbox_id: string | null;
   prospect_id: string | null;
+  contact_id: string | null;
   campaign_id: string | null;
   from_email: string;
   subject: string | null;
   snippet: string | null;
+  body: string | null;
   received_at: string;
   external_id: string | null;
   created_at: string;
@@ -538,6 +543,44 @@ export interface SystemUser {
   role_id: string | null;
   status: string;
   last_login_at: string | null;
+  password_hash: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface AuthSession {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: string;
+  created_at: string;
+}
+export interface ProspectContact {
+  id: string;
+  prospect_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  raw_phone: string | null;
+  gender: string | null;
+  job_title: string | null;
+  avatar_url: string | null;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface ClientContact {
+  id: string;
+  client_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  raw_phone: string | null;
+  gender: string | null;
+  job_title: string | null;
+  avatar_url: string | null;
+  is_primary: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -552,6 +595,7 @@ export interface ProspectCategory {
 export interface ProspectInteraction {
   id: string;
   prospect_id: string;
+  contact_id: string | null;
   interaction_type: string;
   direction: string;
   subject: string | null;
@@ -611,6 +655,9 @@ export interface Tables {
   permissions: Permission;
   role_permissions: RolePermission;
   system_users: SystemUser;
+  auth_sessions: AuthSession;
+  prospect_contacts: ProspectContact;
+  client_contacts: ClientContact;
   prospect_categories: ProspectCategory;
   prospect_interactions: ProspectInteraction;
   ai_prospect_searches: AiProspectSearch;

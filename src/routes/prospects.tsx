@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { db } from "@/lib/db";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { discoverProspects, type AiProspect } from "@/lib/settings.functions";
+import { importProspectContacts, type ContactImportRow } from "@/lib/prospects.functions";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import {
   Dialog,
@@ -30,6 +31,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -64,15 +67,14 @@ function ProspectsRoute() {
 }
 
 const FIELDS = [
-  { key: "email", label: "Email (required)" },
+  { key: "company", label: "Company / organisation (required)" },
   { key: "first_name", label: "First name" },
   { key: "last_name", label: "Last name" },
-  { key: "company", label: "Company" },
+  { key: "email", label: "Email" },
+  { key: "gender", label: "Gender" },
   { key: "job_title", label: "Job title" },
   { key: "phone", label: "Phone" },
 ] as const;
-
-const STATUSES = ["new", "contacted", "replied", "interested", "not_interested", "client"];
 
 type Row = Record<string, unknown>;
 
@@ -83,6 +85,7 @@ type Draft = {
   company: string;
   job_title: string;
   phone: string;
+  gender: string;
   website: string;
   linkedin_url: string;
   category_id: string;
@@ -94,6 +97,7 @@ const emptyDraft = (): Draft => ({
   company: "",
   job_title: "",
   phone: "",
+  gender: "",
   website: "",
   linkedin_url: "",
   category_id: "",
@@ -118,19 +122,34 @@ function AddProspectsDialog({
       return;
     }
     setBusy(true);
-    const { error } = await db.from("prospects").insert(
-      valid.map((d) => ({
-        ...d,
-        email: d.email.trim().toLowerCase() || `unknown-${crypto.randomUUID()}@prospect.local`,
-        category_id: d.category_id || null,
-      })),
-    );
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    let result;
+    try {
+      result = await importProspectContacts({
+        data: {
+          rows: valid.map((d) => ({
+            company: d.company,
+            firstName: d.first_name,
+            lastName: d.last_name,
+            email: d.email,
+            phone: d.phone,
+            gender: d.gender,
+            jobTitle: d.job_title,
+            website: d.website,
+            linkedinUrl: d.linkedin_url,
+            categoryId: d.category_id || null,
+          })),
+          sourceFile: "Manual entry",
+        },
+      });
+    } catch (error) {
+      setBusy(false);
+      toast.error(error instanceof Error ? error.message : "Could not save contacts.");
       return;
     }
-    toast.success(`${valid.length} prospect${valid.length === 1 ? "" : "s"} added.`);
+    setBusy(false);
+    toast.success(
+      `${result.contactsCreated + result.contactsUpdated} contact${valid.length === 1 ? "" : "s"} saved across ${result.companies} compan${result.companies === 1 ? "y" : "ies"}.`,
+    );
     setDrafts([emptyDraft()]);
     setOpen(false);
     onDone();
@@ -188,6 +207,20 @@ function AddProspectsDialog({
                   value={draft.phone}
                   onChange={(e) => update(index, "phone", e.target.value)}
                 />
+                <Select
+                  value={draft.gender || "none"}
+                  onValueChange={(v) => update(index, "gender", v === "none" ? "" : v)}
+                >
+                  <SelectTrigger aria-label="Gender">
+                    <SelectValue placeholder="Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Gender not specified</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Input
                   aria-label="Website"
                   placeholder="Website"
@@ -287,15 +320,15 @@ function CategoryDialog({
       <DialogTrigger asChild>
         <Button variant="outline">Categories</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="flex h-[88vh] max-h-[88vh] flex-col overflow-hidden sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Prospect categories</DialogTitle>
           <DialogDescription>
             Describe the segment and what your team can offer it. AI research uses this context.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-5 md:grid-cols-[1fr_1.15fr]">
-          <div className="space-y-4">
+        <div className="grid min-h-0 flex-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+          <div className="space-y-4 overflow-y-auto pr-1 md:overflow-y-visible md:pr-0">
             <FieldInput
               label="Category name"
               value={form.name}
@@ -327,8 +360,10 @@ function CategoryDialog({
               </Button>
             ) : null}
           </div>
-          <div className="space-y-2">
-            <p className="text-sm font-semibold">Existing categories</p>
+          <div className="gwero-scrollbar min-h-0 space-y-2 overflow-y-auto pr-2">
+            <p className="sticky top-0 z-10 bg-background pb-2 text-sm font-semibold">
+              Existing categories
+            </p>
             {categories.map((category) => (
               <div key={category.id} className="rounded-xl border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -417,25 +452,25 @@ function AiSearchDialog({
   });
   const add = async () => {
     const items = results.filter((_, i) => selected.includes(i));
-    const { error } = await db.from("prospects").insert(
-      items.map((p) => ({
-        email: p.email || `unknown-${crypto.randomUUID()}@prospect.local`,
-        first_name: p.first_name,
-        last_name: p.last_name,
-        company: p.company,
-        job_title: p.job_title,
-        phone: p.phone,
-        website: p.website,
-        linkedin_url: p.linkedin_url,
-        fit_score: p.fit_score,
-        fit_reason: p.fit_reason,
-        category_id: categoryId || null,
-        extra: { source_urls: p.source_urls },
-        source_file: "OpenAI web research",
-      })),
-    );
-    if (error) {
-      toast.error(error.message);
+    try {
+      await importProspectContacts({
+        data: {
+          rows: items.map((p) => ({
+            company: p.company,
+            firstName: p.first_name || "",
+            lastName: p.last_name || "",
+            email: p.email || "",
+            phone: p.phone || "",
+            jobTitle: p.job_title || "",
+            website: p.website || "",
+            linkedinUrl: p.linkedin_url || "",
+            categoryId: categoryId || null,
+          })),
+          sourceFile: "OpenAI web research",
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save researched prospects.");
       return;
     }
     toast.success(`${items.length} researched prospects added.`);
@@ -568,6 +603,25 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
       );
       if (hit) guess[field.key] = hit;
     }
+    const aliases: Record<string, string[]> = {
+      company: ["organisation", "organization", "company", "client"],
+      first_name: ["name of participant first", "first name", "firstname"],
+      last_name: ["name of participant last", "last name", "lastname", "surname"],
+      phone: ["contact phone", "phone", "mobile", "number"],
+      gender: ["gender", "sex"],
+      email: ["email address", "email", "mail"],
+    };
+    for (const [field, choices] of Object.entries(aliases)) {
+      const hit = cols.find((column) =>
+        choices.includes(
+          column
+            .toLowerCase()
+            .replace(/[^a-z]+/g, " ")
+            .trim(),
+        ),
+      );
+      if (hit) guess[field] = hit;
+    }
     if (!guess["email"]) {
       const hit = cols.find((c) => c.toLowerCase().includes("mail"));
       if (hit) guess["email"] = hit;
@@ -580,52 +634,50 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
   }
 
   async function importRows() {
-    const emailCol = mapping["email"];
-    if (!emailCol) {
-      toast.error("Choose which column holds the email address.");
+    const companyCol = mapping["company"];
+    if (!companyCol) {
+      toast.error("Choose which column holds the company or organisation.");
       return;
     }
     setBusy(true);
     const mapped = rows
       .map((row) => {
-        const used = new Set(Object.values(mapping));
-        const extra: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(row)) {
-          if (!used.has(key) && value !== "") extra[key] = value;
-        }
         const pick = (field: string) => {
           const col = mapping[field];
           const value = col ? row[col] : null;
           return value == null || value === "" ? null : String(value).trim();
         };
-        const email = pick("email");
-        if (!email || !email.includes("@")) return null;
+        const company = pick("company");
+        if (!company) return null;
         return {
-          email: email.toLowerCase(),
-          first_name: pick("first_name"),
-          last_name: pick("last_name"),
-          company: pick("company"),
-          job_title: pick("job_title"),
-          phone: pick("phone"),
-          extra,
-          source_file: fileName,
+          company,
+          email: pick("email") || "",
+          firstName: pick("first_name") || "",
+          lastName: pick("last_name") || "",
+          gender: pick("gender") || "",
+          jobTitle: pick("job_title") || "",
+          phone: pick("phone") || "",
         };
       })
-      .filter(Boolean) as Array<Record<string, unknown>>;
+      .filter(Boolean) as ContactImportRow[];
 
     if (!mapped.length) {
       setBusy(false);
-      toast.error("No valid email addresses found in that column.");
+      toast.error("No company names were found in that column.");
       return;
     }
 
-    const { error } = await db.from("prospects").upsert(mapped as never, { onConflict: "email" });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
+    try {
+      const result = await importProspectContacts({ data: { rows: mapped, sourceFile: fileName } });
+      toast.success(
+        `${result.contactsCreated + result.contactsUpdated} contacts imported into ${result.companies} canonical companies.`,
+      );
+    } catch (error) {
+      setBusy(false);
+      toast.error(error instanceof Error ? error.message : "Import failed.");
       return;
     }
-    toast.success(`${mapped.length} prospects imported.`);
+    setBusy(false);
     setOpen(false);
     setRows([]);
     setHeaders([]);
@@ -717,6 +769,10 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
 function ProspectsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("name_asc");
+  const [visibleCount, setVisibleCount] = useState(30);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const { data: prospects = [] } = useQuery({
     queryKey: ["prospects"],
@@ -737,48 +793,53 @@ function ProspectsPage() {
       return data;
     },
   });
-
-  const setStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await db.from("prospects").update({ status }).eq("id", id);
+  const { data: contacts = [] } = useQuery({
+    queryKey: ["prospect-contacts"],
+    queryFn: async () => {
+      const { data, error } = await db.from("prospect_contacts").select("*").order("first_name");
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["prospects"] }),
   });
 
-  const convert = useMutation({
-    mutationFn: async (prospect: (typeof prospects)[number]) => {
-      const { error } = await db.from("clients").insert({
-        name: [prospect.first_name, prospect.last_name].filter(Boolean).join(" ") || prospect.email,
-        company: prospect.company,
-        email: prospect.email,
-        phone: prospect.phone,
-        prospect_id: prospect.id,
-      });
-      if (error) throw error;
-      await db.from("prospects").update({ status: "client" }).eq("id", prospect.id);
-    },
-    onSuccess: () => {
-      toast.success("Prospect converted to a client.");
-      void qc.invalidateQueries({ queryKey: ["prospects"] });
-      void qc.invalidateQueries({ queryKey: ["clients"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await db.from("prospects").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["prospects"] }),
-  });
-
-  const filtered = prospects.filter((p) =>
-    `${p.email} ${p.first_name ?? ""} ${p.last_name ?? ""} ${p.company ?? ""}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  const filtered = prospects
+    .filter(
+      (p) =>
+        (categoryFilter === "all" || p.category_id === categoryFilter) &&
+        `${p.email} ${p.first_name ?? ""} ${p.last_name ?? ""} ${p.company ?? ""}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+    )
+    .sort((a, b) => {
+      const companyA = a.company || a.email;
+      const companyB = b.company || b.email;
+      if (sortBy === "name_desc") return companyB.localeCompare(companyA);
+      if (sortBy === "newest")
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      if (sortBy === "oldest")
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sortBy === "contacts_desc") {
+        const countA = contacts.filter((contact) => contact.prospect_id === a.id).length;
+        const countB = contacts.filter((contact) => contact.prospect_id === b.id).length;
+        return countB - countA || companyA.localeCompare(companyB);
+      }
+      return companyA.localeCompare(companyB);
+    });
+  const visible = filtered.slice(0, visibleCount);
+  useEffect(() => setVisibleCount(30), [search, categoryFilter, sortBy]);
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting)
+          setVisibleCount((count) => Math.min(count + 30, filtered.length));
+      },
+      { rootMargin: "300px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [filtered.length]);
 
   return (
     <AppShell
@@ -804,92 +865,173 @@ function ProspectsPage() {
     >
       <Card>
         <CardContent className="pt-6">
-          <Input
-            placeholder="Search by name, email or company"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mb-4 max-w-sm"
-          />
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="mb-4 grid min-w-0 gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(190px,280px)_minmax(180px,230px)]">
+            <Input
+              placeholder="Search by name, email or company"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-w-0"
+            />
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full min-w-0" aria-label="Filter by category">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full min-w-0" aria-label="Sort prospects">
+                <SelectValue placeholder="Sort prospects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name_asc">Company A–Z</SelectItem>
+                <SelectItem value="name_desc">Company Z–A</SelectItem>
+                <SelectItem value="newest">Newest added</SelectItem>
+                <SelectItem value="oldest">Oldest added</SelectItem>
+                <SelectItem value="contacts_desc">Most contacts</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="relative">
+            <Table className="table-fixed" containerClassName="overflow-visible">
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="sticky top-20 z-20 w-[36%] bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                    Company
+                  </TableHead>
+                  <TableHead className="sticky top-20 z-20 w-[38%] bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                    Company email
+                  </TableHead>
+                  <TableHead className="sticky top-20 z-20 w-[26%] bg-background/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+                    Contact people
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">
-                      <Link
-                        to="/prospects/$id"
-                        params={{ id: p.id }}
-                        className="text-violet-800 hover:underline"
-                      >
-                        {[p.first_name, p.last_name].filter(Boolean).join(" ") ||
-                          p.company ||
-                          "Open prospect"}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{p.email}</TableCell>
-                    <TableCell>
-                      <div>{p.company ?? "—"}</div>
-                      <p className="text-xs text-muted-foreground">
-                        {categories.find((c) => c.id === p.category_id)?.name || "Uncategorised"}
-                        {p.fit_score != null ? ` · ${p.fit_score}% fit` : ""}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={p.status}
-                        onValueChange={(status) => setStatus.mutate({ id: p.id, status })}
-                      >
-                        <SelectTrigger className="h-8 w-40">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUSES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s.replace("_", " ")}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="space-x-2 text-right">
-                      <Button size="sm" variant="outline" onClick={() => convert.mutate(p)}>
-                        Make client
-                      </Button>
-                      <ConfirmAction
-                        title="Delete prospect?"
-                        description={`Remove ${p.company || p.email} and its interaction history?`}
-                        onConfirm={() => remove.mutateAsync(p.id)}
-                        trigger={
-                          <Button size="sm" variant="destructive">
-                            Delete
-                          </Button>
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {visible.map((p) => {
+                  const people = contacts.filter((contact) => contact.prospect_id === p.id);
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="min-w-0 font-medium">
+                        <div className="flex items-center gap-3">
+                          {p.logo_path ? (
+                            <img
+                              src={p.logo_path}
+                              alt=""
+                              className="size-9 rounded-lg border bg-white object-contain p-1"
+                            />
+                          ) : (
+                            <span className="grid size-9 place-items-center rounded-lg bg-violet-50 text-xs font-bold text-violet-700">
+                              {(p.company || "P").charAt(0)}
+                            </span>
+                          )}
+                          <Link
+                            to="/prospects/$id"
+                            params={{ id: p.id }}
+                            className="min-w-0 truncate text-violet-800 hover:underline"
+                          >
+                            {p.company || "Open prospect"}
+                          </Link>
+                        </div>
+                      </TableCell>
+                      <TableCell className="min-w-0 overflow-hidden">
+                        {p.email.includes("@prospect.local") ? (
+                          <span className="text-muted-foreground">No verified company email</span>
+                        ) : (
+                          <a
+                            href={`mailto:${p.email}`}
+                            className="block truncate hover:text-primary hover:underline"
+                          >
+                            {p.email}
+                          </a>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <TooltipProvider delayDuration={150}>
+                          <div className="flex min-w-0 -space-x-2 overflow-hidden py-1">
+                            {people.slice(0, 8).map((person) => {
+                              const name =
+                                [person.first_name, person.last_name].filter(Boolean).join(" ") ||
+                                person.email ||
+                                "Contact";
+                              const initials =
+                                [person.first_name, person.last_name]
+                                  .filter(Boolean)
+                                  .map((part) => part!.charAt(0))
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase() || "?";
+                              return (
+                                <Tooltip key={person.id}>
+                                  <TooltipTrigger asChild>
+                                    <Link
+                                      to="/prospects/$id/contacts/$contactId"
+                                      params={{ id: p.id, contactId: person.id }}
+                                      aria-label={`Open ${name}`}
+                                    >
+                                      <Avatar className="size-9 border-2 border-background transition-transform hover:z-10 hover:scale-110">
+                                        <AvatarImage src={person.avatar_url || undefined} alt="" />
+                                        <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                                          {initials}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </Link>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{name}</p>
+                                    {person.job_title ? (
+                                      <p className="text-xs opacity-75">{person.job_title}</p>
+                                    ) : null}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                            {people.length > 8 ? (
+                              <span className="grid size-9 place-items-center rounded-full border-2 border-background bg-muted text-xs font-semibold">
+                                +{people.length - 8}
+                              </span>
+                            ) : null}
+                            {!people.length ? (
+                              <span className="text-sm text-muted-foreground">No contacts</span>
+                            ) : null}
+                          </div>
+                        </TooltipProvider>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                      No prospects yet — upload a spreadsheet to get started.
+                    <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
+                      No prospects match the current search and category filters.
                     </TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
           </div>
+          <div ref={loadMoreRef} className="h-2" aria-hidden="true" />
           <div className="mt-4 text-xs text-muted-foreground">
-            <Badge variant="secondary">{prospects.length}</Badge> prospects in total
+            <Badge variant="secondary">{visible.length}</Badge> of {filtered.length} matching
+            prospects loaded
+            {visible.length < filtered.length ? " · Scroll to load more" : ""}
           </div>
+          {visible.length < filtered.length ? (
+            <Button
+              className="mt-3"
+              size="sm"
+              variant="outline"
+              onClick={() => setVisibleCount((count) => Math.min(count + 30, filtered.length))}
+            >
+              Load more prospects
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </AppShell>

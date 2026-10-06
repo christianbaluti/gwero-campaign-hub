@@ -1,40 +1,62 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSecret, hasSecret, setSecret } from "./settings.server";
+import { authMiddleware, permissionMiddleware } from "./auth.middleware";
 
 async function admin() {
   return (await import("./db.server")).serverDb;
 }
 
-export const getSettingsOverview = createServerFn({ method: "GET" }).handler(async () => {
+export const getPublicBranding = createServerFn({ method: "GET" }).handler(async () => {
   const db = await admin();
-  const [settings, templates, roles, permissions, rolePermissions, users] = await Promise.all([
-    db.from("system_settings").select("*").order("setting_key"),
-    db.from("email_templates").select("*").order("name"),
-    db.from("roles").select("*").order("name"),
-    db.from("permissions").select("*").order("module"),
-    db.from("role_permissions").select("*"),
-    db.from("system_users").select("*").order("full_name"),
-  ]);
-  return JSON.parse(
-    JSON.stringify({
-      settings: settings.data ?? [],
-      templates: templates.data ?? [],
-      roles: roles.data ?? [],
-      permissions: permissions.data ?? [],
-      rolePermissions: rolePermissions.data ?? [],
-      users: users.data ?? [],
-      configured: {
-        openai: await hasSecret("openai_api_key"),
-        googleId: await hasSecret("google_oauth_client_id"),
-        googleSecret: await hasSecret("google_oauth_client_secret"),
-        microsoftId: await hasSecret("microsoft_oauth_client_id"),
-        microsoftSecret: await hasSecret("microsoft_oauth_client_secret"),
-      },
-    }),
-  );
+  const { data, error } = await db
+    .from("system_settings")
+    .select("*")
+    .in("setting_key", [
+      "system_name",
+      "logo_url",
+      "icon_url",
+      "primary_color",
+      "accent_color",
+      "font_family",
+    ]);
+  if (error) throw new Error(error.message);
+  return Object.fromEntries((data ?? []).map((row) => [row.setting_key, row.setting_value]));
 });
 
+export const getSettingsOverview = createServerFn({ method: "GET" })
+  .middleware([permissionMiddleware("settings.manage")])
+  .handler(async ({ context }) => {
+    const db = await admin();
+    const [settings, templates, roles, permissions, rolePermissions, users] = await Promise.all([
+      db.from("system_settings").select("*").order("setting_key"),
+      db.from("email_templates").select("*").order("name"),
+      db.from("roles").select("*").order("name"),
+      db.from("permissions").select("*").order("module"),
+      db.from("role_permissions").select("*"),
+      db.from("system_users").select("*").order("full_name"),
+    ]);
+    return JSON.parse(
+      JSON.stringify({
+        settings: settings.data ?? [],
+        templates: templates.data ?? [],
+        roles: roles.data ?? [],
+        permissions: permissions.data ?? [],
+        rolePermissions: rolePermissions.data ?? [],
+        users: (users.data ?? []).map(({ password_hash: _passwordHash, ...user }) => user),
+        currentUserId: context.user.id,
+        configured: {
+          openai: await hasSecret("openai_api_key"),
+          googleId: await hasSecret("google_oauth_client_id"),
+          googleSecret: await hasSecret("google_oauth_client_secret"),
+          microsoftId: await hasSecret("microsoft_oauth_client_id"),
+          microsoftSecret: await hasSecret("microsoft_oauth_client_secret"),
+        },
+      }),
+    );
+  });
+
 export const saveSystemSettings = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("settings.manage")])
   .validator(
     (data: { group: string; values: Record<string, string | number | boolean | null> }) => data,
   )
@@ -53,6 +75,7 @@ export const saveSystemSettings = createServerFn({ method: "POST" })
   });
 
 export const saveProviderSecrets = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("settings.manage")])
   .validator((data: Record<string, string>) => data)
   .handler(async ({ data }) => {
     for (const [key, value] of Object.entries(data)) await setSecret(key, value);
@@ -74,6 +97,7 @@ export type AiProspect = {
 };
 
 export const discoverProspects = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
   .validator((data: { prompt: string; categoryId?: string | null; limit?: number }) => data)
   .handler(async ({ data }) => {
     const apiKey = await getSecret("openai_api_key");

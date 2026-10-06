@@ -30,8 +30,19 @@ import {
   Bell,
   CircleHelp,
   Settings,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { db } from "@/lib/db";
+import { getAuthStatus, logout } from "@/lib/auth.functions";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
@@ -104,6 +115,7 @@ export function AppShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: () => getAuthStatus() });
   const { data: branding = [] } = useQuery({
     queryKey: ["app-branding"],
     queryFn: async () => {
@@ -128,7 +140,7 @@ export function AppShell({
   }, [brand["icon_url"]]);
   return (
     <div
-      className="flex min-h-screen bg-background"
+      className="flex min-h-screen max-w-full overflow-x-clip bg-background"
       style={
         {
           fontFamily: brand["font_family"] || undefined,
@@ -191,7 +203,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col md:pl-64">
+      <div className="flex w-full min-w-0 flex-1 flex-col md:pl-64">
         <header className="fixed left-0 right-0 top-0 z-30 flex min-h-20 items-center gap-4 border-b border-violet-100 bg-white/95 px-5 backdrop-blur md:left-64 md:px-8">
           <div className="relative hidden max-w-xl flex-1 lg:block">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -211,13 +223,47 @@ export function AppShell({
               <Bell className="size-5" />
               <span className="absolute right-1.5 top-1.5 size-2 rounded-full border border-white bg-rose-500" />
             </button>
-            <div className="ml-2 grid size-9 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-              GA
-            </div>
-            <div className="hidden sm:block">
-              <p className="text-xs font-semibold">Gwero Admin</p>
-              <p className="text-[10px] text-muted-foreground">Business operations</p>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="ml-2 flex items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-accent">
+                  <span className="grid size-9 place-items-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+                    {(auth?.user?.fullName || "Gwero User")
+                      .split(/\s+/)
+                      .slice(0, 2)
+                      .map((part) => part.charAt(0))
+                      .join("")
+                      .toUpperCase()}
+                  </span>
+                  <span className="hidden sm:block">
+                    <span className="block text-xs font-semibold">
+                      {auth?.user?.fullName || "Gwero user"}
+                    </span>
+                    <span className="block text-[10px] text-muted-foreground">
+                      {auth?.user?.roleName || "System account"}
+                    </span>
+                  </span>
+                  <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>
+                  <span className="block font-medium">{auth?.user?.fullName}</span>
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {auth?.user?.email}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-rose-600"
+                  onClick={() => {
+                    void logout().finally(() => window.location.assign("/login"));
+                  }}
+                >
+                  <LogOut className="mr-2 size-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <div className="mt-20 flex gap-1 overflow-x-auto border-b border-border bg-card px-3 py-2 md:hidden">
@@ -236,11 +282,11 @@ export function AppShell({
             </Link>
           ))}
         </div>
-        <main className="flex-1 p-4 md:pt-28 md:px-7 md:pb-7">
-          <div className="mx-auto max-w-[1500px]">
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:px-7 md:pb-7 md:pt-28">
+          <div className="mx-auto min-w-0 max-w-[1500px]">
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="font-display text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
+              <div className="min-w-0">
+                <h1 className="break-words font-display text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
                   {title}
                 </h1>
                 {description ? (

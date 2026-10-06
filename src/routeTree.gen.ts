@@ -20,6 +20,7 @@ import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as HrRouteImport } from './routes/hr'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as PayrollRouteImport } from './routes/payroll'
 import { Route as PrequalificationsRouteImport } from './routes/prequalifications'
@@ -46,6 +47,7 @@ import { Route as ApiOauthMicrosoftCallbackRouteImport } from './routes/api/oaut
 import { Route as ApiOauthMicrosoftStartRouteImport } from './routes/api/oauth/microsoft/start'
 import { Route as ApiPublicTClickRouteImport } from './routes/api/public/t/click'
 import { Route as ApiPublicTOpenRouteImport } from './routes/api/public/t/open'
+import { Route as ProspectsIdContactsContactIdRouteImport } from './routes/prospects.$id.contacts.$contactId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -100,6 +102,11 @@ const InboxRoute = InboxRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketingRoute = MarketingRouteImport.update({
@@ -233,6 +240,12 @@ const ApiPublicTOpenRoute = ApiPublicTOpenRouteImport.update({
   path: '/api/public/t/open',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProspectsIdContactsContactIdRoute =
+  ProspectsIdContactsContactIdRouteImport.update({
+    id: '/contacts/$contactId',
+    path: '/contacts/$contactId',
+    getParentRoute: () => ProspectsIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -246,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
@@ -262,7 +276,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
-  '/prospects/$id': typeof ProspectsIdRoute
+  '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -272,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
+  '/prospects/$id/contacts/$contactId': typeof ProspectsIdContactsContactIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -285,6 +300,7 @@ export interface FileRoutesByTo {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
@@ -301,7 +317,7 @@ export interface FileRoutesByTo {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
-  '/prospects/$id': typeof ProspectsIdRoute
+  '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -311,6 +327,7 @@ export interface FileRoutesByTo {
   '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
+  '/prospects/$id/contacts/$contactId': typeof ProspectsIdContactsContactIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -325,6 +342,7 @@ export interface FileRoutesById {
   '/hr': typeof HrRoute
   '/inbox': typeof InboxRoute
   '/jobs': typeof JobsRoute
+  '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
   '/prequalifications': typeof PrequalificationsRoute
@@ -341,7 +359,7 @@ export interface FileRoutesById {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
-  '/prospects/$id': typeof ProspectsIdRoute
+  '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
@@ -351,6 +369,7 @@ export interface FileRoutesById {
   '/api/oauth/microsoft/start': typeof ApiOauthMicrosoftStartRoute
   '/api/public/t/click': typeof ApiPublicTClickRoute
   '/api/public/t/open': typeof ApiPublicTOpenRoute
+  '/prospects/$id/contacts/$contactId': typeof ProspectsIdContactsContactIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -366,6 +385,7 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
+    | '/login'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -392,6 +412,7 @@ export interface FileRouteTypes {
     | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
+    | '/prospects/$id/contacts/$contactId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -405,6 +426,7 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
+    | '/login'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -431,6 +453,7 @@ export interface FileRouteTypes {
     | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
+    | '/prospects/$id/contacts/$contactId'
   id:
     | '__root__'
     | '/'
@@ -444,6 +467,7 @@ export interface FileRouteTypes {
     | '/hr'
     | '/inbox'
     | '/jobs'
+    | '/login'
     | '/marketing'
     | '/payroll'
     | '/prequalifications'
@@ -470,6 +494,7 @@ export interface FileRouteTypes {
     | '/api/oauth/microsoft/start'
     | '/api/public/t/click'
     | '/api/public/t/open'
+    | '/prospects/$id/contacts/$contactId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -484,6 +509,7 @@ export interface RootRouteChildren {
   HrRoute: typeof HrRoute
   InboxRoute: typeof InboxRoute
   JobsRoute: typeof JobsRoute
+  LoginRoute: typeof LoginRoute
   MarketingRoute: typeof MarketingRoute
   PayrollRoute: typeof PayrollRoute
   PrequalificationsRoute: typeof PrequalificationsRoute
@@ -585,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/marketing': {
@@ -769,6 +802,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTOpenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prospects/$id/contacts/$contactId': {
+      id: '/prospects/$id/contacts/$contactId'
+      path: '/contacts/$contactId'
+      fullPath: '/prospects/$id/contacts/$contactId'
+      preLoaderRoute: typeof ProspectsIdContactsContactIdRouteImport
+      parentRoute: typeof ProspectsIdRoute
+    }
   }
 }
 
@@ -795,12 +835,24 @@ const CostSheetsRouteWithChildren = CostSheetsRoute._addFileChildren(
   CostSheetsRouteChildren,
 )
 
+interface ProspectsIdRouteChildren {
+  ProspectsIdContactsContactIdRoute: typeof ProspectsIdContactsContactIdRoute
+}
+
+const ProspectsIdRouteChildren: ProspectsIdRouteChildren = {
+  ProspectsIdContactsContactIdRoute: ProspectsIdContactsContactIdRoute,
+}
+
+const ProspectsIdRouteWithChildren = ProspectsIdRoute._addFileChildren(
+  ProspectsIdRouteChildren,
+)
+
 interface ProspectsRouteChildren {
-  ProspectsIdRoute: typeof ProspectsIdRoute
+  ProspectsIdRoute: typeof ProspectsIdRouteWithChildren
 }
 
 const ProspectsRouteChildren: ProspectsRouteChildren = {
-  ProspectsIdRoute: ProspectsIdRoute,
+  ProspectsIdRoute: ProspectsIdRouteWithChildren,
 }
 
 const ProspectsRouteWithChildren = ProspectsRoute._addFileChildren(
@@ -831,6 +883,7 @@ const rootRouteChildren: RootRouteChildren = {
   HrRoute: HrRoute,
   InboxRoute: InboxRoute,
   JobsRoute: JobsRoute,
+  LoginRoute: LoginRoute,
   MarketingRoute: MarketingRoute,
   PayrollRoute: PayrollRoute,
   PrequalificationsRoute: PrequalificationsRoute,
