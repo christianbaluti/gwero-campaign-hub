@@ -30,7 +30,7 @@ function LoginPage() {
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const systemName = String(branding["system_name"] || "Gwero OS");
   const logo = String(branding["logo_url"] || "");
-  const icon = String(branding["icon_url"] || logo || "/favicon.ico");
+  const icon = String(branding["icon_url"] || logo || "/favicon.svg");
   useEffect(() => {
     document.title = `${systemName} · Sign in`;
     let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');

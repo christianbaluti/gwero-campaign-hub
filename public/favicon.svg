@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Gwero">
+  <defs>
+    <linearGradient id="gwero" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#gwero)"/>
+  <path
+    d="M46.5 29.5H32v8h7.1c-1.7 4.2-5.2 6.4-9.6 6.4-7.1 0-12-5-12-12s5-12 12-12c4 0 7.2 1.5 9.4 4.2l6.1-5.4c-3.8-4.5-9.1-7-15.7-7C17.8 11.7 9 20.2 9 32s8.6 20.3 20.5 20.3c11.2 0 18.7-7.3 18.7-18.8 0-1.5-.1-2.7-.3-4z"
+    fill="#fff"
+  />
+</svg>

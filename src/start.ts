@@ -32,7 +32,7 @@ const pageAuthMiddleware = createMiddleware().server(async ({ next, request }) =
     url.pathname.startsWith("/api/public/") ||
     url.pathname.startsWith("/assets/") ||
     url.pathname.startsWith("/@") ||
-    url.pathname === "/favicon.ico" ||
+    url.pathname === "/favicon.svg" ||
     url.pathname === "/robots.txt";
   const isPageRequest =
     request.method === "GET" && request.headers.get("accept")?.includes("text/html");
