@@ -42,14 +42,31 @@ export async function saveAttachmentBuffer(
 }
 
 export async function readAttachment(path: string) {
+  return (await readAttachmentRecord(path)).content;
+}
+
+export async function readAttachmentRecord(path: string) {
   const parts = path.split("/");
   if (parts.length !== 2 || !parts.every((part) => uuid.test(part)))
     throw new Error("Invalid attachment path");
   const [rows] = await getPool().execute(
-    "SELECT content FROM attachment_files WHERE owner_id = ? AND id = ? LIMIT 1",
+    `SELECT content, file_name, content_type, file_size
+       FROM attachment_files WHERE owner_id = ? AND id = ? LIMIT 1`,
     parts,
   );
-  const row = (rows as Array<{ content: Buffer }>)[0];
+  const row = (
+    rows as Array<{
+      content: Buffer;
+      file_name: string;
+      content_type: string;
+      file_size: number;
+    }>
+  )[0];
   if (!row) throw new Error("Attachment not found");
-  return row.content;
+  return {
+    content: row.content,
+    name: row.file_name,
+    type: row.content_type || "application/octet-stream",
+    size: row.file_size,
+  };
 }
