@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { EmailMessageContent } from "@/components/EmailMessageContent";
+import { parseEmailAttachments, type EmailAttachment } from "@/lib/email-message";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,31 +37,14 @@ export const Route = createFileRoute("/prospects/$id/contacts/$contactId")({
   component: ProspectContactPage,
 });
 
-type Attachment = { path: string; name: string; type: string; size: number };
-
-function parseAttachments(value: unknown): Attachment[] {
-  if (Array.isArray(value)) return value as Attachment[];
-  if (typeof value !== "string" || !value) return [];
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? (parsed as Attachment[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function attachmentUrl(path: string) {
-  const [ownerId, fileId] = path.split("/");
-  return `/api/attachments/${encodeURIComponent(ownerId || "")}/${encodeURIComponent(fileId || "")}`;
-}
-
 function ProspectContactPage() {
   const { id, contactId } = Route.useParams();
   const qc = useQueryClient();
   const editor = useRef<HTMLDivElement>(null);
+  const thread = useRef<HTMLDivElement>(null);
   const syncBusy = useRef(false);
   const [message, setMessage] = useState({ mailboxId: "", subject: "", body: "", bodyHtml: "" });
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -92,13 +77,13 @@ function ProspectContactPage() {
     refetchInterval: 30_000,
   });
   const { data: replies = [] } = useQuery({
-    queryKey: ["contact-replies", contactId],
+    queryKey: ["contact-replies", contactId, id],
     queryFn: async () =>
       (
         await db
           .from("replies")
           .select("*")
-          .eq("contact_id", contactId)
+          .eq("prospect_id", id)
           .order("received_at", { ascending: false })
       ).data || [],
     refetchInterval: 30_000,
@@ -136,17 +121,22 @@ function ProspectContactPage() {
     };
   }, [contactId, id, qc]);
 
+  useEffect(() => {
+    const element = thread.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [contact?.id, interactions.length, replies.length]);
+
   const uploadFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setUploading(true);
     try {
-      const uploaded: Attachment[] = [];
+      const uploaded: EmailAttachment[] = [];
       for (const file of Array.from(files)) {
         const form = new FormData();
         form.set("ownerId", contactId);
         form.set("file", file);
         const response = await fetch("/api/attachments/upload", { method: "POST", body: form });
-        const result = (await response.json()) as Attachment & { error?: string };
+        const result = (await response.json()) as EmailAttachment & { error?: string };
         if (!response.ok) throw new Error(result.error || `Could not upload ${file.name}.`);
         uploaded.push(result);
       }
@@ -228,6 +218,13 @@ function ProspectContactPage() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "?";
+  const matchingReplies = replies.filter(
+    (item) =>
+      item.contact_id === contactId ||
+      (!item.contact_id &&
+        contact.email &&
+        item.from_email?.toLowerCase() === contact.email.toLowerCase()),
+  );
   const conversation = [
     ...interactions.map((item) => ({
       id: item.id,
@@ -236,16 +233,16 @@ function ProspectContactPage() {
       subject: item.subject,
       body: item.body,
       bodyHtml: item.body_html || "",
-      attachments: parseAttachments(item.attachments),
+      attachments: parseEmailAttachments(item.attachments),
     })),
-    ...replies.map((item) => ({
+    ...matchingReplies.map((item) => ({
       id: item.id,
       date: item.received_at,
       direction: "inbound",
       subject: item.subject,
       body: item.body || item.snippet || "",
       bodyHtml: item.body_html || "",
-      attachments: parseAttachments(item.attachments),
+      attachments: parseEmailAttachments(item.attachments),
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -301,8 +298,8 @@ function ProspectContactPage() {
             </Button>
           </CardContent>
         </Card>
-        <div className="min-w-0 space-y-5">
-          <Card>
+        <div className="flex min-w-0 flex-col gap-5">
+          <Card className="order-2">
             <CardHeader>
               <CardTitle>Email this contact</CardTitle>
             </CardHeader>
@@ -450,11 +447,14 @@ function ProspectContactPage() {
               )}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="order-1">
             <CardHeader>
-              <CardTitle>Full conversation</CardTitle>
+              <CardTitle className="flex items-center justify-between gap-3">
+                <span>Full conversation</span>
+                <Badge variant="secondary">{conversation.length} messages</Badge>
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent ref={thread} className="max-h-[68vh] space-y-3 overflow-y-auto">
               {conversation.map((item) => (
                 <div
                   key={item.id}
@@ -471,34 +471,11 @@ function ProspectContactPage() {
                   {item.subject ? (
                     <p className="mt-2 break-words font-medium">{item.subject}</p>
                   ) : null}
-                  {item.bodyHtml ? (
-                    <iframe
-                      title={`Email ${item.subject || item.id}`}
-                      sandbox=""
-                      referrerPolicy="no-referrer"
-                      srcDoc={`<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>body{font:14px system-ui,sans-serif;color:#374151;margin:0;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${item.bodyHtml}</body></html>`}
-                      className="mt-2 min-h-24 w-full border-0 bg-white"
-                    />
-                  ) : (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                      {item.body}
-                    </p>
-                  )}
-                  {item.attachments.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {item.attachments.map((attachment) => (
-                        <a
-                          key={attachment.path}
-                          href={attachmentUrl(attachment.path)}
-                          download={attachment.name}
-                          className="inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs hover:text-primary"
-                        >
-                          <Paperclip className="size-3.5 shrink-0" />
-                          <span className="truncate">{attachment.name}</span>
-                        </a>
-                      ))}
-                    </div>
-                  ) : null}
+                  <EmailMessageContent
+                    html={item.bodyHtml}
+                    text={item.body}
+                    attachments={item.attachments}
+                  />
                 </div>
               ))}
               {!conversation.length ? (

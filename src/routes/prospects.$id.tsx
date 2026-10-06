@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Building2, Globe2, Linkedin, Mail, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { EmailMessageContent } from "@/components/EmailMessageContent";
+import { parseEmailAttachments } from "@/lib/email-message";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/contact-normalization";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -265,6 +267,8 @@ function ProspectDetail() {
       date: item.occurred_at,
       subject: item.subject,
       body: item.body,
+      bodyHtml: item.body_html || "",
+      attachments: parseEmailAttachments(item.attachments),
       direction: item.direction,
       contact_id: item.contact_id,
     })),
@@ -273,6 +277,8 @@ function ProspectDetail() {
       date: item.received_at,
       subject: item.subject,
       body: item.body || item.snippet || "",
+      bodyHtml: item.body_html || "",
+      attachments: parseEmailAttachments(item.attachments),
       direction: "inbound",
       contact_id: item.contact_id,
     })),
@@ -597,9 +603,11 @@ function ProspectDetail() {
                       </time>
                     </div>
                     {item.subject ? <p className="mt-3 font-medium">{item.subject}</p> : null}
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                      {item.body}
-                    </p>
+                    <EmailMessageContent
+                      html={item.bodyHtml}
+                      text={item.body}
+                      attachments={item.attachments}
+                    />
                   </div>
                 );
               })}
