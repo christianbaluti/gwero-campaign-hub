@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -35,6 +35,12 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { getAuthStatus, logout } from "@/lib/auth.functions";
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  processNotificationEmails,
+} from "@/lib/notifications.functions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -115,7 +121,14 @@ export function AppShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const qc = useQueryClient();
   const { data: auth } = useQuery({ queryKey: ["auth-status"], queryFn: () => getAuthStatus() });
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => getNotifications(),
+    refetchInterval: 30_000,
+  });
+  const unread = notifications.filter((item) => !item.read_at);
   const { data: branding = [] } = useQuery({
     queryKey: ["app-branding"],
     queryFn: async () => {
@@ -138,6 +151,9 @@ export function AppShell({
     }
     link.href = brand["icon_url"];
   }, [brand["icon_url"]]);
+  useEffect(() => {
+    void processNotificationEmails().catch(() => undefined);
+  }, []);
   return (
     <div
       className="flex min-h-screen max-w-full overflow-x-clip bg-background"
@@ -216,13 +232,75 @@ export function AppShell({
             <button aria-label="Help" className="rounded-xl p-2 text-slate-500 hover:bg-accent">
               <CircleHelp className="size-5" />
             </button>
-            <button
-              aria-label="Notifications"
-              className="relative rounded-xl p-2 text-slate-500 hover:bg-accent"
-            >
-              <Bell className="size-5" />
-              <span className="absolute right-1.5 top-1.5 size-2 rounded-full border border-white bg-rose-500" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label={`Notifications${unread.length ? `, ${unread.length} unread` : ""}`}
+                  className="relative rounded-xl p-2 text-slate-500 hover:bg-accent"
+                >
+                  <Bell className="size-5" />
+                  {unread.length ? (
+                    <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-5 text-white">
+                      {unread.length > 99 ? "99+" : unread.length}
+                    </span>
+                  ) : null}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[min(92vw,380px)]">
+                <div className="flex items-center justify-between px-2 py-1.5">
+                  <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                  {unread.length ? (
+                    <button
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => {
+                        void markAllNotificationsRead().then(() =>
+                          qc.invalidateQueries({ queryKey: ["notifications"] }),
+                        );
+                      }}
+                    >
+                      Mark all read
+                    </button>
+                  ) : null}
+                </div>
+                <DropdownMenuSeparator />
+                <div className="gwero-scrollbar max-h-96 overflow-y-auto">
+                  {notifications.slice(0, 15).map((item) => (
+                    <DropdownMenuItem
+                      key={item.id}
+                      className="block cursor-pointer whitespace-normal p-3"
+                      onClick={() => {
+                        void markNotificationRead({ data: { notificationId: item.id } }).then(
+                          () => {
+                            void qc.invalidateQueries({ queryKey: ["notifications"] });
+                            if (item.action_url) window.location.assign(item.action_url);
+                          },
+                        );
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span
+                          className={`mt-1.5 size-2 shrink-0 rounded-full ${item.read_at ? "bg-slate-200" : "bg-primary"}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900">{item.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                            {item.body}
+                          </p>
+                          <time className="mt-1 block text-[10px] text-muted-foreground">
+                            {new Date(item.created_at).toLocaleString()}
+                          </time>
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                  {!notifications.length ? (
+                    <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      You are all caught up.
+                    </p>
+                  ) : null}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="ml-2 flex items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-accent">

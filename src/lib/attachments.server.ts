@@ -1,26 +1,55 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { resolve, join } from "node:path";
+import { getPool } from "./db.server";
 
-const root = resolve(process.env["ATTACHMENT_DIR"] || "var/attachments");
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function saveAttachment(campaignId: string, file: File) {
   if (!uuid.test(campaignId)) throw new Error("Invalid campaign ID");
   if (file.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds 20 MB");
-  const directory = join(root, campaignId);
-  await mkdir(directory, { recursive: true });
-  const path = `${campaignId}/${randomUUID()}`;
-  await writeFile(join(root, path), Buffer.from(await file.arrayBuffer()), {
-    flag: "wx",
-    mode: 0o600,
-  });
+  const fileId = randomUUID();
+  const path = `${campaignId}/${fileId}`;
+  await getPool().execute(
+    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      fileId,
+      campaignId,
+      file.name,
+      file.type || "application/octet-stream",
+      file.size,
+      Buffer.from(await file.arrayBuffer()),
+    ],
+  );
   return { path, name: file.name, type: file.type || "application/octet-stream", size: file.size };
+}
+
+export async function saveAttachmentBuffer(
+  ownerId: string,
+  content: Uint8Array,
+  name: string,
+  type = "application/octet-stream",
+) {
+  if (!uuid.test(ownerId)) throw new Error("Invalid attachment owner ID");
+  if (content.byteLength > 20 * 1024 * 1024) throw new Error("Attachment exceeds 20 MB");
+  const fileId = randomUUID();
+  const path = `${ownerId}/${fileId}`;
+  await getPool().execute(
+    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [fileId, ownerId, name, type, content.byteLength, Buffer.from(content)],
+  );
+  return { path, name, type, size: content.byteLength };
 }
 
 export async function readAttachment(path: string) {
   const parts = path.split("/");
   if (parts.length !== 2 || !parts.every((part) => uuid.test(part)))
     throw new Error("Invalid attachment path");
-  return readFile(join(root, ...parts));
+  const [rows] = await getPool().execute(
+    "SELECT content FROM attachment_files WHERE owner_id = ? AND id = ? LIMIT 1",
+    parts,
+  );
+  const row = (rows as Array<{ content: Buffer }>)[0];
+  if (!row) throw new Error("Attachment not found");
+  return row.content;
 }

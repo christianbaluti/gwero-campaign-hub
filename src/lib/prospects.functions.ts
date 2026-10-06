@@ -22,6 +22,107 @@ export type ContactImportRow = {
   categoryId?: string | null;
 };
 
+export type ProspectCompanyInput = {
+  company: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  linkedinUrl?: string;
+  categoryId?: string | null;
+  industry?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  registrationNumber?: string;
+  employeeCount?: number | null;
+  notes?: string;
+  logoPath?: string;
+};
+
+export const createProspectCompany = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("prospects.manage")])
+  .validator((data: ProspectCompanyInput) => data)
+  .handler(async ({ data }) => {
+    const company = canonicalCompany(data.company);
+    if (!company) throw new Error("Company or organisation name is required.");
+    const key = companyKey(company);
+    const email = normalizeText(data.email).toLowerCase();
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) throw new Error("Enter a valid company email.");
+    const { getPool } = await import("./db.server");
+    const id = crypto.randomUUID();
+    const placeholder = `company-${Buffer.from(`${key}-${id}`).toString("base64url").slice(0, 44)}@prospect.local`;
+    try {
+      const [existing] = await getPool().execute(
+        "SELECT id FROM prospects WHERE canonical_key = ? OR (? <> '' AND email = ?) LIMIT 1",
+        [key, email, email],
+      );
+      if ((existing as Array<unknown>).length)
+        throw new Error("A prospect with this company or email already exists.");
+      await getPool().execute(
+        `INSERT INTO prospects
+          (id, email, company, phone, status, notes, extra, source_file, category_id, website,
+           linkedin_url, logo_path, canonical_key, industry, address, city, country,
+           registration_number, employee_count)
+         VALUES (?, ?, ?, ?, 'new', ?, '{}', 'Manual entry', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          email || placeholder,
+          company,
+          normalizePhone(data.phone) || null,
+          normalizeText(data.notes) || null,
+          data.categoryId || null,
+          normalizeText(data.website) || null,
+          normalizeText(data.linkedinUrl) || null,
+          normalizeText(data.logoPath) || null,
+          key,
+          normalizeText(data.industry) || null,
+          normalizeText(data.address) || null,
+          normalizeText(data.city) || null,
+          normalizeText(data.country) || null,
+          normalizeText(data.registrationNumber) || null,
+          data.employeeCount && data.employeeCount > 0 ? Math.round(data.employeeCount) : null,
+        ],
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code === "ER_DUP_ENTRY")
+        throw new Error("A prospect with this company or email already exists.");
+      throw error;
+    }
+    return { id };
+  });
+
+export const deleteProspectContact = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("prospects.manage")])
+  .validator((data: { prospectId: string; contactId: string }) => data)
+  .handler(async ({ data }) => {
+    const { getPool } = await import("./db.server");
+    const connection = await getPool().getConnection();
+    try {
+      await connection.beginTransaction();
+      await connection.execute(
+        "UPDATE replies SET contact_id = NULL WHERE contact_id = ? AND prospect_id = ?",
+        [data.contactId, data.prospectId],
+      );
+      await connection.execute(
+        "UPDATE prospect_interactions SET contact_id = NULL WHERE contact_id = ? AND prospect_id = ?",
+        [data.contactId, data.prospectId],
+      );
+      const [result] = await connection.execute(
+        "DELETE FROM prospect_contacts WHERE id = ? AND prospect_id = ?",
+        [data.contactId, data.prospectId],
+      );
+      if (!(result as { affectedRows?: number }).affectedRows)
+        throw new Error("Contact not found.");
+      await connection.commit();
+      return { ok: true };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  });
+
 export const importProspectContacts = createServerFn({ method: "POST" })
   .middleware([permissionMiddleware("prospects.manage")])
   .validator((data: { rows: ContactImportRow[]; sourceFile?: string }) => data)

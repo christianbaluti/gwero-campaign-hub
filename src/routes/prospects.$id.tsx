@@ -1,9 +1,11 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Building2, Globe2, Linkedin, Mail, Pencil, Phone } from "lucide-react";
+import { Building2, Globe2, Linkedin, Mail, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/contact-normalization";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { convertProspectToClient, deleteProspectContact } from "@/lib/prospects.functions";
 
 export const Route = createFileRoute("/prospects/$id")({ component: ProspectDetailRoute });
 
@@ -43,6 +46,8 @@ function ProspectDetailRoute() {
 function ProspectDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const convert = useServerFn(convertProspectToClient);
+  const removeContact = useServerFn(deleteProspectContact);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profile, setProfile] = useState({
     company: "",
@@ -52,6 +57,12 @@ function ProspectDetail() {
     linkedin_url: "",
     notes: "",
     logo_path: "",
+    industry: "",
+    address: "",
+    city: "",
+    country: "",
+    registration_number: "",
+    employee_count: "",
   });
   const [newContact, setNewContact] = useState({
     first_name: "",
@@ -76,6 +87,14 @@ function ProspectDetail() {
         .select("*")
         .eq("prospect_id", id)
         .order("is_primary", { ascending: false });
+      if (result.error) throw result.error;
+      return result.data;
+    },
+  });
+  const { data: linkedClient } = useQuery({
+    queryKey: ["prospect-client", id],
+    queryFn: async () => {
+      const result = await db.from("clients").select("id").eq("prospect_id", id).maybeSingle();
       if (result.error) throw result.error;
       return result.data;
     },
@@ -114,6 +133,12 @@ function ProspectDetail() {
         linkedin_url: prospect.linkedin_url || "",
         notes: prospect.notes || "",
         logo_path: prospect.logo_path || "",
+        industry: prospect.industry || "",
+        address: prospect.address || "",
+        city: prospect.city || "",
+        country: prospect.country || "",
+        registration_number: prospect.registration_number || "",
+        employee_count: prospect.employee_count ? String(prospect.employee_count) : "",
       });
       setEditingProfile(false);
     }
@@ -146,6 +171,12 @@ function ProspectDetail() {
         linkedin_url: profile.linkedin_url.trim() || null,
         notes: profile.notes.trim() || null,
         logo_path: profile.logo_path || null,
+        industry: profile.industry.trim() || null,
+        address: profile.address.trim() || null,
+        city: profile.city.trim() || null,
+        country: profile.country.trim() || null,
+        registration_number: profile.registration_number.trim() || null,
+        employee_count: profile.employee_count ? Number(profile.employee_count) : null,
       })
       .eq("id", id);
     if (result.error) {
@@ -203,6 +234,31 @@ function ProspectDetail() {
     toast.success("Contact person added.");
     void qc.invalidateQueries({ queryKey: ["prospect-contacts", id] });
   };
+  const convertToClient = async () => {
+    try {
+      const result = await convert({ data: { prospectId: id } });
+      toast.success("Prospect converted to a client.");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["prospect-client", id] }),
+        qc.invalidateQueries({ queryKey: ["clients"] }),
+        qc.invalidateQueries({ queryKey: ["prospect", id] }),
+      ]);
+      window.location.assign(`/clients/${result.clientId}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Prospect could not be converted.");
+      throw error;
+    }
+  };
+  const removePerson = async (contactId: string) => {
+    try {
+      await removeContact({ data: { prospectId: id, contactId } });
+      toast.success("Contact person deleted.");
+      await qc.invalidateQueries({ queryKey: ["prospect-contacts", id] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Contact could not be deleted.");
+      throw error;
+    }
+  };
   const timeline = [
     ...interactions.map((item) => ({
       id: item.id,
@@ -228,6 +284,25 @@ function ProspectDetail() {
       description={`${contacts.length} contact person${contacts.length === 1 ? "" : "s"}`}
       actions={
         <>
+          {linkedClient ? (
+            <Button asChild>
+              <Link to="/clients/$id" params={{ id: linkedClient.id }}>
+                <UserCheck className="size-4" /> Open client
+              </Link>
+            </Button>
+          ) : (
+            <ConfirmAction
+              title="Convert this prospect to a client?"
+              description="A client record and its contact people will be created. The prospect and its conversation history will remain available."
+              confirmLabel="Convert to client"
+              onConfirm={convertToClient}
+              trigger={
+                <Button>
+                  <UserCheck className="size-4" /> Convert to client
+                </Button>
+              }
+            />
+          )}
           {!editingProfile ? (
             <Button onClick={() => setEditingProfile(true)}>
               <Pencil className="size-4" /> Edit details
@@ -296,6 +371,32 @@ function ProspectDetail() {
                     value={prospect.linkedin_url || "Not supplied"}
                     href={prospect.linkedin_url || undefined}
                   />
+                  <ProfileDetail
+                    icon={Building2}
+                    label="Industry"
+                    value={prospect.industry || "Not supplied"}
+                  />
+                  <ProfileDetail
+                    icon={Building2}
+                    label="Registration number"
+                    value={prospect.registration_number || "Not supplied"}
+                  />
+                  <ProfileDetail
+                    icon={Building2}
+                    label="Employees"
+                    value={
+                      prospect.employee_count ? String(prospect.employee_count) : "Not supplied"
+                    }
+                  />
+                  <ProfileDetail
+                    icon={Globe2}
+                    label="Location"
+                    value={
+                      [prospect.address, prospect.city, prospect.country]
+                        .filter(Boolean)
+                        .join(", ") || "Not supplied"
+                    }
+                  />
                 </dl>
                 {prospect.notes ? (
                   <div className="rounded-xl bg-muted/50 p-3">
@@ -347,7 +448,20 @@ function ProspectDetail() {
                     }}
                   />
                 </div>
-                {(["company", "email", "phone", "website", "linkedin_url"] as const).map((key) => (
+                {(
+                  [
+                    "company",
+                    "email",
+                    "phone",
+                    "website",
+                    "linkedin_url",
+                    "industry",
+                    "registration_number",
+                    "employee_count",
+                    "city",
+                    "country",
+                  ] as const
+                ).map((key) => (
                   <div key={key} className="min-w-0 space-y-1.5">
                     <Label htmlFor={`prospect-${key}`}>
                       {key === "linkedin_url"
@@ -364,6 +478,16 @@ function ProspectDetail() {
                     />
                   </div>
                 ))}
+                <div className="space-y-1.5">
+                  <Label htmlFor="prospect-address">Address</Label>
+                  <Textarea
+                    id="prospect-address"
+                    value={profile.address}
+                    onChange={(event) =>
+                      setProfile((old) => ({ ...old, address: event.target.value }))
+                    }
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="prospect-notes">Notes</Label>
                   <Textarea
@@ -387,6 +511,14 @@ function ProspectDetail() {
                         linkedin_url: prospect.linkedin_url || "",
                         notes: prospect.notes || "",
                         logo_path: prospect.logo_path || "",
+                        industry: prospect.industry || "",
+                        address: prospect.address || "",
+                        city: prospect.city || "",
+                        country: prospect.country || "",
+                        registration_number: prospect.registration_number || "",
+                        employee_count: prospect.employee_count
+                          ? String(prospect.employee_count)
+                          : "",
                       });
                       setEditingProfile(false);
                     }}
@@ -410,6 +542,7 @@ function ProspectDetail() {
                   person={person}
                   prospectId={id}
                   onSave={(values) => saveContact(person.id, values)}
+                  onDelete={() => removePerson(person.id)}
                 />
               ))}
               <div className="rounded-xl border border-dashed p-4">
@@ -525,6 +658,7 @@ function ContactEditor({
   person,
   prospectId,
   onSave,
+  onDelete,
 }: {
   person: {
     id: string;
@@ -544,6 +678,7 @@ function ContactEditor({
     job_title: string;
     avatar_url?: string;
   }) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState({
@@ -583,9 +718,21 @@ function ContactEditor({
             {values.email ? ` · ${values.email}` : ""}
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-          Edit
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+          <ConfirmAction
+            title="Delete this contact person?"
+            description="The person will be removed from this prospect. Existing email history will remain attached to the company."
+            onConfirm={onDelete}
+            trigger={
+              <Button size="icon" variant="destructive" aria-label={`Delete ${name}`}>
+                <Trash2 className="size-4" />
+              </Button>
+            }
+          />
+        </div>
       </div>
     );
   return (

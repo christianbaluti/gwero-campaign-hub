@@ -1,7 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { Mail, Phone, RefreshCw, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Bold,
+  Image,
+  Italic,
+  Link2,
+  Mail,
+  Paperclip,
+  Phone,
+  Send,
+  Underline,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/db";
 import { sendProspectEmail, syncReplies } from "@/lib/crm.functions";
 
@@ -25,11 +35,34 @@ export const Route = createFileRoute("/prospects/$id/contacts/$contactId")({
   component: ProspectContactPage,
 });
 
+type Attachment = { path: string; name: string; type: string; size: number };
+
+function parseAttachments(value: unknown): Attachment[] {
+  if (Array.isArray(value)) return value as Attachment[];
+  if (typeof value !== "string" || !value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? (parsed as Attachment[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function attachmentUrl(path: string) {
+  const [ownerId, fileId] = path.split("/");
+  return `/api/attachments/${encodeURIComponent(ownerId || "")}/${encodeURIComponent(fileId || "")}`;
+}
+
 function ProspectContactPage() {
   const { id, contactId } = Route.useParams();
   const qc = useQueryClient();
-  const [message, setMessage] = useState({ mailboxId: "", subject: "", body: "" });
+  const editor = useRef<HTMLDivElement>(null);
+  const syncBusy = useRef(false);
+  const [message, setMessage] = useState({ mailboxId: "", subject: "", body: "", bodyHtml: "" });
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
   const { data: prospect } = useQuery({
     queryKey: ["prospect", id],
     queryFn: async () => (await db.from("prospects").select("*").eq("id", id).maybeSingle()).data,
@@ -56,6 +89,7 @@ function ProspectContactPage() {
           .eq("contact_id", contactId)
           .order("occurred_at", { ascending: false })
       ).data || [],
+    refetchInterval: 30_000,
   });
   const { data: replies = [] } = useQuery({
     queryKey: ["contact-replies", contactId],
@@ -67,6 +101,7 @@ function ProspectContactPage() {
           .eq("contact_id", contactId)
           .order("received_at", { ascending: false })
       ).data || [],
+    refetchInterval: 30_000,
   });
   const { data: mailboxes = [] } = useQuery({
     queryKey: ["mailboxes"],
@@ -74,23 +109,73 @@ function ProspectContactPage() {
       (await db.from("mailboxes").select("*").order("is_default", { ascending: false })).data || [],
   });
   const selectedMailbox = message.mailboxId || mailboxes[0]?.id || "";
-  const refresh = async () => {
-    setBusy(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      if (syncBusy.current || !mounted) return;
+      syncBusy.current = true;
+      try {
+        await syncReplies();
+        if (mounted)
+          await Promise.all([
+            qc.invalidateQueries({ queryKey: ["contact-replies", contactId] }),
+            qc.invalidateQueries({ queryKey: ["prospect-replies", id] }),
+          ]);
+      } catch {
+        // Settings retains the provider diagnostic; background refresh stays quiet.
+      } finally {
+        syncBusy.current = false;
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 120_000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [contactId, id, qc]);
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
     try {
-      const result = await syncReplies();
-      toast.success(
-        `Mailbox sync complete. ${result.imported} new message${result.imported === 1 ? "" : "s"} found.`,
-      );
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["contact-replies", contactId] }),
-        qc.invalidateQueries({ queryKey: ["prospect-replies", id] }),
-      ]);
+      const uploaded: Attachment[] = [];
+      for (const file of Array.from(files)) {
+        const form = new FormData();
+        form.set("ownerId", contactId);
+        form.set("file", file);
+        const response = await fetch("/api/attachments/upload", { method: "POST", body: form });
+        const result = (await response.json()) as Attachment & { error?: string };
+        if (!response.ok) throw new Error(result.error || `Could not upload ${file.name}.`);
+        uploaded.push(result);
+      }
+      setAttachments((current) => [...current, ...uploaded]);
+      toast.success(`${uploaded.length} attachment${uploaded.length === 1 ? "" : "s"} added.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Inbox sync failed.");
+      toast.error(error instanceof Error ? error.message : "Attachment upload failed.");
     } finally {
-      setBusy(false);
+      setUploading(false);
     }
   };
+
+  const updateEditor = () => {
+    setMessage((current) => ({
+      ...current,
+      body: editor.current?.innerText || "",
+      bodyHtml: editor.current?.innerHTML || "",
+    }));
+  };
+  const format = (command: string, value?: string) => {
+    editor.current?.focus();
+    document.execCommand(command, false, value);
+    updateEditor();
+  };
+  const addLink = () => {
+    const url = window.prompt("Paste the link URL");
+    if (url) format("createLink", url);
+  };
+
   const send = async () => {
     setBusy(true);
     try {
@@ -101,9 +186,13 @@ function ProspectContactPage() {
           mailboxId: selectedMailbox,
           subject: message.subject,
           body: message.body,
+          bodyHtml: message.bodyHtml,
+          attachments,
         },
       });
-      setMessage((old) => ({ ...old, subject: "", body: "" }));
+      setMessage((current) => ({ ...current, subject: "", body: "", bodyHtml: "" }));
+      setAttachments([]);
+      if (editor.current) editor.current.innerHTML = "";
       toast.success("Email sent and added to this conversation.");
       await qc.invalidateQueries({ queryKey: ["contact-interactions", contactId] });
     } catch (error) {
@@ -112,6 +201,7 @@ function ProspectContactPage() {
       setBusy(false);
     }
   };
+
   if (isLoading)
     return (
       <AppShell title="Contact">
@@ -128,6 +218,7 @@ function ProspectContactPage() {
         </Button>
       </AppShell>
     );
+
   const name =
     [contact.first_name, contact.last_name].filter(Boolean).join(" ") || contact.email || "Contact";
   const initials =
@@ -144,6 +235,8 @@ function ProspectContactPage() {
       direction: item.direction,
       subject: item.subject,
       body: item.body,
+      bodyHtml: item.body_html || "",
+      attachments: parseAttachments(item.attachments),
     })),
     ...replies.map((item) => ({
       id: item.id,
@@ -151,31 +244,25 @@ function ProspectContactPage() {
       direction: "inbound",
       subject: item.subject,
       body: item.body || item.snippet || "",
+      bodyHtml: item.body_html || "",
+      attachments: parseAttachments(item.attachments),
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
   return (
     <AppShell
       title={name}
       description={prospect?.company || "Prospect contact"}
       actions={
-        <>
-          <Button variant="outline" asChild>
-            <Link to="/prospects/$id" params={{ id }}>
-              Back to company
-            </Link>
-          </Button>
-          <Button
-            variant="outline"
-            disabled={busy || !mailboxes.length}
-            onClick={() => void refresh()}
-          >
-            <RefreshCw className="size-4" /> Sync inbox
-          </Button>
-        </>
+        <Button variant="outline" asChild>
+          <Link to="/prospects/$id" params={{ id }}>
+            Back to company
+          </Link>
+        </Button>
       }
     >
-      <div className="grid gap-5 xl:grid-cols-[320px_1fr]">
-        <Card>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <Card className="self-start">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center">
               <Avatar className="size-24">
@@ -191,9 +278,9 @@ function ProspectContactPage() {
               {contact.email ? (
                 <a
                   href={`mailto:${contact.email}`}
-                  className="flex items-center gap-2 hover:text-primary"
+                  className="flex items-center gap-2 break-all hover:text-primary"
                 >
-                  <Mail className="size-4" />
+                  <Mail className="size-4 shrink-0" />
                   {contact.email}
                 </a>
               ) : null}
@@ -214,7 +301,7 @@ function ProspectContactPage() {
             </Button>
           </CardContent>
         </Card>
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <Card>
             <CardHeader>
               <CardTitle>Email this contact</CardTitle>
@@ -234,7 +321,9 @@ function ProspectContactPage() {
                     <Label>From</Label>
                     <Select
                       value={selectedMailbox}
-                      onValueChange={(mailboxId) => setMessage((old) => ({ ...old, mailboxId }))}
+                      onValueChange={(mailboxId) =>
+                        setMessage((current) => ({ ...current, mailboxId }))
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -253,25 +342,109 @@ function ProspectContactPage() {
                     <Input
                       value={message.subject}
                       onChange={(event) =>
-                        setMessage((old) => ({ ...old, subject: event.target.value }))
+                        setMessage((current) => ({ ...current, subject: event.target.value }))
                       }
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Message</Label>
-                    <Textarea
-                      rows={7}
-                      value={message.body}
-                      onChange={(event) =>
-                        setMessage((old) => ({ ...old, body: event.target.value }))
-                      }
-                    />
+                    <div className="overflow-hidden rounded-md border bg-background">
+                      <div className="flex flex-wrap gap-1 border-b bg-muted/40 p-2">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Bold"
+                          onClick={() => format("bold")}
+                        >
+                          <Bold className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Italic"
+                          onClick={() => format("italic")}
+                        >
+                          <Italic className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Underline"
+                          onClick={() => format("underline")}
+                        >
+                          <Underline className="size-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Add link"
+                          onClick={addLink}
+                        >
+                          <Link2 className="size-4" />
+                        </Button>
+                        <Label
+                          htmlFor="contact-email-attachment"
+                          className="ml-auto inline-flex h-9 cursor-pointer items-center gap-2 rounded-md px-3 text-sm hover:bg-muted"
+                        >
+                          <Paperclip className="size-4" />
+                          {uploading ? "Uploading…" : "Attach files"}
+                        </Label>
+                        <input
+                          id="contact-email-attachment"
+                          className="sr-only"
+                          type="file"
+                          multiple
+                          disabled={uploading}
+                          onChange={(event) => {
+                            void uploadFiles(event.target.files);
+                            event.target.value = "";
+                          }}
+                        />
+                      </div>
+                      <div
+                        ref={editor}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={updateEditor}
+                        data-placeholder="Write your message…"
+                        className="min-h-40 max-h-96 overflow-y-auto p-3 text-sm outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]"
+                      />
+                    </div>
                   </div>
+                  {attachments.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {attachments.map((attachment) => (
+                        <span
+                          key={attachment.path}
+                          className="inline-flex max-w-full items-center gap-2 rounded-full border bg-muted/40 px-3 py-1 text-xs"
+                        >
+                          <Image className="size-3.5 shrink-0" />
+                          <span className="truncate">{attachment.name}</span>
+                          <button
+                            type="button"
+                            aria-label={`Remove ${attachment.name}`}
+                            onClick={() =>
+                              setAttachments((current) =>
+                                current.filter((item) => item.path !== attachment.path),
+                              )
+                            }
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <Button
-                    disabled={busy || !message.subject.trim() || !message.body.trim()}
+                    disabled={busy || uploading || !message.subject.trim() || !message.body.trim()}
                     onClick={() => void send()}
                   >
-                    <Send className="size-4" /> Send email
+                    <Send className="size-4" />
+                    {busy ? "Sending…" : "Send email"}
                   </Button>
                 </>
               )}
@@ -285,7 +458,7 @@ function ProspectContactPage() {
               {conversation.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-xl border p-4 ${item.direction === "outbound" ? "ml-8 bg-primary/5" : "mr-8 bg-muted/40"}`}
+                  className={`min-w-0 rounded-xl border p-4 ${item.direction === "outbound" ? "sm:ml-8 bg-primary/5" : "sm:mr-8 bg-muted/40"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <Badge variant={item.direction === "inbound" ? "default" : "secondary"}>
@@ -295,15 +468,42 @@ function ProspectContactPage() {
                       {new Date(item.date).toLocaleString()}
                     </time>
                   </div>
-                  {item.subject ? <p className="mt-2 font-medium">{item.subject}</p> : null}
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                    {item.body}
-                  </p>
+                  {item.subject ? (
+                    <p className="mt-2 break-words font-medium">{item.subject}</p>
+                  ) : null}
+                  {item.bodyHtml ? (
+                    <iframe
+                      title={`Email ${item.subject || item.id}`}
+                      sandbox=""
+                      referrerPolicy="no-referrer"
+                      srcDoc={`<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>body{font:14px system-ui,sans-serif;color:#374151;margin:0;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${item.bodyHtml}</body></html>`}
+                      className="mt-2 min-h-24 w-full border-0 bg-white"
+                    />
+                  ) : (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                      {item.body}
+                    </p>
+                  )}
+                  {item.attachments.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {item.attachments.map((attachment) => (
+                        <a
+                          key={attachment.path}
+                          href={attachmentUrl(attachment.path)}
+                          download={attachment.name}
+                          className="inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-2 text-xs hover:text-primary"
+                        >
+                          <Paperclip className="size-3.5 shrink-0" />
+                          <span className="truncate">{attachment.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
               {!conversation.length ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">
-                  No emails with this contact yet.
+                  No emails with this contact yet. New replies are checked automatically.
                 </p>
               ) : null}
             </CardContent>

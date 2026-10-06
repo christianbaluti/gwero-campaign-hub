@@ -20,6 +20,12 @@ export interface Prospect {
   last_contact_at: string | null;
   logo_path: string | null;
   canonical_key: string | null;
+  industry: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  registration_number: string | null;
+  employee_count: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -161,6 +167,8 @@ export interface Reply {
   subject: string | null;
   snippet: string | null;
   body: string | null;
+  body_html: string | null;
+  attachments: Json;
   received_at: string;
   external_id: string | null;
   created_at: string;
@@ -600,8 +608,31 @@ export interface ProspectInteraction {
   direction: string;
   subject: string | null;
   body: string;
+  body_html: string | null;
+  attachments: Json;
+  message_id: string | null;
   occurred_at: string;
   created_at: string;
+}
+export interface Notification {
+  id: string;
+  user_id: string;
+  notification_type: string;
+  title: string;
+  body: string;
+  action_url: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read_at: string | null;
+  email_sent_at: string | null;
+  created_at: string;
+}
+export interface NotificationPreference {
+  user_id: string;
+  in_app_enabled: boolean;
+  email_enabled: boolean;
+  email_delay_minutes: number;
+  updated_at: string;
 }
 export interface AiProspectSearch {
   id: string;
@@ -614,6 +645,8 @@ export interface AiProspectSearch {
 
 export interface Tables {
   prospects: Prospect;
+  notifications: Notification;
+  notification_preferences: NotificationPreference;
   clients: Client;
   mailboxes: Mailbox;
   mailbox_secrets: MailboxSecret;

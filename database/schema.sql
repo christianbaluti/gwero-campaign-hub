@@ -385,6 +385,12 @@ ALTER TABLE prospects ADD COLUMN IF NOT EXISTS last_contact_at DATETIME(3) NULL;
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS logo_path VARCHAR(500) NULL;
 ALTER TABLE prospects MODIFY COLUMN logo_path LONGTEXT NULL;
 ALTER TABLE prospects ADD COLUMN IF NOT EXISTS canonical_key VARCHAR(255) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS industry VARCHAR(255) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS address TEXT NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS city VARCHAR(160) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS country VARCHAR(160) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS registration_number VARCHAR(160) NULL;
+ALTER TABLE prospects ADD COLUMN IF NOT EXISTS employee_count INT NULL;
 
 CREATE TABLE IF NOT EXISTS prospect_contacts (
   id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,
@@ -424,7 +430,35 @@ CREATE TABLE IF NOT EXISTS prospect_interactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE prospect_interactions ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
+ALTER TABLE prospect_interactions ADD COLUMN IF NOT EXISTS body_html LONGTEXT NULL;
+ALTER TABLE prospect_interactions ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+ALTER TABLE prospect_interactions ADD COLUMN IF NOT EXISTS message_id VARCHAR(500) NULL;
 ALTER TABLE replies ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS body_html LONGTEXT NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id CHAR(36) PRIMARY KEY, user_id CHAR(36) NOT NULL, notification_type VARCHAR(80) NOT NULL,
+  title VARCHAR(255) NOT NULL, body TEXT NOT NULL, action_url VARCHAR(1000), entity_type VARCHAR(80),
+  entity_id CHAR(36), read_at DATETIME(3), email_sent_at DATETIME(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY notifications_user_created (user_id, created_at), KEY notifications_unread (user_id, read_at),
+  CONSTRAINT notifications_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id CHAR(36) PRIMARY KEY, in_app_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  email_enabled BOOLEAN NOT NULL DEFAULT TRUE, email_delay_minutes INT NOT NULL DEFAULT 60,
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  CONSTRAINT notification_preferences_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS attachment_files (
+  id CHAR(36) PRIMARY KEY, owner_id CHAR(36) NOT NULL, file_name VARCHAR(500) NOT NULL,
+  content_type VARCHAR(255) NOT NULL, file_size INT UNSIGNED NOT NULL, content LONGBLOB NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY attachment_files_owner (owner_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS ai_prospect_searches (
   id CHAR(36) PRIMARY KEY, prompt LONGTEXT NOT NULL, search_context LONGTEXT,

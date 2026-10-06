@@ -17,7 +17,7 @@ async function admin() {
   return serverDb;
 }
 
-async function gatewayFetch(
+export async function gatewayFetch(
   provider: string,
   secret: {
     mailbox_id: string;
@@ -382,7 +382,8 @@ function parseAddress(value: string) {
 
 type GooglePayload = {
   mimeType?: string;
-  body?: { data?: string };
+  filename?: string;
+  body?: { data?: string; attachmentId?: string };
   parts?: GooglePayload[];
 };
 
@@ -400,6 +401,25 @@ function decodeGoogleBody(payload?: GooglePayload): string {
   return own && payload.mimeType === "text/html" ? htmlToText(own) : "";
 }
 
+function decodeGoogleHtml(payload?: GooglePayload): string {
+  if (!payload) return "";
+  const own = payload.body?.data
+    ? Buffer.from(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+        "utf8",
+      )
+    : "";
+  if (own && payload.mimeType === "text/html") return own;
+  return (payload.parts ?? []).map(decodeGoogleHtml).find(Boolean) || "";
+}
+
+function googleAttachmentParts(payload?: GooglePayload): GooglePayload[] {
+  if (!payload) return [];
+  return [
+    ...(payload.filename && (payload.body?.attachmentId || payload.body?.data) ? [payload] : []),
+    ...(payload.parts ?? []).flatMap(googleAttachmentParts),
+  ];
+}
+
 export const sendProspectEmail = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator(
@@ -409,6 +429,8 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
       mailboxId: string;
       subject: string;
       body: string;
+      bodyHtml?: string;
+      attachments?: Array<{ path: string; name: string; type: string; size: number }>;
     }) => data,
   )
   .handler(async ({ data }) => {
@@ -434,7 +456,22 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
     const subject = data.subject.trim();
     const body = data.body.trim();
     if (!subject || !body) throw new Error("Add both a subject and message.");
-    const html = `<div style="white-space:pre-wrap">${body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+    const html =
+      data.bodyHtml?.trim() ||
+      `<div style="white-space:pre-wrap">${body.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`;
+    const attachmentMeta = data.attachments ?? [];
+    const { readAttachment } = await import("./attachments.server");
+    const attachments = await Promise.all(
+      attachmentMeta.map(async (attachment) => {
+        if (!attachment.path.startsWith(`${data.contactId}/`))
+          throw new Error("Invalid attachment.");
+        return {
+          filename: attachment.name,
+          contentType: attachment.type || "application/octet-stream",
+          content: await readAttachment(attachment.path),
+        };
+      }),
+    );
     const messageId = `<${crypto.randomUUID()}@gwero-crm>`;
     const { buildMime } = await import("./mime.server");
     const raw = buildMime({
@@ -444,6 +481,7 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
       subject,
       html,
       text: body,
+      attachments,
       messageId,
     });
     if (mailbox.provider === "smtp") {
@@ -487,6 +525,12 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
             subject,
             body: { contentType: "HTML", content: html },
             toRecipients: [{ emailAddress: { address: contact.email } }],
+            attachments: attachments.map((attachment) => ({
+              "@odata.type": "#microsoft.graph.fileAttachment",
+              name: attachment.filename,
+              contentType: attachment.contentType,
+              contentBytes: Buffer.from(attachment.content).toString("base64"),
+            })),
           },
         }),
       });
@@ -502,6 +546,9 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
       direction: "outbound",
       subject,
       body,
+      body_html: html,
+      attachments: JSON.stringify(attachmentMeta),
+      message_id: messageId,
     });
     if (error)
       throw new Error(
@@ -544,7 +591,9 @@ export const syncReplies = createServerFn({ method: "POST" })
         subject: string;
         snippet: string;
         body: string;
+        bodyHtml: string;
         date: string;
+        attachments: Array<{ name: string; type: string; data: string }>;
       }> = [];
       try {
         const { data: secret } = await db
@@ -566,9 +615,11 @@ export const syncReplies = createServerFn({ method: "POST" })
               id: `${mailbox.id}:${h.messageId || h.uid}`,
               from: parseAddress(h.from),
               subject: h.subject,
-              snippet: h.subject,
-              body: h.subject,
+              snippet: h.body.slice(0, 500) || h.subject,
+              body: h.body || h.subject,
+              bodyHtml: h.bodyHtml,
               date: h.date ? new Date(h.date).toISOString() : new Date().toISOString(),
+              attachments: h.attachments,
             });
           }
         } else if (mailbox.provider === "gmail") {
@@ -597,22 +648,43 @@ export const syncReplies = createServerFn({ method: "POST" })
             };
             const header = (name: string) =>
               msg.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value ?? "";
+            const attachments: Array<{ name: string; type: string; data: string }> = [];
+            for (const part of googleAttachmentParts(msg.payload as GooglePayload)) {
+              let data = part.body?.data || "";
+              if (!data && part.body?.attachmentId) {
+                const attachmentResponse = await gatewayFetch(
+                  "gmail",
+                  secret!,
+                  `/gmail/v1/users/me/messages/${item.id}/attachments/${part.body.attachmentId}`,
+                );
+                if (attachmentResponse.ok)
+                  data = ((await attachmentResponse.json()) as { data?: string }).data || "";
+              }
+              if (data)
+                attachments.push({
+                  name: part.filename || "attachment",
+                  type: part.mimeType || "application/octet-stream",
+                  data,
+                });
+            }
             messages.push({
               id: `${mailbox.id}:${item.id}`,
               from: parseAddress(header("from")),
               subject: header("subject"),
               snippet: msg.snippet ?? "",
               body: decodeGoogleBody(msg.payload as GooglePayload) || msg.snippet || "",
+              bodyHtml: decodeGoogleHtml(msg.payload as GooglePayload),
               date: header("date")
                 ? new Date(header("date")).toISOString()
                 : new Date().toISOString(),
+              attachments,
             });
           }
         } else {
           const res = await gatewayFetch(
             "outlook",
             secret!,
-            "/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,body,bodyPreview,receivedDateTime",
+            "/me/mailFolders/inbox/messages?$top=50&$select=id,subject,from,body,bodyPreview,receivedDateTime&$expand=attachments($select=name,contentType,size,contentBytes)",
           );
           if (!res.ok) throw new Error(await res.text());
           const list = (await res.json()) as {
@@ -623,6 +695,7 @@ export const syncReplies = createServerFn({ method: "POST" })
               body?: { content?: string; contentType?: string };
               receivedDateTime: string;
               from?: { emailAddress?: { address?: string } };
+              attachments?: Array<{ name?: string; contentType?: string; contentBytes?: string }>;
             }>;
           };
           for (const m of list.value ?? []) {
@@ -635,7 +708,18 @@ export const syncReplies = createServerFn({ method: "POST" })
                 m.body?.contentType === "html" || m.body?.contentType === "HTML"
                   ? htmlToText(m.body.content || "")
                   : m.body?.content || m.bodyPreview,
+              bodyHtml:
+                m.body?.contentType === "html" || m.body?.contentType === "HTML"
+                  ? m.body.content || ""
+                  : "",
               date: m.receivedDateTime,
+              attachments: (m.attachments ?? [])
+                .filter((attachment) => attachment.contentBytes)
+                .map((attachment) => ({
+                  name: attachment.name || "attachment",
+                  type: attachment.contentType || "application/octet-stream",
+                  data: attachment.contentBytes || "",
+                })),
             });
           }
         }
@@ -644,6 +728,17 @@ export const syncReplies = createServerFn({ method: "POST" })
           const match = byEmail.get(message.from);
           if (!match) continue;
           const { prospectId, contactId } = match;
+          const { saveAttachmentBuffer } = await import("./attachments.server");
+          const savedAttachments = await Promise.all(
+            message.attachments.map((attachment) =>
+              saveAttachmentBuffer(
+                contactId || prospectId,
+                Buffer.from(attachment.data.replace(/-/g, "+").replace(/_/g, "/"), "base64"),
+                attachment.name,
+                attachment.type,
+              ),
+            ),
+          );
           const { data: recipientRow } = await db
             .from("campaign_recipients")
             .select("id, campaign_id")
@@ -662,11 +757,32 @@ export const syncReplies = createServerFn({ method: "POST" })
             subject: message.subject,
             snippet: message.snippet?.slice(0, 500),
             body: message.body,
+            body_html: message.bodyHtml || null,
+            attachments: JSON.stringify(savedAttachments),
             received_at: message.date,
             external_id: message.id,
           });
           if (!error) {
             imported++;
+            const notificationTitle = `New email from ${message.from}`;
+            const notificationBody =
+              message.subject || message.snippet || "A new reply was received.";
+            const activeUsers = (await db.from("system_users").select("id").eq("status", "active"))
+              .data;
+            if (activeUsers?.length)
+              await db.from("notifications").insert(
+                activeUsers.map((user) => ({
+                  user_id: user.id,
+                  notification_type: "prospect.reply",
+                  title: notificationTitle,
+                  body: notificationBody,
+                  action_url: contactId
+                    ? `/prospects/${prospectId}/contacts/${contactId}`
+                    : `/prospects/${prospectId}`,
+                  entity_type: contactId ? "prospect_contact" : "prospect",
+                  entity_id: contactId || prospectId,
+                })),
+              );
             if (recipientRow) {
               await db
                 .from("campaign_recipients")

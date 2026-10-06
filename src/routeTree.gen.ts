@@ -41,6 +41,8 @@ import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
 import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
 import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
+import { Route as ApiCronNotificationsRouteImport } from './routes/api/cron/notifications'
+import { Route as ApiAttachmentsOwnerIdFileIdRouteImport } from './routes/api/attachments/$ownerId/$fileId'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 import { Route as ApiOauthGoogleStartRouteImport } from './routes/api/oauth/google/start'
 import { Route as ApiOauthMicrosoftCallbackRouteImport } from './routes/api/oauth/microsoft/callback'
@@ -209,6 +211,17 @@ const ApiAttachmentsUploadRoute = ApiAttachmentsUploadRouteImport.update({
   path: '/api/attachments/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronNotificationsRoute = ApiCronNotificationsRouteImport.update({
+  id: '/api/cron/notifications',
+  path: '/api/cron/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAttachmentsOwnerIdFileIdRoute =
+  ApiAttachmentsOwnerIdFileIdRouteImport.update({
+    id: '/api/attachments/$ownerId/$fileId',
+    path: '/api/attachments/$ownerId/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOauthGoogleCallbackRoute = ApiOauthGoogleCallbackRouteImport.update({
   id: '/api/oauth/google/callback',
   path: '/api/oauth/google/callback',
@@ -280,6 +293,8 @@ export interface FileRoutesByFullPath {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -321,6 +336,8 @@ export interface FileRoutesByTo {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -363,6 +380,8 @@ export interface FileRoutesById {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
   '/api/oauth/microsoft/callback': typeof ApiOauthMicrosoftCallbackRoute
@@ -406,6 +425,8 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
+    | '/api/cron/notifications'
+    | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -447,6 +468,8 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns'
     | '/api/attachments/upload'
+    | '/api/cron/notifications'
+    | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -488,6 +511,8 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
+    | '/api/cron/notifications'
+    | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
     | '/api/oauth/microsoft/callback'
@@ -526,6 +551,8 @@ export interface RootRouteChildren {
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
+  ApiCronNotificationsRoute: typeof ApiCronNotificationsRoute
+  ApiAttachmentsOwnerIdFileIdRoute: typeof ApiAttachmentsOwnerIdFileIdRoute
   ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
   ApiOauthGoogleStartRoute: typeof ApiOauthGoogleStartRoute
   ApiOauthMicrosoftCallbackRoute: typeof ApiOauthMicrosoftCallbackRoute
@@ -760,6 +787,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAttachmentsUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/notifications': {
+      id: '/api/cron/notifications'
+      path: '/api/cron/notifications'
+      fullPath: '/api/cron/notifications'
+      preLoaderRoute: typeof ApiCronNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/attachments/$ownerId/$fileId': {
+      id: '/api/attachments/$ownerId/$fileId'
+      path: '/api/attachments/$ownerId/$fileId'
+      fullPath: '/api/attachments/$ownerId/$fileId'
+      preLoaderRoute: typeof ApiAttachmentsOwnerIdFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/oauth/google/callback': {
       id: '/api/oauth/google/callback'
       path: '/api/oauth/google/callback'
@@ -900,6 +941,8 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,
+  ApiCronNotificationsRoute: ApiCronNotificationsRoute,
+  ApiAttachmentsOwnerIdFileIdRoute: ApiAttachmentsOwnerIdFileIdRoute,
   ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
   ApiOauthGoogleStartRoute: ApiOauthGoogleStartRoute,
   ApiOauthMicrosoftCallbackRoute: ApiOauthMicrosoftCallbackRoute,

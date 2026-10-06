@@ -1,6 +1,6 @@
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { db } from "@/lib/db";
@@ -12,7 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { discoverProspects, type AiProspect } from "@/lib/settings.functions";
-import { importProspectContacts, type ContactImportRow } from "@/lib/prospects.functions";
+import {
+  createProspectCompany,
+  importProspectContacts,
+  type ContactImportRow,
+} from "@/lib/prospects.functions";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import {
   Dialog,
@@ -78,29 +82,37 @@ const FIELDS = [
 
 type Row = Record<string, unknown>;
 
-type Draft = {
-  email: string;
-  first_name: string;
-  last_name: string;
+type CompanyDraft = {
   company: string;
-  job_title: string;
+  email: string;
   phone: string;
-  gender: string;
   website: string;
   linkedin_url: string;
   category_id: string;
+  industry: string;
+  address: string;
+  city: string;
+  country: string;
+  registration_number: string;
+  employee_count: string;
+  notes: string;
+  logo_path: string;
 };
-const emptyDraft = (): Draft => ({
-  email: "",
-  first_name: "",
-  last_name: "",
+const emptyCompany = (): CompanyDraft => ({
   company: "",
-  job_title: "",
+  email: "",
   phone: "",
-  gender: "",
   website: "",
   linkedin_url: "",
   category_id: "",
+  industry: "",
+  address: "",
+  city: "",
+  country: "Malawi",
+  registration_number: "",
+  employee_count: "",
+  notes: "",
+  logo_path: "",
 });
 
 function AddProspectsDialog({
@@ -111,48 +123,55 @@ function AddProspectsDialog({
   onDone: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [drafts, setDrafts] = useState<Draft[]>([emptyDraft()]);
+  const [draft, setDraft] = useState<CompanyDraft>(emptyCompany());
   const [busy, setBusy] = useState(false);
-  const update = (index: number, key: keyof Draft, value: string) =>
-    setDrafts((items) => items.map((item, i) => (i === index ? { ...item, [key]: value } : item)));
+  const update = (key: keyof CompanyDraft, value: string) =>
+    setDraft((current) => ({ ...current, [key]: value }));
+  const loadLogo = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2_000_000) {
+      toast.error("Choose an image smaller than 2 MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => update("logo_path", String(reader.result || ""));
+    reader.readAsDataURL(file);
+  };
   const save = async () => {
-    const valid = drafts.filter((d) => d.email.includes("@") || d.company.trim());
-    if (!valid.length) {
-      toast.error("Add a company or valid email.");
+    if (!draft.company.trim()) {
+      toast.error("Company or organisation name is required.");
       return;
     }
     setBusy(true);
-    let result;
     try {
-      result = await importProspectContacts({
+      const result = await createProspectCompany({
         data: {
-          rows: valid.map((d) => ({
-            company: d.company,
-            firstName: d.first_name,
-            lastName: d.last_name,
-            email: d.email,
-            phone: d.phone,
-            gender: d.gender,
-            jobTitle: d.job_title,
-            website: d.website,
-            linkedinUrl: d.linkedin_url,
-            categoryId: d.category_id || null,
-          })),
-          sourceFile: "Manual entry",
+          company: draft.company,
+          email: draft.email,
+          phone: draft.phone,
+          website: draft.website,
+          linkedinUrl: draft.linkedin_url,
+          categoryId: draft.category_id || null,
+          industry: draft.industry,
+          address: draft.address,
+          city: draft.city,
+          country: draft.country,
+          registrationNumber: draft.registration_number,
+          employeeCount: draft.employee_count ? Number(draft.employee_count) : null,
+          notes: draft.notes,
+          logoPath: draft.logo_path,
         },
       });
+      toast.success("Prospect created. Add contact people from its profile.");
+      setDraft(emptyCompany());
+      setOpen(false);
+      onDone();
+      window.location.assign(`/prospects/${result.id}`);
     } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create prospect.");
+    } finally {
       setBusy(false);
-      toast.error(error instanceof Error ? error.message : "Could not save contacts.");
-      return;
     }
-    setBusy(false);
-    toast.success(
-      `${result.contactsCreated + result.contactsUpdated} contact${valid.length === 1 ? "" : "s"} saved across ${result.companies} compan${result.companies === 1 ? "y" : "ies"}.`,
-    );
-    setDrafts([emptyDraft()]);
-    setOpen(false);
-    onDone();
   };
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -161,120 +180,139 @@ function AddProspectsDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Add one or several prospects</DialogTitle>
+          <DialogTitle>Add prospect company</DialogTitle>
           <DialogDescription>
-            Start with one row and use “Add another” for long-form batch entry.
+            Create the organisation first. Contact people are added from the prospect profile. Only
+            the company name is required.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          {drafts.map((draft, index) => (
-            <Card key={index}>
-              <CardContent className="grid gap-3 pt-5 md:grid-cols-3">
-                <Input
-                  aria-label="First name"
-                  placeholder="First name"
-                  value={draft.first_name}
-                  onChange={(e) => update(index, "first_name", e.target.value)}
+        <div className="grid gap-5 md:grid-cols-[180px_1fr]">
+          <div className="space-y-3">
+            <div className="grid h-36 place-items-center rounded-xl border border-dashed bg-muted/20 p-3">
+              {draft.logo_path ? (
+                <img
+                  src={draft.logo_path}
+                  alt="Prospect logo preview"
+                  className="max-h-28 object-contain"
                 />
-                <Input
-                  aria-label="Last name"
-                  placeholder="Last name"
-                  value={draft.last_name}
-                  onChange={(e) => update(index, "last_name", e.target.value)}
-                />
-                <Input
-                  aria-label="Company"
-                  placeholder="Company *"
-                  value={draft.company}
-                  onChange={(e) => update(index, "company", e.target.value)}
-                />
-                <Input
-                  aria-label="Email"
-                  type="email"
-                  placeholder="Email"
-                  value={draft.email}
-                  onChange={(e) => update(index, "email", e.target.value)}
-                />
-                <Input
-                  aria-label="Job title"
-                  placeholder="Job title"
-                  value={draft.job_title}
-                  onChange={(e) => update(index, "job_title", e.target.value)}
-                />
-                <Input
-                  aria-label="Phone"
-                  placeholder="Phone"
-                  value={draft.phone}
-                  onChange={(e) => update(index, "phone", e.target.value)}
-                />
-                <Select
-                  value={draft.gender || "none"}
-                  onValueChange={(v) => update(index, "gender", v === "none" ? "" : v)}
-                >
-                  <SelectTrigger aria-label="Gender">
-                    <SelectValue placeholder="Gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Gender not specified</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  aria-label="Website"
-                  placeholder="Website"
-                  value={draft.website}
-                  onChange={(e) => update(index, "website", e.target.value)}
-                />
-                <Input
-                  aria-label="LinkedIn URL"
-                  placeholder="LinkedIn URL"
-                  value={draft.linkedin_url}
-                  onChange={(e) => update(index, "linkedin_url", e.target.value)}
-                />
-                <Select
-                  value={draft.category_id || "none"}
-                  onValueChange={(v) => update(index, "category_id", v === "none" ? "" : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No category</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {drafts.length > 1 ? (
-                  <Button
-                    variant="ghost"
-                    className="md:col-span-3 md:w-fit"
-                    onClick={() => setDrafts((items) => items.filter((_, i) => i !== index))}
-                  >
-                    Remove row
-                  </Button>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDrafts((items) => [...items, emptyDraft()])}
-            >
-              + Add another
-            </Button>
-            <Button disabled={busy} onClick={() => void save()}>
-              {busy ? "Saving…" : "Save prospects"}
-            </Button>
+              ) : (
+                <span className="text-center text-sm text-muted-foreground">
+                  Company logo
+                  <br />
+                  (optional)
+                </span>
+              )}
+            </div>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(event) => loadLogo(event.target.files?.[0])}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CompanyField label="Company / organisation name *" className="sm:col-span-2">
+              <Input value={draft.company} onChange={(e) => update("company", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="Company email">
+              <Input
+                type="email"
+                value={draft.email}
+                onChange={(e) => update("email", e.target.value)}
+              />
+            </CompanyField>
+            <CompanyField label="Company phone">
+              <Input value={draft.phone} onChange={(e) => update("phone", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="Website">
+              <Input value={draft.website} onChange={(e) => update("website", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="LinkedIn page">
+              <Input
+                value={draft.linkedin_url}
+                onChange={(e) => update("linkedin_url", e.target.value)}
+              />
+            </CompanyField>
+            <CompanyField label="Category">
+              <Select
+                value={draft.category_id || "none"}
+                onValueChange={(value) => update("category_id", value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category yet</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CompanyField>
+            <CompanyField label="Industry">
+              <Input value={draft.industry} onChange={(e) => update("industry", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="Registration number">
+              <Input
+                value={draft.registration_number}
+                onChange={(e) => update("registration_number", e.target.value)}
+              />
+            </CompanyField>
+            <CompanyField label="Number of employees">
+              <Input
+                type="number"
+                min="1"
+                value={draft.employee_count}
+                onChange={(e) => update("employee_count", e.target.value)}
+              />
+            </CompanyField>
+            <CompanyField label="City">
+              <Input value={draft.city} onChange={(e) => update("city", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="Country">
+              <Input value={draft.country} onChange={(e) => update("country", e.target.value)} />
+            </CompanyField>
+            <CompanyField label="Physical / postal address" className="sm:col-span-2">
+              <Textarea
+                rows={3}
+                value={draft.address}
+                onChange={(e) => update("address", e.target.value)}
+              />
+            </CompanyField>
+            <CompanyField label="Notes" className="sm:col-span-2">
+              <Textarea
+                rows={4}
+                value={draft.notes}
+                onChange={(e) => update("notes", e.target.value)}
+              />
+            </CompanyField>
+            <div className="flex justify-end sm:col-span-2">
+              <Button disabled={busy || !draft.company.trim()} onClick={() => void save()}>
+                {busy ? "Creating…" : "Create prospect"}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CompanyField({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`space-y-1.5 ${className}`}>
+      <Label>{label}</Label>
+      {children}
+    </div>
   );
 }
 
@@ -774,7 +812,7 @@ function ProspectsPage() {
   const [visibleCount, setVisibleCount] = useState(30);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const { data: prospects = [] } = useQuery({
+  const { data: prospects = [], error: prospectsError } = useQuery({
     queryKey: ["prospects"],
     queryFn: async () => {
       const { data, error } = await db
@@ -863,6 +901,11 @@ function ProspectsPage() {
         </>
       }
     >
+      {prospectsError ? (
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          Prospects could not be loaded: {prospectsError.message}
+        </div>
+      ) : null}
       <Card>
         <CardContent className="pt-6">
           <div className="mb-4 grid min-w-0 gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(190px,280px)_minmax(180px,230px)]">

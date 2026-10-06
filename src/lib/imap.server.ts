@@ -1,5 +1,6 @@
 /** Tiny IMAP reader: fetches recent message headers from INBOX. Server-only. */
 import { connectTls, type LineSocket } from "./socket.server";
+import { simpleParser } from "mailparser";
 
 export interface ImapConfig {
   host: string;
@@ -15,6 +16,9 @@ export interface ImapHeader {
   date: string;
   messageId: string;
   inReplyTo: string;
+  body: string;
+  bodyHtml: string;
+  attachments: Array<{ name: string; type: string; data: string }>;
 }
 
 let tagCounter = 0;
@@ -69,26 +73,33 @@ export async function imapFetchRecent(config: ImapConfig, sinceDays = 14): Promi
       .trim()
       .split(/\s+/)
       .filter(Boolean)
-      .slice(-200);
+      .slice(-50);
     if (!uids.length) return [];
 
-    const fetchRes = await run(
-      socket,
-      `UID FETCH ${uids.join(",")} (BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID IN-REPLY-TO)])`,
-    );
+    const fetchRes = await run(socket, `UID FETCH ${uids.join(",")} (UID BODY.PEEK[])`);
 
     const results: ImapHeader[] = [];
     const parts = fetchRes.split(/^\* \d+ FETCH /m).slice(1);
     for (const part of parts) {
       const uid = /UID (\d+)/.exec(part)?.[1] ?? "";
-      const block = part.replace(/^[^\n]*\n/, "");
+      const literal = part.replace(/^[\s\S]*?\{\d+\}\r?\n/, "").replace(/\r?\n\)\r?\n[\s\S]*$/, "");
+      const parsed = await simpleParser(literal);
       results.push({
         uid,
-        from: headerValue(block, "From"),
-        subject: headerValue(block, "Subject"),
-        date: headerValue(block, "Date"),
-        messageId: headerValue(block, "Message-ID"),
-        inReplyTo: headerValue(block, "In-Reply-To"),
+        from: parsed.from?.text || headerValue(literal, "From"),
+        subject: parsed.subject || headerValue(literal, "Subject"),
+        date: (parsed.date || new Date()).toISOString(),
+        messageId: parsed.messageId || headerValue(literal, "Message-ID"),
+        inReplyTo:
+          (Array.isArray(parsed.inReplyTo) ? parsed.inReplyTo[0] : parsed.inReplyTo) ||
+          headerValue(literal, "In-Reply-To"),
+        body: parsed.text || "",
+        bodyHtml: typeof parsed.html === "string" ? parsed.html : "",
+        attachments: parsed.attachments.map((attachment) => ({
+          name: attachment.filename || "attachment",
+          type: attachment.contentType || "application/octet-stream",
+          data: attachment.content.toString("base64"),
+        })),
       });
     }
     await run(socket, "LOGOUT").catch(() => undefined);
