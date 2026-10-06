@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getSecret, hasSecret, setSecret } from "./settings.server";
+import { getSecret, getSecretStatus, setSecret } from "./settings.server";
 import { authMiddleware, permissionMiddleware } from "./auth.middleware";
 
 async function admin() {
@@ -27,14 +27,26 @@ export const getSettingsOverview = createServerFn({ method: "GET" })
   .middleware([permissionMiddleware("settings.manage")])
   .handler(async ({ context }) => {
     const db = await admin();
-    const [settings, templates, roles, permissions, rolePermissions, users] = await Promise.all([
-      db.from("system_settings").select("*").order("setting_key"),
-      db.from("email_templates").select("*").order("name"),
-      db.from("roles").select("*").order("name"),
-      db.from("permissions").select("*").order("module"),
-      db.from("role_permissions").select("*"),
-      db.from("system_users").select("*").order("full_name"),
-    ]);
+    const secretKeys = [
+      "openai_api_key",
+      "google_oauth_client_id",
+      "google_oauth_client_secret",
+      "microsoft_oauth_client_id",
+      "microsoft_oauth_client_secret",
+    ] as const;
+    const [settings, templates, roles, permissions, rolePermissions, users, secretStatuses] =
+      await Promise.all([
+        db.from("system_settings").select("*").order("setting_key"),
+        db.from("email_templates").select("*").order("name"),
+        db.from("roles").select("*").order("name"),
+        db.from("permissions").select("*").order("module"),
+        db.from("role_permissions").select("*"),
+        db.from("system_users").select("*").order("full_name"),
+        Promise.all(secretKeys.map((key) => getSecretStatus(key))),
+      ]);
+    const secretStatus = Object.fromEntries(
+      secretKeys.map((key, index) => [key, secretStatuses[index]]),
+    );
     return JSON.parse(
       JSON.stringify({
         settings: settings.data ?? [],
@@ -45,12 +57,13 @@ export const getSettingsOverview = createServerFn({ method: "GET" })
         users: (users.data ?? []).map(({ password_hash: _passwordHash, ...user }) => user),
         currentUserId: context.user.id,
         configured: {
-          openai: await hasSecret("openai_api_key"),
-          googleId: await hasSecret("google_oauth_client_id"),
-          googleSecret: await hasSecret("google_oauth_client_secret"),
-          microsoftId: await hasSecret("microsoft_oauth_client_id"),
-          microsoftSecret: await hasSecret("microsoft_oauth_client_secret"),
+          openai: secretStatus["openai_api_key"] === "configured",
+          googleId: secretStatus["google_oauth_client_id"] === "configured",
+          googleSecret: secretStatus["google_oauth_client_secret"] === "configured",
+          microsoftId: secretStatus["microsoft_oauth_client_id"] === "configured",
+          microsoftSecret: secretStatus["microsoft_oauth_client_secret"] === "configured",
         },
+        unreadableSecrets: secretKeys.filter((key) => secretStatus[key] === "unreadable"),
       }),
     );
   });

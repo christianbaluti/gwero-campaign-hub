@@ -88,11 +88,31 @@ function SettingsPage() {
         <p className="text-muted-foreground">Loading settings…</p>
       </AppShell>
     );
+  const secretLabels: Record<string, string> = {
+    openai_api_key: "OpenAI API key",
+    google_oauth_client_id: "Google OAuth client ID",
+    google_oauth_client_secret: "Google OAuth client secret",
+    microsoft_oauth_client_id: "Microsoft OAuth client ID",
+    microsoft_oauth_client_secret: "Microsoft OAuth client secret",
+  };
   return (
     <AppShell
       title="Settings"
       description="Configure Gwero OS, connected email, AI, templates and access control."
     >
+      {data.unreadableSecrets.length ? (
+        <div
+          role="alert"
+          className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+        >
+          <p className="font-semibold">Some provider credentials need to be saved again.</p>
+          <p className="mt-1">
+            These encrypted values came from a different environment and cannot be read here:
+            {data.unreadableSecrets.map((key) => secretLabels[key] || key).join(", ")}. Open the
+            relevant tab and enter the value again; the rest of your settings and data are intact.
+          </p>
+        </div>
+      ) : null}
       <Tabs defaultValue="general" className="space-y-5">
         <TabsList className="h-auto w-full justify-start overflow-x-auto bg-white p-1.5">
           <TabsTrigger value="general">General</TabsTrigger>

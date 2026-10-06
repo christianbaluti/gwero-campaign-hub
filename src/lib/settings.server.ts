@@ -54,16 +54,38 @@ async function decrypt(value: string) {
   );
 }
 
-export async function getSecret(key: string) {
+export type SecretStatus = "configured" | "missing" | "unreadable";
+
+async function readSecret(key: string): Promise<{ value: string | null; status: SecretStatus }> {
   const envName = ENV_KEYS[key];
-  if (envName && process.env[envName]) return process.env[envName]!;
+  if (envName && process.env[envName]) {
+    return { value: process.env[envName]!, status: "configured" };
+  }
   const { serverDb } = await import("./db.server");
   const { data } = await serverDb
     .from("app_secrets")
     .select("*")
     .eq("secret_key", key)
     .maybeSingle();
-  return data?.encrypted_value ? decrypt(data.encrypted_value) : null;
+  if (!data?.encrypted_value) return { value: null, status: "missing" };
+  try {
+    const value = await decrypt(data.encrypted_value);
+    return { value, status: value ? "configured" : "missing" };
+  } catch (error) {
+    console.warn(
+      `Stored secret "${key}" cannot be decrypted with this environment's key. Re-save it in Settings.`,
+      error instanceof Error ? error.message : "Unknown decryption error",
+    );
+    return { value: null, status: "unreadable" };
+  }
+}
+
+export async function getSecret(key: string) {
+  return (await readSecret(key)).value;
+}
+
+export async function getSecretStatus(key: string) {
+  return (await readSecret(key)).status;
 }
 
 export async function setSecret(key: string, value: string) {
@@ -81,5 +103,5 @@ export async function setSecret(key: string, value: string) {
 }
 
 export async function hasSecret(key: string) {
-  return Boolean(await getSecret(key));
+  return (await getSecretStatus(key)) === "configured";
 }
