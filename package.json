@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
-    "deploy:build": "npm run db:migrate && npm run build",
+    "build": "npm run db:migrate && vite build",
+    "deploy:build": "npm run build",
     "db:migrate": "node scripts/migrate.mjs",
     "contacts:import": "node --experimental-strip-types scripts/import-contacts.mjs",
     "contacts:logos": "node scripts/enrich-prospect-logos.mjs",
