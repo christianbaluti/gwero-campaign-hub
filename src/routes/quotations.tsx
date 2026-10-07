@@ -49,7 +49,7 @@ function QuotationsPage() {
           options: statuses,
           defaultValue: "draft",
         },
-        { name: "currency", label: "Currency", defaultValue: "USD" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "USD" },
         { name: "issue_date", label: "Issue date", type: "date" },
         { name: "valid_until", label: "Valid until", type: "date" },
         { name: "tax_rate", label: "Tax rate %", type: "number", defaultValue: "0" },

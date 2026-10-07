@@ -43,7 +43,7 @@ function HrPage() {
         },
         { name: "start_date", label: "Start date", type: "date" },
         { name: "base_salary", label: "Base salary", type: "number", defaultValue: "0" },
-        { name: "currency", label: "Currency", defaultValue: "MWK" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "MWK" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
       searchKeys={["full_name", "employee_number", "department", "job_title"]}

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { MailboxSettings } from "@/components/settings/MailboxSettings";
+import { CurrencySettings } from "@/components/settings/CurrencySettings";
 import {
   Select,
   SelectContent,
@@ -119,6 +120,7 @@ function SettingsPage() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="email">Email connections</TabsTrigger>
           <TabsTrigger value="templates">Email templates</TabsTrigger>
+          <TabsTrigger value="currencies">Currencies</TabsTrigger>
           <TabsTrigger value="ai">AI & Prospecting</TabsTrigger>
           <TabsTrigger value="access">Users & access</TabsTrigger>
         </TabsList>
@@ -142,6 +144,9 @@ function SettingsPage() {
             templates={data.templates}
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
+        </TabsContent>
+        <TabsContent value="currencies">
+          <CurrencySettings />
         </TabsContent>
         <TabsContent value="ai">
           <AiTab

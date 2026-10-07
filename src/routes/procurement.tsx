@@ -27,7 +27,7 @@ function ProcurementPage() {
         },
         { name: "order_date", label: "Order date", type: "date" },
         { name: "expected_date", label: "Expected date", type: "date" },
-        { name: "currency", label: "Currency", defaultValue: "MWK" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "MWK" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
       searchKeys={["po_number", "status"]}

@@ -216,6 +216,8 @@ export interface Reply {
   prospect_id: string | null;
   contact_id: string | null;
   campaign_id: string | null;
+  opportunity_type: string | null;
+  opportunity_id: string | null;
   from_email: string;
   subject: string | null;
   snippet: string | null;

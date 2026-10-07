@@ -212,6 +212,8 @@ const fields: Record<TableName, string[]> = {
     "prospect_id",
     "contact_id",
     "campaign_id",
+    "opportunity_type",
+    "opportunity_id",
     "from_email",
     "subject",
     "snippet",

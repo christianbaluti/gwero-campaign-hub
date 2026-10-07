@@ -55,7 +55,7 @@ function MarketingPage() {
         { name: "budget", label: "Budget", type: "number", defaultValue: "0" },
         { name: "spend", label: "Spend", type: "number", defaultValue: "0" },
         { name: "leads", label: "Leads", type: "number", defaultValue: "0" },
-        { name: "currency", label: "Currency", defaultValue: "USD" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "USD" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
     />

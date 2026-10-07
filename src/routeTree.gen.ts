@@ -34,12 +34,15 @@ import { Route as RfqsRouteImport } from './routes/rfqs'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TasksRouteImport } from './routes/tasks'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as BidsIdRouteImport } from './routes/bids.$id'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
 import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
 import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
+import { Route as RfpsIdRouteImport } from './routes/rfps.$id'
+import { Route as RfqsIdRouteImport } from './routes/rfqs.$id'
 import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
 import { Route as ApiCronCampaignsRouteImport } from './routes/api/cron/campaigns'
 import { Route as ApiCronNotificationsRouteImport } from './routes/api/cron/notifications'
@@ -178,6 +181,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BidsIdRoute = BidsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => BidsRoute,
+} as any)
 const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
   id: '/campaigns/',
   path: '/campaigns/',
@@ -207,6 +215,16 @@ const QuotationsIdRoute = QuotationsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => QuotationsRoute,
+} as any)
+const RfpsIdRoute = RfpsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => RfpsRoute,
+} as any)
+const RfqsIdRoute = RfqsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => RfqsRoute,
 } as any)
 const ApiAttachmentsUploadRoute = ApiAttachmentsUploadRouteImport.update({
   id: '/api/attachments/upload',
@@ -275,7 +293,7 @@ const ProspectsIdContactsContactIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
-  '/bids': typeof BidsRoute
+  '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
@@ -293,16 +311,19 @@ export interface FileRoutesByFullPath {
   '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
-  '/rfps': typeof RfpsRoute
-  '/rfqs': typeof RfqsRoute
+  '/rfps': typeof RfpsRouteWithChildren
+  '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/api/health': typeof ApiHealthRoute
+  '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
+  '/rfps/$id': typeof RfpsIdRoute
+  '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
@@ -320,7 +341,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
-  '/bids': typeof BidsRoute
+  '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
@@ -338,16 +359,19 @@ export interface FileRoutesByTo {
   '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
-  '/rfps': typeof RfpsRoute
-  '/rfqs': typeof RfqsRoute
+  '/rfps': typeof RfpsRouteWithChildren
+  '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/api/health': typeof ApiHealthRoute
+  '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
+  '/rfps/$id': typeof RfpsIdRoute
+  '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
@@ -366,7 +390,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agreements': typeof AgreementsRoute
-  '/bids': typeof BidsRoute
+  '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
@@ -384,16 +408,19 @@ export interface FileRoutesById {
   '/prospects': typeof ProspectsRouteWithChildren
   '/quotations': typeof QuotationsRouteWithChildren
   '/recruitment': typeof RecruitmentRoute
-  '/rfps': typeof RfpsRoute
-  '/rfqs': typeof RfqsRoute
+  '/rfps': typeof RfpsRouteWithChildren
+  '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
   '/api/health': typeof ApiHealthRoute
+  '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
+  '/rfps/$id': typeof RfpsIdRoute
+  '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
@@ -436,11 +463,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/api/health'
+    | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
     | '/prospects/$id'
     | '/quotations/$id'
+    | '/rfps/$id'
+    | '/rfqs/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
@@ -481,11 +511,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/api/health'
+    | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
     | '/prospects/$id'
     | '/quotations/$id'
+    | '/rfps/$id'
+    | '/rfqs/$id'
     | '/campaigns'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
@@ -526,11 +559,14 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/api/health'
+    | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
     | '/prospects/$id'
     | '/quotations/$id'
+    | '/rfps/$id'
+    | '/rfqs/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
@@ -549,7 +585,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgreementsRoute: typeof AgreementsRoute
-  BidsRoute: typeof BidsRoute
+  BidsRoute: typeof BidsRouteWithChildren
   ClientsRoute: typeof ClientsRouteWithChildren
   CostSheetsRoute: typeof CostSheetsRouteWithChildren
   DealsRoute: typeof DealsRoute
@@ -567,8 +603,8 @@ export interface RootRouteChildren {
   ProspectsRoute: typeof ProspectsRouteWithChildren
   QuotationsRoute: typeof QuotationsRouteWithChildren
   RecruitmentRoute: typeof RecruitmentRoute
-  RfpsRoute: typeof RfpsRoute
-  RfqsRoute: typeof RfqsRoute
+  RfpsRoute: typeof RfpsRouteWithChildren
+  RfqsRoute: typeof RfqsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -764,6 +800,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/bids/$id': {
+      id: '/bids/$id'
+      path: '/$id'
+      fullPath: '/bids/$id'
+      preLoaderRoute: typeof BidsIdRouteImport
+      parentRoute: typeof BidsRoute
+    }
     '/campaigns/': {
       id: '/campaigns/'
       path: '/campaigns'
@@ -805,6 +848,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/quotations/$id'
       preLoaderRoute: typeof QuotationsIdRouteImport
       parentRoute: typeof QuotationsRoute
+    }
+    '/rfps/$id': {
+      id: '/rfps/$id'
+      path: '/$id'
+      fullPath: '/rfps/$id'
+      preLoaderRoute: typeof RfpsIdRouteImport
+      parentRoute: typeof RfpsRoute
+    }
+    '/rfqs/$id': {
+      id: '/rfqs/$id'
+      path: '/$id'
+      fullPath: '/rfqs/$id'
+      preLoaderRoute: typeof RfqsIdRouteImport
+      parentRoute: typeof RfqsRoute
     }
     '/api/attachments/upload': {
       id: '/api/attachments/upload'
@@ -893,6 +950,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface BidsRouteChildren {
+  BidsIdRoute: typeof BidsIdRoute
+}
+
+const BidsRouteChildren: BidsRouteChildren = {
+  BidsIdRoute: BidsIdRoute,
+}
+
+const BidsRouteWithChildren = BidsRoute._addFileChildren(BidsRouteChildren)
+
 interface ClientsRouteChildren {
   ClientsIdRoute: typeof ClientsIdRoute
 }
@@ -952,10 +1019,30 @@ const QuotationsRouteWithChildren = QuotationsRoute._addFileChildren(
   QuotationsRouteChildren,
 )
 
+interface RfpsRouteChildren {
+  RfpsIdRoute: typeof RfpsIdRoute
+}
+
+const RfpsRouteChildren: RfpsRouteChildren = {
+  RfpsIdRoute: RfpsIdRoute,
+}
+
+const RfpsRouteWithChildren = RfpsRoute._addFileChildren(RfpsRouteChildren)
+
+interface RfqsRouteChildren {
+  RfqsIdRoute: typeof RfqsIdRoute
+}
+
+const RfqsRouteChildren: RfqsRouteChildren = {
+  RfqsIdRoute: RfqsIdRoute,
+}
+
+const RfqsRouteWithChildren = RfqsRoute._addFileChildren(RfqsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgreementsRoute: AgreementsRoute,
-  BidsRoute: BidsRoute,
+  BidsRoute: BidsRouteWithChildren,
   ClientsRoute: ClientsRouteWithChildren,
   CostSheetsRoute: CostSheetsRouteWithChildren,
   DealsRoute: DealsRoute,
@@ -973,8 +1060,8 @@ const rootRouteChildren: RootRouteChildren = {
   ProspectsRoute: ProspectsRouteWithChildren,
   QuotationsRoute: QuotationsRouteWithChildren,
   RecruitmentRoute: RecruitmentRoute,
-  RfpsRoute: RfpsRoute,
-  RfqsRoute: RfqsRoute,
+  RfpsRoute: RfpsRouteWithChildren,
+  RfqsRoute: RfqsRouteWithChildren,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,
   ApiHealthRoute: ApiHealthRoute,

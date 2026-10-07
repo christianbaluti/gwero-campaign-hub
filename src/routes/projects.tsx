@@ -36,7 +36,7 @@ function ProjectsPage() {
         { name: "start_date", label: "Start date", type: "date" },
         { name: "end_date", label: "End date", type: "date" },
         { name: "budget", label: "Budget", type: "number", defaultValue: "0" },
-        { name: "currency", label: "Currency", defaultValue: "MWK" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "MWK" },
         { name: "progress", label: "Progress %", type: "number", defaultValue: "0" },
         { name: "description", label: "Description", type: "textarea" },
       ]}

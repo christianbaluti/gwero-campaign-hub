@@ -150,6 +150,9 @@ CREATE TABLE IF NOT EXISTS replies (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ALTER TABLE replies ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
 ALTER TABLE replies ADD COLUMN IF NOT EXISTS body LONGTEXT NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS opportunity_type VARCHAR(20) NULL;
+ALTER TABLE replies ADD COLUMN IF NOT EXISTS opportunity_id CHAR(36) NULL;
+ALTER TABLE replies ADD INDEX IF NOT EXISTS replies_opportunity_idx (opportunity_type, opportunity_id, received_at);
 
 CREATE TABLE IF NOT EXISTS quotations (
   id CHAR(36) PRIMARY KEY, quote_number VARCHAR(60) NOT NULL, title VARCHAR(255) NOT NULL,
@@ -266,6 +269,80 @@ CREATE TABLE IF NOT EXISTS requests (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   KEY requests_type_idx (request_type),
   CONSTRAINT requests_client_fk FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS notes TEXT NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_type VARCHAR(30) NOT NULL DEFAULT 'email';
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_cc LONGTEXT NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS delivery_location TEXT NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS portal_url VARCHAR(1000) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS portal_username VARCHAR(320) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_type VARCHAR(30) NOT NULL DEFAULT 'email';
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_cc LONGTEXT NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS delivery_location TEXT NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS portal_url VARCHAR(1000) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS portal_username VARCHAR(320) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+
+CREATE TABLE IF NOT EXISTS currencies (
+  id CHAR(36) PRIMARY KEY, code VARCHAR(10) NOT NULL, name VARCHAR(120) NOT NULL,
+  symbol VARCHAR(12) NOT NULL, is_default BOOLEAN NOT NULL DEFAULT FALSE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE, sort_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY currencies_code_key (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO currencies (id, code, name, symbol, is_default, sort_order) VALUES
+  (UUID(), 'MWK', 'Malawian Kwacha', 'MK', TRUE, 10),
+  (UUID(), 'USD', 'US Dollar', '$', FALSE, 20),
+  (UUID(), 'EUR', 'Euro', '€', FALSE, 30),
+  (UUID(), 'GBP', 'British Pound', '£', FALSE, 40),
+  (UUID(), 'ZAR', 'South African Rand', 'R', FALSE, 50);
+
+CREATE TABLE IF NOT EXISTS opportunity_checklist_items (
+  id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
+  title VARCHAR(500) NOT NULL, notes TEXT, assignee_id CHAR(36), due_at DATETIME(3),
+  status VARCHAR(30) NOT NULL DEFAULT 'pending', document_required BOOLEAN NOT NULL DEFAULT TRUE,
+  completed_by CHAR(36), completed_at DATETIME(3), position INT NOT NULL DEFAULT 0,
+  created_by CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY opportunity_checklist_parent_idx (opportunity_type, opportunity_id, position)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opportunity_documents (
+  id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
+  checklist_item_id CHAR(36), document_id CHAR(36), attachment_path VARCHAR(1000),
+  display_name VARCHAR(500) NOT NULL, content_type VARCHAR(255), file_size INT UNSIGNED,
+  document_role VARCHAR(30) NOT NULL DEFAULT 'response', include_in_submission BOOLEAN NOT NULL DEFAULT TRUE,
+  outgoing_name VARCHAR(500), created_by CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY opportunity_documents_parent_idx (opportunity_type, opportunity_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opportunity_comments (
+  id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
+  body TEXT NOT NULL, author_id CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY opportunity_comments_parent_idx (opportunity_type, opportunity_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opportunity_submissions (
+  id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
+  channel VARCHAR(30) NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'draft', mailbox_id CHAR(36),
+  recipient_email VARCHAR(320), cc LONGTEXT, subject TEXT, body_html LONGTEXT,
+  file_mode VARCHAR(30) NOT NULL DEFAULT 'separate', detail TEXT, external_message_id VARCHAR(500),
+  submitted_by CHAR(36), submitted_at DATETIME(3), error TEXT,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY opportunity_submissions_parent_idx (opportunity_type, opportunity_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS marketing_activities (

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { ModulePage } from "@/components/ModulePage";
 
 export const Route = createFileRoute("/cost-sheets")({
@@ -16,6 +16,9 @@ export const Route = createFileRoute("/cost-sheets")({
 });
 
 function CostSheetsPage() {
+  const location = useLocation();
+  if (location.pathname !== "/cost-sheets" && location.pathname !== "/cost-sheets/")
+    return <Outlet />;
   return (
     <ModulePage
       title="Cost sheets"
@@ -45,7 +48,7 @@ function CostSheetsPage() {
           options: ["draft", "approved", "archived"],
           defaultValue: "draft",
         },
-        { name: "currency", label: "Currency", defaultValue: "USD" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "USD" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
     />

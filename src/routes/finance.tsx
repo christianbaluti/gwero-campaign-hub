@@ -40,7 +40,7 @@ function FinancePage() {
         { name: "amount", label: "Amount", type: "number", defaultValue: "0" },
         { name: "tax", label: "Tax", type: "number", defaultValue: "0" },
         { name: "paid_amount", label: "Paid amount", type: "number", defaultValue: "0" },
-        { name: "currency", label: "Currency", defaultValue: "MWK" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "MWK" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
       searchKeys={["invoice_number", "status"]}

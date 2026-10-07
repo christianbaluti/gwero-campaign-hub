@@ -728,6 +728,20 @@ export const syncReplies = createServerFn({ method: "POST" })
           const match = byEmail.get(message.from);
           if (!match) continue;
           const { prospectId, contactId } = match;
+          const pool = (await import("./db.server")).getPool();
+          const [opportunityRows] = await pool.query(
+            `SELECT opportunity_type, opportunity_id
+               FROM opportunity_submissions
+              WHERE LOWER(recipient_email) = LOWER(?) AND status = 'submitted'
+              ORDER BY CASE
+                WHEN LOWER(?) LIKE CONCAT('%', LOWER(subject), '%')
+                  OR LOWER(subject) LIKE CONCAT('%', LOWER(?), '%') THEN 0 ELSE 1
+              END, submitted_at DESC LIMIT 1`,
+            [message.from, message.subject || "", message.subject || ""],
+          );
+          const opportunity = (
+            opportunityRows as Array<{ opportunity_type: string; opportunity_id: string }>
+          )[0];
           const { saveAttachmentBuffer } = await import("./attachments.server");
           const savedAttachments = await Promise.all(
             message.attachments.map((attachment) =>
@@ -753,6 +767,8 @@ export const syncReplies = createServerFn({ method: "POST" })
             prospect_id: prospectId,
             contact_id: contactId,
             campaign_id: recipientRow?.campaign_id ?? null,
+            opportunity_type: opportunity?.opportunity_type ?? null,
+            opportunity_id: opportunity?.opportunity_id ?? null,
             from_email: message.from,
             subject: message.subject,
             snippet: message.snippet?.slice(0, 500),

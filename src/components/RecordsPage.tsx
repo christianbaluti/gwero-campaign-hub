@@ -26,13 +26,14 @@ import { Trash2 } from "lucide-react";
 import { db } from "@/lib/db";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import type { TableName } from "@/lib/db.types";
+import { listOpportunityDependencies } from "@/lib/opportunities.functions";
 
 export type Row = Record<string, unknown>;
 
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "textarea" | "select" | "reference";
+  type?: "text" | "number" | "date" | "textarea" | "select" | "reference" | "currency";
   options?: readonly string[];
   refTable?: TableName;
   refLabel?: string;
@@ -86,6 +87,11 @@ function FieldInput({
       return (data ?? []) as unknown as Row[];
     },
   });
+  const { data: currencyData } = useQuery({
+    queryKey: ["opportunity-dependencies"],
+    queryFn: () => listOpportunityDependencies() as Promise<{ currencies: Row[] }>,
+    enabled: field.type === "currency",
+  });
 
   if (field.type === "textarea") {
     return (
@@ -107,6 +113,22 @@ function FieldInput({
           {(field.options ?? []).map((o) => (
             <SelectItem key={o} value={o}>
               {o}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
+  if (field.type === "currency") {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select currency" />
+        </SelectTrigger>
+        <SelectContent>
+          {(currencyData?.currencies ?? []).map((currency) => (
+            <SelectItem key={String(currency["id"])} value={String(currency["code"])}>
+              {String(currency["code"])} — {String(currency["name"])}
             </SelectItem>
           ))}
         </SelectContent>

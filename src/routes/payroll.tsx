@@ -24,7 +24,7 @@ function PayrollPage() {
           options: ["draft", "review", "approved", "paid"],
           defaultValue: "draft",
         },
-        { name: "currency", label: "Currency", defaultValue: "MWK" },
+        { name: "currency", label: "Currency", type: "currency", defaultValue: "MWK" },
         { name: "notes", label: "Notes", type: "textarea" },
       ]}
       searchKeys={["period", "status"]}

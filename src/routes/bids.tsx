@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ModulePage } from "@/components/ModulePage";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
+import { OpportunityListPage } from "@/components/OpportunityListPage";
 
 export const Route = createFileRoute("/bids")({
   component: BidsPage,
@@ -16,40 +16,10 @@ export const Route = createFileRoute("/bids")({
 });
 
 function BidsPage() {
-  return (
-    <ModulePage
-      title="Bids"
-      description="Tender tracker with deadlines, bonds and outcomes."
-      table="bids"
-      searchKeys={["reference", "title", "buyer"]}
-      createLabel="New bid"
-      columns={[
-        { key: "title", label: "Title" },
-        { key: "reference", label: "Reference" },
-        { key: "buyer", label: "Buyer" },
-        { key: "status", label: "Status", className: "capitalize" },
-        { key: "closing_date", label: "Closing" },
-        { key: "value", label: "Value" },
-      ]}
-      fields={[
-        { name: "title", label: "Title" },
-        { name: "reference", label: "Reference" },
-        { name: "buyer", label: "Buyer" },
-        { name: "client_id", label: "Client", type: "reference", refTable: "clients" },
-        {
-          name: "status",
-          label: "Status",
-          type: "select",
-          options: ["identified", "preparing", "submitted", "won", "lost"],
-          defaultValue: "identified",
-        },
-        { name: "closing_date", label: "Closing date", type: "date" },
-        { name: "submission_date", label: "Submitted on", type: "date" },
-        { name: "value", label: "Value", type: "number", defaultValue: "0" },
-        { name: "bond_amount", label: "Bond amount", type: "number", defaultValue: "0" },
-        { name: "currency", label: "Currency", defaultValue: "USD" },
-        { name: "notes", label: "Notes", type: "textarea" },
-      ]}
-    />
+  const location = useLocation();
+  return location.pathname !== "/bids" && location.pathname !== "/bids/" ? (
+    <Outlet />
+  ) : (
+    <OpportunityListPage kind="bid" />
   );
 }
