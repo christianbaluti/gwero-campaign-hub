@@ -677,10 +677,11 @@ function CampaignDetail() {
               <CardContent className="space-y-3">
                 <Label className="flex cursor-pointer items-center justify-center rounded-xl border border-dashed p-4 text-sm text-muted-foreground hover:border-primary hover:text-primary">
                   <FileUp className="mr-2 h-4 w-4" /> Upload attachment
-                  <Input
-                    className="sr-only"
+                  <input
+                    className="hidden"
                     disabled={!editable}
                     type="file"
+                    aria-label="Upload campaign attachment"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (file) void uploadFile(file);
