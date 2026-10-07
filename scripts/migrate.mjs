@@ -61,6 +61,34 @@ try {
       await connection.query(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
       continue;
     }
+    const dropIndex = statement.match(
+      /^ALTER TABLE\s+`?([a-zA-Z0-9_]+)`?\s+DROP INDEX IF EXISTS\s+`?([a-zA-Z0-9_]+)`?$/i,
+    );
+    if (dropIndex) {
+      const [, table, index] = dropIndex;
+      const [existing] = await connection.execute(
+        "SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1",
+        [database, table, index],
+      );
+      if (!existing.length) continue;
+      await connection.query(`ALTER TABLE \`${table}\` DROP INDEX \`${index}\``);
+      continue;
+    }
+    const addIndex = statement.match(
+      /^ALTER TABLE\s+`?([a-zA-Z0-9_]+)`?\s+ADD (UNIQUE )?INDEX IF NOT EXISTS\s+`?([a-zA-Z0-9_]+)`?\s+(\([\s\S]+\))$/i,
+    );
+    if (addIndex) {
+      const [, table, unique, index, columns] = addIndex;
+      const [existing] = await connection.execute(
+        "SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1",
+        [database, table, index],
+      );
+      if (existing.length) continue;
+      await connection.query(
+        `ALTER TABLE \`${table}\` ADD ${unique || ""}INDEX \`${index}\` ${columns}`,
+      );
+      continue;
+    }
     await connection.query(statement);
   }
   console.log(`MySQL schema ready: ${database}`);

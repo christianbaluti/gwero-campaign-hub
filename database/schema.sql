@@ -48,6 +48,60 @@ CREATE TABLE IF NOT EXISTS campaign_recipients (
   CONSTRAINT recipients_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS campaign_type VARCHAR(40) NOT NULL DEFAULT 'outreach';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS objective TEXT NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS owner_id CHAR(36) NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS approval_required BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS approved_by CHAR(36) NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS approved_at DATETIME(3) NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS scheduled_at DATETIME(3) NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS completed_at DATETIME(3) NULL;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS timezone VARCHAR(80) NOT NULL DEFAULT 'Africa/Blantyre';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS daily_limit INT NOT NULL DEFAULT 100;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS stop_on_reply BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS stop_on_bounce BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS audience_rules LONGTEXT NULL;
+
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS contact_id CHAR(36) NULL;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS current_step INT NOT NULL DEFAULT 1;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS next_action_at DATETIME(3) NULL;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS stopped_reason VARCHAR(255) NULL;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS last_activity_at DATETIME(3) NULL;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS converted_at DATETIME(3) NULL;
+ALTER TABLE campaign_recipients ADD COLUMN IF NOT EXISTS attempt_count INT NOT NULL DEFAULT 0;
+ALTER TABLE campaign_recipients ADD INDEX IF NOT EXISTS recipients_campaign_idx (campaign_id);
+ALTER TABLE campaign_recipients DROP INDEX IF EXISTS recipients_campaign_prospect_key;
+ALTER TABLE campaign_recipients ADD UNIQUE INDEX IF NOT EXISTS recipients_campaign_contact_key (campaign_id, contact_id);
+ALTER TABLE campaign_recipients ADD INDEX IF NOT EXISTS recipients_campaign_due_idx (campaign_id, status, next_action_at);
+
+CREATE TABLE IF NOT EXISTS campaign_steps (
+  id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, step_order INT NOT NULL,
+  step_type VARCHAR(40) NOT NULL DEFAULT 'email', name VARCHAR(255) NOT NULL,
+  delay_amount INT NOT NULL DEFAULT 0, delay_unit VARCHAR(20) NOT NULL DEFAULT 'days',
+  subject TEXT, body_html LONGTEXT, task_instructions TEXT, is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY campaign_steps_order (campaign_id, step_order),
+  CONSTRAINT campaign_steps_campaign_fk FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS campaign_events (
+  id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, recipient_id CHAR(36),
+  event_type VARCHAR(80) NOT NULL, detail TEXT, actor_id CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY campaign_events_campaign_created (campaign_id, created_at),
+  CONSTRAINT campaign_events_campaign_fk FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE,
+  CONSTRAINT campaign_events_recipient_fk FOREIGN KEY (recipient_id) REFERENCES campaign_recipients(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS email_suppressions (
+  id CHAR(36) PRIMARY KEY, email VARCHAR(320) NOT NULL, reason VARCHAR(80) NOT NULL,
+  source VARCHAR(80) NOT NULL DEFAULT 'manual', campaign_id CHAR(36), notes TEXT,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY email_suppressions_email (email),
+  CONSTRAINT email_suppressions_campaign_fk FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS deals (
   id CHAR(36) PRIMARY KEY, title VARCHAR(255) NOT NULL, client_id CHAR(36), prospect_id CHAR(36),
   value DECIMAL(15,2) NOT NULL DEFAULT 0, currency VARCHAR(8) NOT NULL DEFAULT 'USD', stage VARCHAR(40) NOT NULL DEFAULT 'new',
@@ -478,6 +532,7 @@ INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES
   (UUID(), 'prospects.manage', 'Create and update prospects', 'Prospects'),
   (UUID(), 'prospects.convert', 'Convert prospects to clients', 'Prospects'),
   (UUID(), 'campaigns.manage', 'Manage campaigns', 'Campaigns'),
+  (UUID(), 'campaigns.approve', 'Approve campaigns for launch', 'Campaigns'),
   (UUID(), 'clients.manage', 'Manage clients', 'Clients');
 
 INSERT IGNORE INTO role_permissions (id, role_id, permission_id)

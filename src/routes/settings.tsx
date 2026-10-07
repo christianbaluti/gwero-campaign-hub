@@ -108,8 +108,9 @@ function SettingsPage() {
           <p className="font-semibold">Some provider credentials need to be saved again.</p>
           <p className="mt-1">
             These encrypted values came from a different environment and cannot be read here:
-            {data.unreadableSecrets.map((key) => secretLabels[key] || key).join(", ")}. Open the
-            relevant tab and enter the value again; the rest of your settings and data are intact.
+            {data.unreadableSecrets.map((key: string) => secretLabels[key] || key).join(", ")}. Open
+            the relevant tab and enter the value again; the rest of your settings and data are
+            intact.
           </p>
         </div>
       ) : null}

@@ -743,7 +743,7 @@ export const syncReplies = createServerFn({ method: "POST" })
             .from("campaign_recipients")
             .select("id, campaign_id")
             .eq("prospect_id", prospectId)
-            .eq("status", "sent")
+            .in("status", ["sent", "active", "completed"])
             .order("sent_at", { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -786,7 +786,12 @@ export const syncReplies = createServerFn({ method: "POST" })
             if (recipientRow) {
               await db
                 .from("campaign_recipients")
-                .update({ replied_at: message.date })
+                .update({
+                  replied_at: message.date,
+                  status: "stopped",
+                  stopped_reason: "Replied",
+                  last_activity_at: message.date,
+                })
                 .eq("id", recipientRow.id);
             }
             await db

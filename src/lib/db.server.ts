@@ -88,6 +88,19 @@ const fields: Record<TableName, string[]> = {
     "track_opens",
     "track_clicks",
     "status",
+    "campaign_type",
+    "objective",
+    "owner_id",
+    "approval_required",
+    "approved_by",
+    "approved_at",
+    "scheduled_at",
+    "completed_at",
+    "timezone",
+    "daily_limit",
+    "stop_on_reply",
+    "stop_on_bounce",
+    "audience_rules",
     "sent_at",
     "created_at",
     "updated_at",
@@ -96,6 +109,7 @@ const fields: Record<TableName, string[]> = {
     "id",
     "campaign_id",
     "prospect_id",
+    "contact_id",
     "status",
     "error",
     "message_id",
@@ -105,8 +119,39 @@ const fields: Record<TableName, string[]> = {
     "clicked_at",
     "click_count",
     "replied_at",
+    "current_step",
+    "next_action_at",
+    "stopped_reason",
+    "last_activity_at",
+    "converted_at",
+    "attempt_count",
     "created_at",
   ],
+  campaign_steps: [
+    "id",
+    "campaign_id",
+    "step_order",
+    "step_type",
+    "name",
+    "delay_amount",
+    "delay_unit",
+    "subject",
+    "body_html",
+    "task_instructions",
+    "is_active",
+    "created_at",
+    "updated_at",
+  ],
+  campaign_events: [
+    "id",
+    "campaign_id",
+    "recipient_id",
+    "event_type",
+    "detail",
+    "actor_id",
+    "created_at",
+  ],
+  email_suppressions: ["id", "email", "reason", "source", "campaign_id", "notes", "created_at"],
   deals: [
     "id",
     "title",
@@ -604,7 +649,7 @@ const fields: Record<TableName, string[]> = {
 };
 const jsonFields: Record<string, string[]> = {
   prospects: ["extra"],
-  campaigns: ["cc", "bcc", "attachments"],
+  campaigns: ["cc", "bcc", "attachments", "audience_rules"],
   system_settings: ["setting_value"],
   ai_prospect_searches: ["results_json"],
   replies: ["attachments"],
@@ -612,7 +657,14 @@ const jsonFields: Record<string, string[]> = {
 };
 const booleanFields: Record<string, string[]> = {
   mailboxes: ["smtp_secure", "is_default"],
-  campaigns: ["track_opens", "track_clicks"],
+  campaigns: [
+    "track_opens",
+    "track_clicks",
+    "approval_required",
+    "stop_on_reply",
+    "stop_on_bounce",
+  ],
+  campaign_steps: ["is_active"],
   agreements: ["auto_renew"],
   email_templates: ["is_active"],
   roles: ["is_system"],
@@ -626,6 +678,9 @@ const publicTables = new Set<TableName>([
   "mailboxes",
   "campaigns",
   "campaign_recipients",
+  "campaign_steps",
+  "campaign_events",
+  "email_suppressions",
   "deals",
   "agreements",
   "agreement_items",
@@ -747,6 +802,14 @@ async function enrich(table: TableName, input: DbInput, selected: Array<Record<s
       row["campaign_recipients"] = await rows("campaign_recipients", " WHERE campaign_id = ?", [
         row["id"],
       ]);
+  }
+  if (table === "campaigns" && projection.includes("campaign_steps(")) {
+    for (const row of selected)
+      row["campaign_steps"] = await rows(
+        "campaign_steps",
+        " WHERE campaign_id = ? ORDER BY step_order ASC",
+        [row["id"]],
+      );
   }
   if (table === "campaign_recipients" && projection.includes("prospects(")) {
     for (const row of selected)

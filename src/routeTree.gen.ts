@@ -41,7 +41,9 @@ import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
 import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
 import { Route as ApiAttachmentsUploadRouteImport } from './routes/api/attachments/upload'
+import { Route as ApiCronCampaignsRouteImport } from './routes/api/cron/campaigns'
 import { Route as ApiCronNotificationsRouteImport } from './routes/api/cron/notifications'
+import { Route as ApiPublicUnsubscribeRouteImport } from './routes/api/public/unsubscribe'
 import { Route as ApiAttachmentsOwnerIdFileIdRouteImport } from './routes/api/attachments/$ownerId/$fileId'
 import { Route as ApiOauthGoogleCallbackRouteImport } from './routes/api/oauth/google/callback'
 import { Route as ApiOauthGoogleStartRouteImport } from './routes/api/oauth/google/start'
@@ -211,9 +213,19 @@ const ApiAttachmentsUploadRoute = ApiAttachmentsUploadRouteImport.update({
   path: '/api/attachments/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronCampaignsRoute = ApiCronCampaignsRouteImport.update({
+  id: '/api/cron/campaigns',
+  path: '/api/cron/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCronNotificationsRoute = ApiCronNotificationsRouteImport.update({
   id: '/api/cron/notifications',
   path: '/api/cron/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicUnsubscribeRoute = ApiPublicUnsubscribeRouteImport.update({
+  id: '/api/public/unsubscribe',
+  path: '/api/public/unsubscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAttachmentsOwnerIdFileIdRoute =
@@ -293,7 +305,9 @@ export interface FileRoutesByFullPath {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/public/unsubscribe': typeof ApiPublicUnsubscribeRoute
   '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
@@ -336,7 +350,9 @@ export interface FileRoutesByTo {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/public/unsubscribe': typeof ApiPublicUnsubscribeRoute
   '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
@@ -380,7 +396,9 @@ export interface FileRoutesById {
   '/quotations/$id': typeof QuotationsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
+  '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
+  '/api/public/unsubscribe': typeof ApiPublicUnsubscribeRoute
   '/api/attachments/$ownerId/$fileId': typeof ApiAttachmentsOwnerIdFileIdRoute
   '/api/oauth/google/callback': typeof ApiOauthGoogleCallbackRoute
   '/api/oauth/google/start': typeof ApiOauthGoogleStartRoute
@@ -425,7 +443,9 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
+    | '/api/cron/campaigns'
     | '/api/cron/notifications'
+    | '/api/public/unsubscribe'
     | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
@@ -468,7 +488,9 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns'
     | '/api/attachments/upload'
+    | '/api/cron/campaigns'
     | '/api/cron/notifications'
+    | '/api/public/unsubscribe'
     | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
@@ -511,7 +533,9 @@ export interface FileRouteTypes {
     | '/quotations/$id'
     | '/campaigns/'
     | '/api/attachments/upload'
+    | '/api/cron/campaigns'
     | '/api/cron/notifications'
+    | '/api/public/unsubscribe'
     | '/api/attachments/$ownerId/$fileId'
     | '/api/oauth/google/callback'
     | '/api/oauth/google/start'
@@ -551,7 +575,9 @@ export interface RootRouteChildren {
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
+  ApiCronCampaignsRoute: typeof ApiCronCampaignsRoute
   ApiCronNotificationsRoute: typeof ApiCronNotificationsRoute
+  ApiPublicUnsubscribeRoute: typeof ApiPublicUnsubscribeRoute
   ApiAttachmentsOwnerIdFileIdRoute: typeof ApiAttachmentsOwnerIdFileIdRoute
   ApiOauthGoogleCallbackRoute: typeof ApiOauthGoogleCallbackRoute
   ApiOauthGoogleStartRoute: typeof ApiOauthGoogleStartRoute
@@ -787,11 +813,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAttachmentsUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/campaigns': {
+      id: '/api/cron/campaigns'
+      path: '/api/cron/campaigns'
+      fullPath: '/api/cron/campaigns'
+      preLoaderRoute: typeof ApiCronCampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cron/notifications': {
       id: '/api/cron/notifications'
       path: '/api/cron/notifications'
       fullPath: '/api/cron/notifications'
       preLoaderRoute: typeof ApiCronNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/unsubscribe': {
+      id: '/api/public/unsubscribe'
+      path: '/api/public/unsubscribe'
+      fullPath: '/api/public/unsubscribe'
+      preLoaderRoute: typeof ApiPublicUnsubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/attachments/$ownerId/$fileId': {
@@ -941,7 +981,9 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,
+  ApiCronCampaignsRoute: ApiCronCampaignsRoute,
   ApiCronNotificationsRoute: ApiCronNotificationsRoute,
+  ApiPublicUnsubscribeRoute: ApiPublicUnsubscribeRoute,
   ApiAttachmentsOwnerIdFileIdRoute: ApiAttachmentsOwnerIdFileIdRoute,
   ApiOauthGoogleCallbackRoute: ApiOauthGoogleCallbackRoute,
   ApiOauthGoogleStartRoute: ApiOauthGoogleStartRoute,

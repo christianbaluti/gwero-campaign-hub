@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/api/cron/notifications")({
+export const Route = createFileRoute("/api/cron/campaigns")({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -8,13 +8,8 @@ export const Route = createFileRoute("/api/cron/notifications")({
         const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
         if (!expected || !provided || provided !== expected)
           return Response.json({ error: "Unauthorized" }, { status: 401 });
-        const { runNotificationEscalations } = await import("@/lib/notifications.server");
         const { processCampaignQueue } = await import("@/lib/campaigns.server");
-        const [notifications, campaigns] = await Promise.all([
-          runNotificationEscalations(),
-          processCampaignQueue(),
-        ]);
-        return Response.json({ notifications, campaigns });
+        return Response.json(await processCampaignQueue());
       },
     },
   },

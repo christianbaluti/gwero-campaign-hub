@@ -315,6 +315,11 @@ export const convertProspectToClient = createServerFn({ method: "POST" })
       await connection.execute("UPDATE prospects SET status = 'client' WHERE id = ?", [
         data.prospectId,
       ]);
+      await connection.execute(
+        `UPDATE campaign_recipients SET converted_at = COALESCE(converted_at, CURRENT_TIMESTAMP(3))
+          WHERE prospect_id = ?`,
+        [data.prospectId],
+      );
       await connection.commit();
       return { clientId };
     } catch (error) {

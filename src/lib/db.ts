@@ -26,7 +26,16 @@ const dbAction = createServerFn({ method: "POST" })
         return readOnly ? "prospects.view" : "prospects.manage";
       }
       if (["clients", "client_contacts"].includes(data.table)) return "clients.manage";
-      if (["campaigns", "campaign_recipients", "replies"].includes(data.table))
+      if (
+        [
+          "campaigns",
+          "campaign_recipients",
+          "campaign_steps",
+          "campaign_events",
+          "email_suppressions",
+          "replies",
+        ].includes(data.table)
+      )
         return "campaigns.manage";
       return null;
     })();

@@ -84,6 +84,19 @@ export interface Campaign {
   track_opens: boolean;
   track_clicks: boolean;
   status: string;
+  campaign_type: string;
+  objective: string | null;
+  owner_id: string | null;
+  approval_required: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  scheduled_at: string | null;
+  completed_at: string | null;
+  timezone: string;
+  daily_limit: number;
+  stop_on_reply: boolean;
+  stop_on_bounce: boolean;
+  audience_rules: Json;
   sent_at: string | null;
   created_at: string;
   updated_at: string;
@@ -92,6 +105,7 @@ export interface CampaignRecipient {
   id: string;
   campaign_id: string;
   prospect_id: string;
+  contact_id: string | null;
   status: string;
   error: string | null;
   message_id: string | null;
@@ -101,6 +115,45 @@ export interface CampaignRecipient {
   clicked_at: string | null;
   click_count: number;
   replied_at: string | null;
+  current_step: number;
+  next_action_at: string | null;
+  stopped_reason: string | null;
+  last_activity_at: string | null;
+  converted_at: string | null;
+  attempt_count: number;
+  created_at: string;
+}
+export interface CampaignStep {
+  id: string;
+  campaign_id: string;
+  step_order: number;
+  step_type: string;
+  name: string;
+  delay_amount: number;
+  delay_unit: string;
+  subject: string | null;
+  body_html: string | null;
+  task_instructions: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+export interface CampaignEvent {
+  id: string;
+  campaign_id: string;
+  recipient_id: string | null;
+  event_type: string;
+  detail: string | null;
+  actor_id: string | null;
+  created_at: string;
+}
+export interface EmailSuppression {
+  id: string;
+  email: string;
+  reason: string;
+  source: string;
+  campaign_id: string | null;
+  notes: string | null;
   created_at: string;
 }
 export interface Deal {
@@ -652,6 +705,9 @@ export interface Tables {
   mailbox_secrets: MailboxSecret;
   campaigns: Campaign;
   campaign_recipients: CampaignRecipient;
+  campaign_steps: CampaignStep;
+  campaign_events: CampaignEvent;
+  email_suppressions: EmailSuppression;
   deals: Deal;
   agreements: Agreement;
   agreement_items: AgreementItem;
@@ -701,6 +757,7 @@ export type AppRow<K extends TableName> = Tables[K] & {
   clients?: Client | null;
   campaigns?: Campaign | null;
   campaign_recipients?: CampaignRecipient[];
+  campaign_steps?: CampaignStep[];
   projects?: Project | null;
   suppliers?: Supplier | null;
   employees?: Employee | null;
