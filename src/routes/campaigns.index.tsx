@@ -5,6 +5,7 @@ import { BarChart3, CalendarClock, MailCheck, Plus, Search, Send, Users } from "
 import { toast } from "sonner";
 import { createCampaign, deleteCampaign, listCampaigns } from "@/lib/campaign.functions";
 import { AppShell } from "@/components/AppShell";
+import { CampaignTypeSelect } from "@/components/CampaignTypeSelect";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -295,24 +296,15 @@ function CampaignsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Campaign type</Label>
-              <Select
+              <Label htmlFor="new-campaign-type">Campaign type</Label>
+              <CampaignTypeSelect
                 value={draft.campaignType}
+                triggerId="new-campaign-type"
+                helperId="new-campaign-type-help"
                 onValueChange={(campaignType) =>
                   setDraft((current) => ({ ...current, campaignType }))
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="outreach">Sales outreach sequence</SelectItem>
-                  <SelectItem value="broadcast">One-time announcement</SelectItem>
-                  <SelectItem value="follow_up">Prospect follow-up</SelectItem>
-                  <SelectItem value="event">Event invitation</SelectItem>
-                  <SelectItem value="client">Client communication</SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="campaign-objective">Business objective</Label>

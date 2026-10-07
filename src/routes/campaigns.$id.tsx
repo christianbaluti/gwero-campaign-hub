@@ -36,6 +36,7 @@ import {
 } from "@/lib/campaign.functions";
 import { BASE_PLACEHOLDERS } from "@/lib/personalize";
 import { AppShell } from "@/components/AppShell";
+import { CampaignTypeSelect } from "@/components/CampaignTypeSelect";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -486,25 +487,16 @@ function CampaignDetail() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Campaign type</Label>
-                <Select
+                <Label htmlFor="campaign-type">Campaign type</Label>
+                <CampaignTypeSelect
                   disabled={!editable}
                   value={form.campaignType}
+                  triggerId="campaign-type"
+                  helperId="campaign-type-help"
                   onValueChange={(campaignType) =>
                     setForm((current) => ({ ...current, campaignType }))
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="outreach">Sales outreach sequence</SelectItem>
-                    <SelectItem value="broadcast">One-time announcement</SelectItem>
-                    <SelectItem value="follow_up">Prospect follow-up</SelectItem>
-                    <SelectItem value="event">Event invitation</SelectItem>
-                    <SelectItem value="client">Client communication</SelectItem>
-                  </SelectContent>
-                </Select>
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Campaign owner</Label>
