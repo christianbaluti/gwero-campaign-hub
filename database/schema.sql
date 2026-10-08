@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS campaign_steps (
   CONSTRAINT campaign_steps_campaign_fk FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE campaign_steps ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+
 CREATE TABLE IF NOT EXISTS campaign_events (
   id CHAR(36) PRIMARY KEY, campaign_id CHAR(36) NOT NULL, recipient_id CHAR(36),
   event_type VARCHAR(80) NOT NULL, detail TEXT, actor_id CHAR(36),
@@ -582,6 +584,26 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
   email_enabled BOOLEAN NOT NULL DEFAULT TRUE, email_delay_minutes INT NOT NULL DEFAULT 60,
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   CONSTRAINT notification_preferences_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS page_notes (
+  id CHAR(36) PRIMARY KEY, page_key VARCHAR(1000) NOT NULL, title VARCHAR(255), body TEXT NOT NULL,
+  color VARCHAR(30) NOT NULL DEFAULT 'yellow', is_pinned BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by CHAR(36) NOT NULL, updated_by CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY page_notes_page_updated (page_key(255), updated_at),
+  CONSTRAINT page_notes_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE CASCADE,
+  CONSTRAINT page_notes_updater_fk FOREIGN KEY (updated_by) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS page_note_mentions (
+  note_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (note_id, user_id),
+  KEY page_note_mentions_user (user_id, created_at),
+  CONSTRAINT page_note_mentions_note_fk FOREIGN KEY (note_id) REFERENCES page_notes(id) ON DELETE CASCADE,
+  CONSTRAINT page_note_mentions_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS attachment_files (

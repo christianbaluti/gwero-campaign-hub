@@ -28,6 +28,7 @@ type StepRow = {
   delay_unit: "minutes" | "hours" | "days";
   subject: string | null;
   body_html: string | null;
+  attachments: string | Array<{ path: string; name: string; type?: string }> | null;
   task_instructions: string | null;
 };
 
@@ -139,6 +140,16 @@ async function deliverEmail(
   const attachments = [] as Array<{ filename: string; contentType: string; content: Uint8Array }>;
   for (const attachment of jsonArray<{ path: string; name: string; type?: string }>(
     campaign.attachments,
+  )) {
+    const content = await readAttachment(attachment.path);
+    attachments.push({
+      filename: attachment.name,
+      contentType: attachment.type || "application/octet-stream",
+      content: new Uint8Array(content),
+    });
+  }
+  for (const attachment of jsonArray<{ path: string; name: string; type?: string }>(
+    step.attachments,
   )) {
     const content = await readAttachment(attachment.path);
     attachments.push({

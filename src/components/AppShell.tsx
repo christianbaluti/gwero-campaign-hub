@@ -49,6 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { StickyNotes } from "@/components/StickyNotes";
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
@@ -229,6 +230,7 @@ export function AppShell({
             />
           </div>
           <div className="ml-auto flex items-center gap-2">
+            <StickyNotes />
             <button aria-label="Help" className="rounded-xl p-2 text-slate-500 hover:bg-accent">
               <CircleHelp className="size-5" />
             </button>

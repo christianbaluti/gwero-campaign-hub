@@ -133,6 +133,7 @@ export interface CampaignStep {
   delay_unit: string;
   subject: string | null;
   body_html: string | null;
+  attachments: Json;
   task_instructions: string | null;
   is_active: boolean;
   created_at: string;
@@ -689,6 +690,23 @@ export interface NotificationPreference {
   email_delay_minutes: number;
   updated_at: string;
 }
+export interface PageNote {
+  id: string;
+  page_key: string;
+  title: string | null;
+  body: string;
+  color: string;
+  is_pinned: boolean;
+  created_by: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+}
+export interface PageNoteMention {
+  note_id: string;
+  user_id: string;
+  created_at: string;
+}
 export interface AiProspectSearch {
   id: string;
   prompt: string;
@@ -702,6 +720,8 @@ export interface Tables {
   prospects: Prospect;
   notifications: Notification;
   notification_preferences: NotificationPreference;
+  page_notes: PageNote;
+  page_note_mentions: PageNoteMention;
   clients: Client;
   mailboxes: Mailbox;
   mailbox_secrets: MailboxSecret;

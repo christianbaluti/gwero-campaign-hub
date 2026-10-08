@@ -12,6 +12,7 @@ import {
   FileUp,
   ListChecks,
   Mail,
+  Paperclip,
   Pause,
   Play,
   Plus,
@@ -38,6 +39,7 @@ import { BASE_PLACEHOLDERS } from "@/lib/personalize";
 import { AppShell } from "@/components/AppShell";
 import { CampaignTypeSelect } from "@/components/CampaignTypeSelect";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { RichEmailEditor } from "@/components/RichEmailEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,6 +149,7 @@ type Workspace = {
     delay_unit: "minutes" | "hours" | "days";
     subject: string | null;
     body_html: string | null;
+    attachments: Attachment[] | string | null;
     task_instructions: string | null;
   }>;
   recipients: Recipient[];
@@ -254,6 +257,10 @@ function CampaignDetail() {
           delayUnit: step.delay_unit,
           subject: step.subject || "",
           bodyHtml: step.body_html || "",
+          attachments:
+            typeof step.attachments === "string"
+              ? (JSON.parse(step.attachments || "[]") as Attachment[])
+              : step.attachments || [],
           taskInstructions: step.task_instructions || "",
         })),
       );
@@ -435,6 +442,24 @@ function CampaignDetail() {
     }
     updateAttachments((current) => [...current, result]);
     toast.success("Attachment added. Save the campaign settings to keep it.");
+  }
+
+  async function uploadStepFile(stepId: string, file: File) {
+    const body = new FormData();
+    body.set("campaignId", id);
+    body.set("file", file);
+    const response = await fetch("/api/attachments/upload", { method: "POST", body });
+    const result = (await response.json()) as Attachment & { error?: string };
+    if (!response.ok) {
+      toast.error(result.error || "Attachment upload failed.");
+      return;
+    }
+    updateSteps((current) =>
+      current.map((step) =>
+        step.id === stepId ? { ...step, attachments: [...(step.attachments || []), result] } : step,
+      ),
+    );
+    toast.success(`${result.name} attached to this email step.`);
   }
 
   if (isLoading || !data || !campaign)
@@ -766,6 +791,7 @@ function CampaignDetail() {
                         delayUnit: "days",
                         subject: "",
                         bodyHtml: "",
+                        attachments: [],
                         taskInstructions: "Call the contact and record the outcome.",
                       },
                     ])
@@ -787,6 +813,7 @@ function CampaignDetail() {
                         delayUnit: "days",
                         subject: "",
                         bodyHtml: "",
+                        attachments: [],
                         taskInstructions: "",
                       },
                     ])
@@ -929,21 +956,18 @@ function CampaignDetail() {
                         />
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
-                        <Label>Email message (HTML supported)</Label>
-                        <Textarea
+                        <Label>Email message</Label>
+                        <RichEmailEditor
                           disabled={!editable}
-                          rows={10}
                           value={step.bodyHtml}
-                          onChange={(event) =>
+                          ariaLabel={`Email message for step ${index + 1}`}
+                          onChange={(bodyHtml) =>
                             updateSteps((current) =>
                               current.map((item) =>
-                                item.id === step.id
-                                  ? { ...item, bodyHtml: event.target.value }
-                                  : item,
+                                item.id === step.id ? { ...item, bodyHtml } : item,
                               ),
                             )
                           }
-                          placeholder="<p>Hi {{first_name}},</p>"
                         />
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           {BASE_PLACEHOLDERS.map((placeholder) => (
@@ -952,6 +976,71 @@ function CampaignDetail() {
                               variant="secondary"
                             >{`{{${placeholder}}}`}</Badge>
                           ))}
+                        </div>
+                        <div className="mt-4 rounded-xl border bg-muted/20 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-medium">Email attachments</p>
+                              <p className="text-xs text-muted-foreground">
+                                These files are sent only with this step. Maximum 20 MB per file.
+                              </p>
+                            </div>
+                            <Label className="inline-flex cursor-pointer items-center rounded-lg border bg-white px-3 py-2 text-sm font-medium hover:border-primary hover:text-primary">
+                              <Paperclip className="mr-2 size-4" /> Attach file
+                              <input
+                                className="hidden"
+                                type="file"
+                                disabled={!editable}
+                                aria-label={`Attach a file to step ${index + 1}`}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  if (file) void uploadStepFile(step.id, file);
+                                  event.target.value = "";
+                                }}
+                              />
+                            </Label>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {(step.attachments || []).map((attachment) => (
+                              <div
+                                key={attachment.path}
+                                className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm"
+                              >
+                                <span className="min-w-0 truncate">
+                                  <Paperclip className="mr-2 inline size-4 text-muted-foreground" />
+                                  {attachment.name}
+                                </span>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  disabled={!editable}
+                                  aria-label={`Remove ${attachment.name} from step ${index + 1}`}
+                                  onClick={() =>
+                                    updateSteps((current) =>
+                                      current.map((item) =>
+                                        item.id === step.id
+                                          ? {
+                                              ...item,
+                                              attachments: (item.attachments || []).filter(
+                                                (file) => file.path !== attachment.path,
+                                              ),
+                                            }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            {!step.attachments?.length ? (
+                              <p className="py-2 text-xs text-muted-foreground">
+                                No files attached to this email.
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </>

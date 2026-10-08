@@ -33,6 +33,7 @@ export type CampaignStepInput = {
   delayUnit: "minutes" | "hours" | "days";
   subject: string;
   bodyHtml: string;
+  attachments: Array<{ path: string; name: string; type?: string; size?: number }>;
   taskInstructions: string;
 };
 
@@ -56,6 +57,14 @@ function normaliseCampaign(row: SerializableRecord) {
     row[key] = Boolean(row[key]);
   }
   return row;
+}
+
+function sanitiseEmailHtml(value: string) {
+  return value
+    .replace(/<(script|iframe|object|embed|form|input|button)[^>]*>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<(script|iframe|object|embed|form|input|button)[^>]*\/?\s*>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[\s\S]*?\2/gi, '$1="#"');
 }
 
 async function event(campaignId: string, eventType: string, actorId: string, detail?: string) {
@@ -296,8 +305,8 @@ export const saveCampaignSequence = createServerFn({ method: "POST" })
         await connection.execute(
           `INSERT INTO campaign_steps
             (id, campaign_id, step_order, step_type, name, delay_amount, delay_unit,
-             subject, body_html, task_instructions, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+             subject, body_html, attachments, task_instructions, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
           [
             step.id || randomUUID(),
             data.campaignId,
@@ -307,7 +316,8 @@ export const saveCampaignSequence = createServerFn({ method: "POST" })
             Math.max(0, Number(step.delayAmount) || 0),
             step.delayUnit,
             step.stepType === "email" ? step.subject : null,
-            step.stepType === "email" ? step.bodyHtml : null,
+            step.stepType === "email" ? sanitiseEmailHtml(step.bodyHtml) : null,
+            step.stepType === "email" ? JSON.stringify(step.attachments || []) : null,
             step.stepType === "task" ? step.taskInstructions : null,
           ],
         );

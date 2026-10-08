@@ -137,6 +137,7 @@ const fields: Record<TableName, string[]> = {
     "delay_unit",
     "subject",
     "body_html",
+    "attachments",
     "task_instructions",
     "is_active",
     "created_at",
@@ -647,11 +648,25 @@ const fields: Record<TableName, string[]> = {
     "email_delay_minutes",
     "updated_at",
   ],
+  page_notes: [
+    "id",
+    "page_key",
+    "title",
+    "body",
+    "color",
+    "is_pinned",
+    "created_by",
+    "updated_by",
+    "created_at",
+    "updated_at",
+  ],
+  page_note_mentions: ["note_id", "user_id", "created_at"],
   ai_prospect_searches: ["id", "prompt", "search_context", "results_json", "status", "created_at"],
 };
 const jsonFields: Record<string, string[]> = {
   prospects: ["extra"],
   campaigns: ["cc", "bcc", "attachments", "audience_rules"],
+  campaign_steps: ["attachments"],
   system_settings: ["setting_value"],
   ai_prospect_searches: ["results_json"],
   replies: ["attachments"],
@@ -673,6 +688,7 @@ const booleanFields: Record<string, string[]> = {
   prospect_contacts: ["is_primary"],
   client_contacts: ["is_primary"],
   notification_preferences: ["in_app_enabled", "email_enabled"],
+  page_notes: ["is_pinned"],
 };
 const publicTables = new Set<TableName>([
   "prospects",
@@ -721,6 +737,8 @@ const publicTables = new Set<TableName>([
   "client_contacts",
   "prospect_categories",
   "prospect_interactions",
+  "page_notes",
+  "page_note_mentions",
   "ai_prospect_searches",
 ]);
 let pool: Pool | undefined;
