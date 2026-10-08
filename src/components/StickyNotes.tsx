@@ -102,7 +102,7 @@ function LiveStickyNote({
   highestZ: number;
   focused: boolean;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<unknown>;
   onLayoutChange: (layout: Partial<NoteLayout>) => void;
 }) {
   const [layout, setLayout] = useState(() => noteLayout(note));
@@ -464,7 +464,7 @@ export function StickyNotes() {
             highestZ={highestZ}
             focused={focused === note.id}
             onEdit={() => edit(note)}
-            onDelete={() => remove.mutate(note.id)}
+            onDelete={() => remove.mutateAsync(note.id)}
             onLayoutChange={(layout) => changeLayout(note.id, layout)}
           />
         ))}
@@ -572,7 +572,7 @@ export function StickyNotes() {
                           <ConfirmAction
                             title="Delete this sticky note?"
                             description="It will be removed for everyone who can view this page."
-                            onConfirm={() => remove.mutate(note.id)}
+                            onConfirm={() => remove.mutateAsync(note.id)}
                             trigger={
                               <Button
                                 type="button"

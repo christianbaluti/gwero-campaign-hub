@@ -23,12 +23,13 @@ export function ConfirmAction({
   title?: string;
   description?: string;
   confirmLabel?: string;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: () => void | Promise<unknown>;
   disabled?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   return (
-    <AlertDialog>
+    <AlertDialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
       <AlertDialogTrigger asChild disabled={disabled}>
         {trigger}
       </AlertDialogTrigger>
@@ -47,6 +48,7 @@ export function ConfirmAction({
               setBusy(true);
               try {
                 await onConfirm();
+                setOpen(false);
               } finally {
                 setBusy(false);
               }
