@@ -73,14 +73,16 @@ async function notifyMentions({
   const { getPool } = await import("./db.server");
   const db = getPool();
   const actionUrl = `${page}${page.includes("?") ? "&" : "?"}note=${encodeURIComponent(noteId)}`;
+  const notificationIds: string[] = [];
   for (const userId of mentionIds.filter((id) => id !== actorId)) {
+    const notificationId = randomUUID();
     await db.execute(
       `INSERT INTO notifications
         (id, user_id, notification_type, title, body, action_url, entity_type, entity_id)
        SELECT ?, id, 'sticky_note.mention', ?, ?, ?, 'page_note', ?
          FROM system_users WHERE id = ? AND status = 'active'`,
       [
-        randomUUID(),
+        notificationId,
         `${actorName} mentioned you in a sticky note`,
         `${title ? `${title}: ` : ""}${body}`.slice(0, 1000),
         actionUrl,
@@ -88,7 +90,11 @@ async function notifyMentions({
         userId,
       ],
     );
+    notificationIds.push(notificationId);
   }
+  if (!notificationIds.length) return { sent: 0, failed: 0 };
+  const { sendPendingNotificationEmails } = await import("./notifications.server");
+  return sendPendingNotificationEmails({ notificationIds, ignoreDelay: true });
 }
 
 export const getStickyNotes = createServerFn({ method: "GET" })
@@ -187,7 +193,7 @@ export const createStickyNote = createServerFn({ method: "POST" })
         id,
         userId,
       ]);
-    await notifyMentions({
+    const email = await notifyMentions({
       noteId: id,
       mentionIds: input.mentionIds,
       actorId: context.user.id,
@@ -196,7 +202,7 @@ export const createStickyNote = createServerFn({ method: "POST" })
       title: input.title,
       body: input.body,
     });
-    return { id };
+    return { id, email };
   });
 
 export const updateStickyNote = createServerFn({ method: "POST" })
@@ -246,7 +252,7 @@ export const updateStickyNote = createServerFn({ method: "POST" })
         data.noteId,
         userId,
       ]);
-    await notifyMentions({
+    const email = await notifyMentions({
       noteId: data.noteId,
       mentionIds: input.mentionIds.filter((id) => !oldIds.has(id)),
       actorId: context.user.id,
@@ -255,7 +261,7 @@ export const updateStickyNote = createServerFn({ method: "POST" })
       title: input.title,
       body: input.body,
     });
-    return { ok: true };
+    return { ok: true, email };
   });
 
 function wholeNumber(

@@ -351,7 +351,7 @@ export function StickyNotes() {
   const save = useMutation({
     mutationFn: async () => {
       if (editing) {
-        await updateStickyNote({
+        const result = await updateStickyNote({
           data: {
             noteId: editing,
             pageKey,
@@ -362,7 +362,7 @@ export function StickyNotes() {
             mentionIds: form.mentions,
           },
         });
-        return { id: editing };
+        return { id: editing, email: result.email };
       }
       return createStickyNote({
         data: {
@@ -375,8 +375,21 @@ export function StickyNotes() {
         },
       });
     },
-    onSuccess: async () => {
-      toast.success(editing ? "Sticky note updated." : "Sticky note added to this page.");
+    onSuccess: async (result) => {
+      const emailed = result.email?.sent || 0;
+      const failed = result.email?.failed || 0;
+      const skipped = result.email?.skipped;
+      if (emailed) {
+        toast.success(
+          `${editing ? "Sticky note updated" : "Sticky note added"}. Email sent to ${emailed} tagged ${emailed === 1 ? "user" : "users"}.`,
+        );
+      } else if (failed || skipped) {
+        toast.warning(
+          `${editing ? "Sticky note updated" : "Sticky note added"}. Mention email is queued for automatic retry.`,
+        );
+      } else {
+        toast.success(editing ? "Sticky note updated." : "Sticky note added to this page.");
+      }
       reset();
       await Promise.all([
         qc.invalidateQueries({ queryKey }),
@@ -489,7 +502,7 @@ export function StickyNotes() {
             </DialogTitle>
             <DialogDescription>
               Shared notes stay where your team leaves them on this page. Mentioned users receive an
-              in-app notification and, if it remains unread, the configured notification email.
+              in-app notification and an immediate email with a link back to this note.
             </DialogDescription>
           </DialogHeader>
           <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(0,1.25fr)_minmax(320px,.75fr)]">

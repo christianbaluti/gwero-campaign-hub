@@ -16,7 +16,16 @@ function escapeHtml(value: string) {
   });
 }
 
-export async function runNotificationEscalations() {
+export type NotificationEmailResult = {
+  sent: number;
+  failed?: number;
+  skipped?: string;
+};
+
+export async function sendPendingNotificationEmails(options?: {
+  notificationIds?: string[];
+  ignoreDelay?: boolean;
+}): Promise<NotificationEmailResult> {
   const { data: mailbox } = await serverDb
     .from("mailboxes")
     .select("*")
@@ -29,6 +38,14 @@ export async function runNotificationEscalations() {
     .select("*")
     .eq("mailbox_id", mailbox.id)
     .maybeSingle();
+  const notificationIds = [...new Set(options?.notificationIds || [])].filter(Boolean);
+  if (options?.notificationIds && !notificationIds.length) return { sent: 0 };
+  const idFilter = notificationIds.length
+    ? `AND n.id IN (${notificationIds.map(() => "?").join(",")})`
+    : "";
+  const delayFilter = options?.ignoreDelay
+    ? ""
+    : "AND TIMESTAMPADD(MINUTE, COALESCE(p.email_delay_minutes, 60), n.created_at) <= CURRENT_TIMESTAMP(3)";
   const [rows] = await getPool().execute(
     `SELECT n.id, n.title, n.body, n.action_url, u.email, u.full_name
        FROM notifications n
@@ -36,10 +53,13 @@ export async function runNotificationEscalations() {
        LEFT JOIN notification_preferences p ON p.user_id = u.id
       WHERE n.read_at IS NULL AND n.email_sent_at IS NULL
         AND COALESCE(p.email_enabled, TRUE) = TRUE
-        AND TIMESTAMPADD(MINUTE, COALESCE(p.email_delay_minutes, 60), n.created_at) <= CURRENT_TIMESTAMP(3)
+        ${idFilter}
+        ${delayFilter}
       ORDER BY n.created_at ASC LIMIT 100`,
+    notificationIds,
   );
   let sent = 0;
+  let failed = 0;
   for (const row of rows as Array<{
     id: string;
     title: string;
@@ -114,6 +134,7 @@ export async function runNotificationEscalations() {
       }
       sent += 1;
     } catch (error) {
+      failed += 1;
       await getPool().execute(
         "UPDATE notifications SET email_sent_at = NULL WHERE id = ? AND read_at IS NULL",
         [row.id],
@@ -121,5 +142,9 @@ export async function runNotificationEscalations() {
       console.error(`Notification email ${row.id} failed`, error);
     }
   }
-  return { sent };
+  return { sent, failed };
+}
+
+export async function runNotificationEscalations() {
+  return sendPendingNotificationEmails();
 }
