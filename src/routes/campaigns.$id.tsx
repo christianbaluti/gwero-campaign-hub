@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type SetStateAction } from "react";
 import {
   AlertCircle,
   ArrowDown,
@@ -207,6 +207,9 @@ function CampaignDetail() {
   const [form, setForm] = useState(blankForm);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
+  const [formDirty, setFormDirty] = useState(false);
+  const [attachmentsDirty, setAttachmentsDirty] = useState(false);
+  const [stepsDirty, setStepsDirty] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -221,37 +224,54 @@ function CampaignDetail() {
   useEffect(() => {
     if (!data) return;
     const campaign = data.campaign;
-    setForm({
-      name: campaign.name,
-      campaignType: campaign.campaign_type,
-      objective: campaign.objective || "",
-      mailboxId: campaign.mailbox_id || "",
-      ownerId: campaign.owner_id || "",
-      dailyLimit: campaign.daily_limit,
-      timezone: campaign.timezone,
-      approvalRequired: campaign.approval_required,
-      stopOnReply: campaign.stop_on_reply,
-      stopOnBounce: campaign.stop_on_bounce,
-      trackOpens: campaign.track_opens,
-      trackClicks: campaign.track_clicks,
-      cc: (campaign.cc || []).join(", "),
-      bcc: (campaign.bcc || []).join(", "),
-    });
-    setAttachments(campaign.attachments || []);
-    setSteps(
-      data.steps.map((step) => ({
-        id: step.id,
-        step_order: step.step_order,
-        stepType: step.step_type,
-        name: step.name,
-        delayAmount: step.delay_amount,
-        delayUnit: step.delay_unit,
-        subject: step.subject || "",
-        bodyHtml: step.body_html || "",
-        taskInstructions: step.task_instructions || "",
-      })),
-    );
-  }, [data]);
+    if (!formDirty) {
+      setForm({
+        name: campaign.name,
+        campaignType: campaign.campaign_type,
+        objective: campaign.objective || "",
+        mailboxId: campaign.mailbox_id || "",
+        ownerId: campaign.owner_id || "",
+        dailyLimit: campaign.daily_limit,
+        timezone: campaign.timezone,
+        approvalRequired: campaign.approval_required,
+        stopOnReply: campaign.stop_on_reply,
+        stopOnBounce: campaign.stop_on_bounce,
+        trackOpens: campaign.track_opens,
+        trackClicks: campaign.track_clicks,
+        cc: (campaign.cc || []).join(", "),
+        bcc: (campaign.bcc || []).join(", "),
+      });
+    }
+    if (!attachmentsDirty) setAttachments(campaign.attachments || []);
+    if (!stepsDirty) {
+      setSteps(
+        data.steps.map((step) => ({
+          id: step.id,
+          step_order: step.step_order,
+          stepType: step.step_type,
+          name: step.name,
+          delayAmount: step.delay_amount,
+          delayUnit: step.delay_unit,
+          subject: step.subject || "",
+          bodyHtml: step.body_html || "",
+          taskInstructions: step.task_instructions || "",
+        })),
+      );
+    }
+  }, [attachmentsDirty, data, formDirty, stepsDirty]);
+
+  const updateForm = (update: SetStateAction<typeof form>) => {
+    setForm(update);
+    setFormDirty(true);
+  };
+  const updateAttachments = (update: SetStateAction<Attachment[]>) => {
+    setAttachments(update);
+    setAttachmentsDirty(true);
+  };
+  const updateSteps = (update: SetStateAction<Step[]>) => {
+    setSteps(update);
+    setStepsDirty(true);
+  };
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["campaign-workspace", id] });
   const saveSetup = useMutation({
@@ -271,9 +291,11 @@ function CampaignDetail() {
           attachments,
         },
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Campaign settings saved.");
-      void refresh();
+      await refresh();
+      setFormDirty(false);
+      setAttachmentsDirty(false);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -285,9 +307,10 @@ function CampaignDetail() {
           steps: steps.map(({ step_order: _order, ...step }) => step),
         },
       }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Sequence saved.");
-      void refresh();
+      await refresh();
+      setStepsDirty(false);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -410,7 +433,7 @@ function CampaignDetail() {
       toast.error(result.error || "Attachment upload failed.");
       return;
     }
-    setAttachments((current) => [...current, result]);
+    updateAttachments((current) => [...current, result]);
     toast.success("Attachment added. Save the campaign settings to keep it.");
   }
 
@@ -482,7 +505,7 @@ function CampaignDetail() {
                   disabled={!editable}
                   value={form.name}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, name: event.target.value }))
+                    updateForm((current) => ({ ...current, name: event.target.value }))
                   }
                 />
               </div>
@@ -494,7 +517,7 @@ function CampaignDetail() {
                   triggerId="campaign-type"
                   helperId="campaign-type-help"
                   onValueChange={(campaignType) =>
-                    setForm((current) => ({ ...current, campaignType }))
+                    updateForm((current) => ({ ...current, campaignType }))
                   }
                 />
               </div>
@@ -504,7 +527,7 @@ function CampaignDetail() {
                   disabled={!editable}
                   value={form.ownerId || "unassigned"}
                   onValueChange={(ownerId) =>
-                    setForm((current) => ({
+                    updateForm((current) => ({
                       ...current,
                       ownerId: ownerId === "unassigned" ? "" : ownerId,
                     }))
@@ -531,7 +554,7 @@ function CampaignDetail() {
                   rows={4}
                   value={form.objective}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, objective: event.target.value }))
+                    updateForm((current) => ({ ...current, objective: event.target.value }))
                   }
                   placeholder="What measurable business result should this campaign create?"
                 />
@@ -542,7 +565,7 @@ function CampaignDetail() {
                   disabled={!editable}
                   value={form.mailboxId || "none"}
                   onValueChange={(mailboxId) =>
-                    setForm((current) => ({
+                    updateForm((current) => ({
                       ...current,
                       mailboxId: mailboxId === "none" ? "" : mailboxId,
                     }))
@@ -571,7 +594,10 @@ function CampaignDetail() {
                   max={5000}
                   value={form.dailyLimit}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, dailyLimit: Number(event.target.value) }))
+                    updateForm((current) => ({
+                      ...current,
+                      dailyLimit: Number(event.target.value),
+                    }))
                   }
                 />
               </div>
@@ -580,7 +606,7 @@ function CampaignDetail() {
                 <Select
                   disabled={!editable}
                   value={form.timezone}
-                  onValueChange={(timezone) => setForm((current) => ({ ...current, timezone }))}
+                  onValueChange={(timezone) => updateForm((current) => ({ ...current, timezone }))}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -600,7 +626,7 @@ function CampaignDetail() {
                   disabled={!editable}
                   value={form.cc}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, cc: event.target.value }))
+                    updateForm((current) => ({ ...current, cc: event.target.value }))
                   }
                   placeholder="Comma separated"
                 />
@@ -612,7 +638,7 @@ function CampaignDetail() {
                   disabled={!editable}
                   value={form.bcc}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, bcc: event.target.value }))
+                    updateForm((current) => ({ ...current, bcc: event.target.value }))
                   }
                   placeholder="Comma separated"
                 />
@@ -663,7 +689,7 @@ function CampaignDetail() {
                       disabled={!editable}
                       checked={Boolean(form[key])}
                       onCheckedChange={(checked) =>
-                        setForm((current) => ({ ...current, [key]: checked }))
+                        updateForm((current) => ({ ...current, [key]: checked }))
                       }
                     />
                   </div>
@@ -699,7 +725,7 @@ function CampaignDetail() {
                       variant="ghost"
                       disabled={!editable}
                       onClick={() =>
-                        setAttachments((current) =>
+                        updateAttachments((current) =>
                           current.filter((item) => item.path !== attachment.path),
                         )
                       }
@@ -729,7 +755,7 @@ function CampaignDetail() {
                   variant="outline"
                   disabled={!editable}
                   onClick={() =>
-                    setSteps((current) => [
+                    updateSteps((current) => [
                       ...current,
                       {
                         id: crypto.randomUUID(),
@@ -750,7 +776,7 @@ function CampaignDetail() {
                 <Button
                   disabled={!editable}
                   onClick={() =>
-                    setSteps((current) => [
+                    updateSteps((current) => [
                       ...current,
                       {
                         id: crypto.randomUUID(),
@@ -807,7 +833,7 @@ function CampaignDetail() {
                     title="Remove this sequence step?"
                     description="The other steps will be renumbered automatically."
                     onConfirm={() =>
-                      setSteps((current) =>
+                      updateSteps((current) =>
                         current
                           .filter((item) => item.id !== step.id)
                           .map((item, itemIndex) => ({ ...item, step_order: itemIndex + 1 })),
@@ -832,7 +858,7 @@ function CampaignDetail() {
                       disabled={!editable}
                       value={step.name}
                       onChange={(event) =>
-                        setSteps((current) =>
+                        updateSteps((current) =>
                           current.map((item) =>
                             item.id === step.id ? { ...item, name: event.target.value } : item,
                           ),
@@ -849,7 +875,7 @@ function CampaignDetail() {
                         min={0}
                         value={index === 0 ? 0 : step.delayAmount}
                         onChange={(event) =>
-                          setSteps((current) =>
+                          updateSteps((current) =>
                             current.map((item) =>
                               item.id === step.id
                                 ? { ...item, delayAmount: Number(event.target.value) }
@@ -865,7 +891,7 @@ function CampaignDetail() {
                         disabled={!editable || index === 0}
                         value={step.delayUnit}
                         onValueChange={(delayUnit: "minutes" | "hours" | "days") =>
-                          setSteps((current) =>
+                          updateSteps((current) =>
                             current.map((item) =>
                               item.id === step.id ? { ...item, delayUnit } : item,
                             ),
@@ -891,7 +917,7 @@ function CampaignDetail() {
                           disabled={!editable}
                           value={step.subject}
                           onChange={(event) =>
-                            setSteps((current) =>
+                            updateSteps((current) =>
                               current.map((item) =>
                                 item.id === step.id
                                   ? { ...item, subject: event.target.value }
@@ -909,7 +935,7 @@ function CampaignDetail() {
                           rows={10}
                           value={step.bodyHtml}
                           onChange={(event) =>
-                            setSteps((current) =>
+                            updateSteps((current) =>
                               current.map((item) =>
                                 item.id === step.id
                                   ? { ...item, bodyHtml: event.target.value }
@@ -937,7 +963,7 @@ function CampaignDetail() {
                         rows={5}
                         value={step.taskInstructions}
                         onChange={(event) =>
-                          setSteps((current) =>
+                          updateSteps((current) =>
                             current.map((item) =>
                               item.id === step.id
                                 ? { ...item, taskInstructions: event.target.value }
