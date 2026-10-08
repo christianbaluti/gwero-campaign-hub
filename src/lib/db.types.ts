@@ -697,6 +697,12 @@ export interface PageNote {
   body: string;
   color: string;
   is_pinned: boolean;
+  is_open: boolean;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  z_index: number;
   created_by: string;
   updated_by: string;
   created_at: string;

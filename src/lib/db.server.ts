@@ -655,6 +655,12 @@ const fields: Record<TableName, string[]> = {
     "body",
     "color",
     "is_pinned",
+    "is_open",
+    "position_x",
+    "position_y",
+    "width",
+    "height",
+    "z_index",
     "created_by",
     "updated_by",
     "created_at",
@@ -688,7 +694,7 @@ const booleanFields: Record<string, string[]> = {
   prospect_contacts: ["is_primary"],
   client_contacts: ["is_primary"],
   notification_preferences: ["in_app_enabled", "email_enabled"],
-  page_notes: ["is_pinned"],
+  page_notes: ["is_pinned", "is_open"],
 };
 const publicTables = new Set<TableName>([
   "prospects",

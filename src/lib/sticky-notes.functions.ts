@@ -11,6 +11,12 @@ export type StickyNote = {
   body: string;
   color: string;
   is_pinned: boolean;
+  is_open: boolean;
+  position_x: number;
+  position_y: number;
+  width: number;
+  height: number;
+  z_index: number;
   created_by: string;
   created_by_name: string;
   updated_at: string;
@@ -112,6 +118,7 @@ export const getStickyNotes = createServerFn({ method: "GET" })
     return notes.map((note) => ({
       ...note,
       is_pinned: Boolean(note["is_pinned"]),
+      is_open: Boolean(note["is_open"]),
       mentions: mentions.filter((mention) => mention.note_id === note["id"]),
       can_edit:
         note["created_by"] === context.user.id || context.user.permissions.includes("users.manage"),
@@ -149,10 +156,18 @@ export const createStickyNote = createServerFn({ method: "POST" })
     const { getPool } = await import("./db.server");
     const db = getPool();
     const id = randomUUID();
+    const [positionRows] = await db.execute(
+      `SELECT COUNT(*) AS note_count, COALESCE(MAX(z_index), 0) AS max_z
+         FROM page_notes WHERE page_key = ?`,
+      [input.pageKey],
+    );
+    const placement = (positionRows as Array<{ note_count: number; max_z: number }>)[0];
+    const offset = Number(placement?.note_count || 0) % 6;
     await db.execute(
       `INSERT INTO page_notes
-        (id, page_key, title, body, color, is_pinned, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, page_key, title, body, color, is_pinned, is_open, position_x, position_y, width, height,
+         z_index, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, TRUE, ?, ?, 280, 260, ?, ?, ?)`,
       [
         id,
         input.pageKey,
@@ -160,6 +175,9 @@ export const createStickyNote = createServerFn({ method: "POST" })
         input.body,
         input.color,
         input.pinned ? 1 : 0,
+        300 + offset * 28,
+        112 + offset * 28,
+        Number(placement?.max_z || 0) + 1,
         context.user.id,
         context.user.id,
       ],
@@ -237,6 +255,70 @@ export const updateStickyNote = createServerFn({ method: "POST" })
       title: input.title,
       body: input.body,
     });
+    return { ok: true };
+  });
+
+function wholeNumber(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(minimum, Math.min(maximum, Math.round(value!)));
+}
+
+export const updateStickyNoteLayout = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator(
+    (data: {
+      noteId: string;
+      positionX?: number;
+      positionY?: number;
+      width?: number;
+      height?: number;
+      zIndex?: number;
+      isOpen?: boolean;
+      isPinned?: boolean;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const { getPool } = await import("./db.server");
+    const db = getPool();
+    const [rows] = await db.execute(
+      `SELECT position_x, position_y, width, height, z_index, is_open, is_pinned
+         FROM page_notes WHERE id = ? LIMIT 1`,
+      [data.noteId],
+    );
+    const note = (
+      rows as Array<{
+        position_x: number;
+        position_y: number;
+        width: number;
+        height: number;
+        z_index: number;
+        is_open: number;
+        is_pinned: number;
+      }>
+    )[0];
+    if (!note) throw new Error("Sticky note not found.");
+    await db.execute(
+      `UPDATE page_notes
+          SET position_x = ?, position_y = ?, width = ?, height = ?, z_index = ?,
+              is_open = ?, is_pinned = ?, updated_by = ?
+        WHERE id = ?`,
+      [
+        wholeNumber(data.positionX, note.position_x, 0, 10000),
+        wholeNumber(data.positionY, note.position_y, 80, 10000),
+        wholeNumber(data.width, note.width, 210, 900),
+        wholeNumber(data.height, note.height, 180, 900),
+        wholeNumber(data.zIndex, note.z_index, 1, 1000000),
+        data.isOpen === undefined ? note.is_open : data.isOpen ? 1 : 0,
+        data.isPinned === undefined ? note.is_pinned : data.isPinned ? 1 : 0,
+        context.user.id,
+        data.noteId,
+      ],
+    );
     return { ok: true };
   });
 
