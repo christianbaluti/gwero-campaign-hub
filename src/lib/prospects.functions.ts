@@ -52,10 +52,14 @@ export const createProspectCompany = createServerFn({ method: "POST" })
     const id = crypto.randomUUID();
     const placeholder = `company-${Buffer.from(`${key}-${id}`).toString("base64url").slice(0, 44)}@prospect.local`;
     try {
-      const [existing] = await getPool().execute(
-        "SELECT id FROM prospects WHERE canonical_key = ? OR (? <> '' AND email = ?) LIMIT 1",
-        [key, email, email],
-      );
+      const [existing] = email
+        ? await getPool().execute(
+            "SELECT id FROM prospects WHERE canonical_key = ? OR email = ? LIMIT 1",
+            [key, email],
+          )
+        : await getPool().execute("SELECT id FROM prospects WHERE canonical_key = ? LIMIT 1", [
+            key,
+          ]);
       if ((existing as Array<unknown>).length)
         throw new Error("A prospect with this company or email already exists.");
       await getPool().execute(

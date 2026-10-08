@@ -8,6 +8,7 @@ if (!/^[a-zA-Z0-9_]+$/.test(database)) throw new Error("Invalid DB_NAME");
 const connectionOptions = {
   user: process.env.DB_USER || process.env.USER || "root",
   password: process.env.DB_PASSWORD || "",
+  charset: "utf8mb4_unicode_ci",
   ...(process.env.DB_SOCKET || (!process.env.DB_HOST && process.platform === "darwin")
     ? { socketPath: process.env.DB_SOCKET || "/tmp/mysql.sock" }
     : {
