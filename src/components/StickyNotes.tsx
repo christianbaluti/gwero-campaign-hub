@@ -5,6 +5,7 @@ import {
   BellRing,
   Edit3,
   GripHorizontal,
+  Loader2,
   Maximize2,
   Pin,
   PinOff,
@@ -94,6 +95,7 @@ function LiveStickyNote({
   note,
   highestZ,
   focused,
+  saving,
   onEdit,
   onDelete,
   onLayoutChange,
@@ -101,6 +103,7 @@ function LiveStickyNote({
   note: StickyNoteRecord;
   highestZ: number;
   focused: boolean;
+  saving: boolean;
   onEdit: () => void;
   onDelete: () => Promise<unknown>;
   onLayoutChange: (layout: Partial<NoteLayout>) => void;
@@ -243,6 +246,11 @@ function LiveStickyNote({
         <strong className="min-w-0 flex-1 truncate leading-tight">
           {note.title || "Sticky note"}
         </strong>
+        {saving ? (
+          <span className="flex items-center gap-1 text-[.62em] font-medium opacity-60">
+            <Loader2 className="size-[1em] animate-spin" /> Saving
+          </span>
+        ) : null}
         {note.can_edit ? (
           <button
             type="button"
@@ -314,11 +322,14 @@ export function StickyNotes() {
   const [editing, setEditing] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [pendingLayoutIds, setPendingLayoutIds] = useState<Set<string>>(() => new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
+  const layoutVersions = useRef(new Map<string, number>());
   const queryKey = useMemo(() => ["sticky-notes", pageKey], [pageKey]);
   const { data: notes = [] } = useQuery({
     queryKey,
     queryFn: () => getStickyNotes({ data: { pageKey } }),
-    refetchInterval: 3_000,
+    refetchInterval: pendingLayoutIds.size || deletingIds.size ? false : 3_000,
   });
   const { data: users = [] } = useQuery({
     queryKey: ["sticky-note-users"],
@@ -400,15 +411,40 @@ export function StickyNotes() {
   });
   const remove = useMutation({
     mutationFn: (noteId: string) => deleteStickyNote({ data: { noteId } }),
+    onMutate: async (noteId) => {
+      setDeletingIds((current) => new Set(current).add(noteId));
+      await qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData<StickyNoteRecord[]>(queryKey) || [];
+      qc.setQueryData<StickyNoteRecord[]>(
+        queryKey,
+        previous.filter((note) => note.id !== noteId),
+      );
+      return { previous };
+    },
     onSuccess: async () => {
       toast.success("Sticky note deleted.");
       reset();
+    },
+    onError: (error: Error, _noteId, context) => {
+      if (context?.previous) qc.setQueryData(queryKey, context.previous);
+      toast.error(error.message);
+    },
+    onSettled: async (_data, _error, noteId) => {
+      setDeletingIds((current) => {
+        const next = new Set(current);
+        next.delete(noteId);
+        return next;
+      });
       await qc.invalidateQueries({ queryKey });
     },
-    onError: (error: Error) => toast.error(error.message),
   });
   const changeLayout = useCallback(
     (noteId: string, patch: Partial<NoteLayout>) => {
+      const version = (layoutVersions.current.get(noteId) || 0) + 1;
+      layoutVersions.current.set(noteId, version);
+      setPendingLayoutIds((current) => new Set(current).add(noteId));
+      void qc.cancelQueries({ queryKey });
+      const previous = qc.getQueryData<StickyNoteRecord[]>(queryKey) || [];
       qc.setQueryData<StickyNoteRecord[]>(queryKey, (current = []) =>
         current.map((note) =>
           note.id === noteId
@@ -436,10 +472,22 @@ export function StickyNotes() {
           ...(patch.isOpen === undefined ? {} : { isOpen: patch.isOpen }),
           ...(patch.isPinned === undefined ? {} : { isPinned: patch.isPinned }),
         },
-      }).catch((error: Error) => {
-        toast.error(error.message);
-        void qc.invalidateQueries({ queryKey });
-      });
+      })
+        .catch((error: Error) => {
+          if (layoutVersions.current.get(noteId) !== version) return;
+          qc.setQueryData(queryKey, previous);
+          toast.error(`The note change could not be saved: ${error.message}`);
+        })
+        .finally(() => {
+          if (layoutVersions.current.get(noteId) !== version) return;
+          layoutVersions.current.delete(noteId);
+          setPendingLayoutIds((current) => {
+            const next = new Set(current);
+            next.delete(noteId);
+            return next;
+          });
+          void qc.invalidateQueries({ queryKey });
+        });
     },
     [qc, queryKey],
   );
@@ -463,6 +511,7 @@ export function StickyNotes() {
             note={note}
             highestZ={highestZ}
             focused={focused === note.id}
+            saving={pendingLayoutIds.has(note.id)}
             onEdit={() => edit(note)}
             onDelete={() => remove.mutateAsync(note.id)}
             onLayoutChange={(layout) => changeLayout(note.id, layout)}
@@ -479,6 +528,9 @@ export function StickyNotes() {
       >
         <StickyNote className="size-5" />
         <span className="hidden xl:inline">Notes</span>
+        {pendingLayoutIds.size || deletingIds.size ? (
+          <Loader2 className="size-3.5 animate-spin" aria-label="Saving note changes" />
+        ) : null}
         {notes.length ? (
           <span className="absolute -right-1 -top-1 grid min-w-5 place-items-center rounded-full bg-primary px-1 text-[10px] font-bold leading-5 text-white">
             {notes.length > 99 ? "99+" : notes.length}
@@ -520,11 +572,18 @@ export function StickyNotes() {
                           {note.created_by_name} · {new Date(note.updated_at).toLocaleString()}
                         </p>
                       </div>
-                      {note.is_pinned ? (
-                        <Pin className="size-4 shrink-0" />
-                      ) : (
-                        <PinOff className="size-4 shrink-0 opacity-50" />
-                      )}
+                      <div className="flex shrink-0 items-center gap-2">
+                        {pendingLayoutIds.has(note.id) ? (
+                          <span className="flex items-center gap-1 text-[11px] opacity-60">
+                            <Loader2 className="size-3 animate-spin" /> Saving
+                          </span>
+                        ) : null}
+                        {note.is_pinned ? (
+                          <Pin className="size-4" />
+                        ) : (
+                          <PinOff className="size-4 opacity-50" />
+                        )}
+                      </div>
                     </div>
                     <p className="mt-3 whitespace-pre-wrap text-sm leading-6">{note.body}</p>
                     {note.mentions.length ? (

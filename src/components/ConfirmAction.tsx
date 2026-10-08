@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import {
   AlertDialog,
@@ -54,7 +55,13 @@ export function ConfirmAction({
               }
             }}
           >
-            {busy ? "Working…" : confirmLabel}
+            {busy ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" /> Working…
+              </span>
+            ) : (
+              confirmLabel
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
