@@ -121,6 +121,7 @@ export const getCampaignWorkspace = createServerFn({ method: "GET" })
                   COALESCE(pc.first_name, p.first_name) AS first_name,
                   COALESCE(pc.last_name, p.last_name) AS last_name,
                   COALESCE(pc.email, p.email) AS email,
+                  COALESCE(pc.phone, p.phone) AS phone,
                   COALESCE(pc.job_title, p.job_title) AS job_title,
                   cat.name AS category_name
              FROM campaign_recipients r
@@ -131,7 +132,8 @@ export const getCampaignWorkspace = createServerFn({ method: "GET" })
           [data.campaignId],
         ),
         db.execute(
-          `SELECT pc.id, pc.prospect_id, pc.first_name, pc.last_name, pc.email, pc.job_title,
+          `SELECT pc.id, pc.prospect_id, pc.first_name, pc.last_name, pc.email, pc.phone,
+                  pc.job_title,
                   pc.is_primary, p.company, p.category_id, cat.name AS category_name,
                   CASE WHEN s.id IS NULL THEN 0 ELSE 1 END AS suppressed,
                   s.reason AS suppression_reason,

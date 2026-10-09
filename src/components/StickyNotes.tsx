@@ -322,6 +322,11 @@ export function StickyNotes() {
   const [editing, setEditing] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [mentionTrigger, setMentionTrigger] = useState<{ start: number; query: string } | null>(
+    null,
+  );
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const noteBodyRef = useRef<HTMLTextAreaElement>(null);
   const [pendingLayoutIds, setPendingLayoutIds] = useState<Set<string>>(() => new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const layoutVersions = useRef(new Map<string, number>());
@@ -346,6 +351,8 @@ export function StickyNotes() {
   const reset = () => {
     setEditing(null);
     setForm(emptyForm);
+    setMentionTrigger(null);
+    setMentionIndex(0);
   };
   const edit = (note: StickyNoteRecord) => {
     setEditing(note.id);
@@ -493,6 +500,52 @@ export function StickyNotes() {
   );
   const visibleNotes = notes.filter((note) => note.is_pinned && note.is_open);
   const highestZ = Math.max(0, ...notes.map((note) => note.z_index));
+  const mentionSuggestions = useMemo(() => {
+    if (!mentionTrigger) return [];
+    const query = mentionTrigger.query.trim().toLowerCase();
+    return users
+      .filter(
+        (user) =>
+          !query ||
+          user.full_name.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query),
+      )
+      .slice(0, 6);
+  }, [mentionTrigger, users]);
+
+  const findMentionTrigger = (value: string, cursor: number | null) => {
+    if (cursor === null) return null;
+    const beforeCursor = value.slice(0, cursor);
+    const start = beforeCursor.lastIndexOf("@");
+    if (start < 0 || beforeCursor.slice(start + 1).includes("\n")) return null;
+    const preceding = start > 0 ? beforeCursor[start - 1] : "";
+    if (preceding && !/[\s([{,:;]/.test(preceding)) return null;
+    const query = beforeCursor.slice(start + 1);
+    if (query.length > 80) return null;
+    return { start, query };
+  };
+
+  const chooseMention = (user: (typeof users)[number]) => {
+    if (!mentionTrigger) return;
+    const textarea = noteBodyRef.current;
+    const cursor = textarea?.selectionStart ?? form.body.length;
+    const inserted = `@${user.full_name} `;
+    const nextBody = form.body.slice(0, mentionTrigger.start) + inserted + form.body.slice(cursor);
+    const nextCursor = mentionTrigger.start + inserted.length;
+    setForm((current) => ({
+      ...current,
+      body: nextBody,
+      mentions: current.mentions.includes(user.id)
+        ? current.mentions
+        : [...current.mentions, user.id],
+    }));
+    setMentionTrigger(null);
+    setMentionIndex(0);
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
 
   useEffect(() => {
     const noteId = new URLSearchParams(location.searchStr).get("note");
@@ -684,15 +737,89 @@ export function StickyNotes() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="sticky-body">Note</Label>
-                  <Textarea
-                    id="sticky-body"
-                    rows={7}
-                    value={form.body}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, body: event.target.value }))
-                    }
-                    placeholder="Write a reminder, decision or request for the team…"
-                  />
+                  <div className="relative">
+                    <Textarea
+                      ref={noteBodyRef}
+                      id="sticky-body"
+                      rows={7}
+                      value={form.body}
+                      onChange={(event) => {
+                        const body = event.target.value;
+                        setForm((current) => ({ ...current, body }));
+                        setMentionTrigger(findMentionTrigger(body, event.target.selectionStart));
+                        setMentionIndex(0);
+                      }}
+                      onClick={(event) =>
+                        setMentionTrigger(
+                          findMentionTrigger(
+                            event.currentTarget.value,
+                            event.currentTarget.selectionStart,
+                          ),
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        if (!mentionTrigger || !mentionSuggestions.length) return;
+                        if (event.key === "ArrowDown") {
+                          event.preventDefault();
+                          setMentionIndex((current) => (current + 1) % mentionSuggestions.length);
+                        } else if (event.key === "ArrowUp") {
+                          event.preventDefault();
+                          setMentionIndex(
+                            (current) =>
+                              (current - 1 + mentionSuggestions.length) % mentionSuggestions.length,
+                          );
+                        } else if (event.key === "Enter" || event.key === "Tab") {
+                          event.preventDefault();
+                          chooseMention(mentionSuggestions[mentionIndex] || mentionSuggestions[0]);
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          setMentionTrigger(null);
+                        }
+                      }}
+                      placeholder="Write a reminder, decision or request. Type @ to tag a user…"
+                      aria-autocomplete="list"
+                      aria-expanded={Boolean(mentionTrigger && mentionSuggestions.length)}
+                      aria-controls="sticky-mention-suggestions"
+                    />
+                    {mentionTrigger && mentionSuggestions.length ? (
+                      <div
+                        id="sticky-mention-suggestions"
+                        role="listbox"
+                        className="absolute inset-x-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-xl"
+                      >
+                        {mentionSuggestions.map((user, index) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            role="option"
+                            aria-selected={index === mentionIndex}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${index === mentionIndex ? "bg-accent" : "hover:bg-muted"}`}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => chooseMention(user)}
+                          >
+                            <Avatar className="size-8 shrink-0">
+                              <AvatarFallback>{initials(user.full_name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-medium">
+                                {user.full_name}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {user.email}
+                              </span>
+                            </span>
+                            {form.mentions.includes(user.id) ? (
+                              <Badge variant="secondary">Tagged</Badge>
+                            ) : null}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Type @ and choose a user. Selecting them adds the tag and notification
+                    recipient.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Colour</Label>

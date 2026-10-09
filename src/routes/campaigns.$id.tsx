@@ -14,6 +14,7 @@ import {
   Mail,
   Paperclip,
   Pause,
+  Phone,
   Play,
   Plus,
   Search,
@@ -109,6 +110,7 @@ type Contact = {
   first_name: string | null;
   last_name: string | null;
   email: string;
+  phone: string | null;
   job_title: string | null;
   company: string | null;
   category_id: string | null;
@@ -396,6 +398,7 @@ function CampaignDetail() {
           personName(contact).toLowerCase().includes(needle) ||
           contact.company?.toLowerCase().includes(needle) ||
           contact.email.toLowerCase().includes(needle) ||
+          contact.phone?.toLowerCase().includes(needle) ||
           contact.job_title?.toLowerCase().includes(needle)),
     );
   }, [category, contactSearch, data?.contacts]);
@@ -1102,7 +1105,7 @@ function CampaignDetail() {
                     className="pl-9"
                     value={contactSearch}
                     onChange={(event) => setContactSearch(event.target.value)}
-                    placeholder="Search name, company, email or position"
+                    placeholder="Search name, company, email, phone or position"
                   />
                 </div>
                 <Select value={category} onValueChange={setCategory}>
@@ -1173,6 +1176,10 @@ function CampaignDetail() {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{personName(contact)}</p>
                       <p className="truncate text-xs text-muted-foreground">{contact.email}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {contact.phone || "Phone number not supplied"}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {contact.job_title || "Position not supplied"}
                       </p>
@@ -1221,6 +1228,10 @@ function CampaignDetail() {
                     <p className="truncate font-medium">{personName(recipient)}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {recipient.email} · {recipient.job_title || "Position not supplied"}
+                    </p>
+                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                      <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      {recipient.phone || "Phone number not supplied"}
                     </p>
                   </div>
                   <div className="min-w-0">
@@ -1485,6 +1496,10 @@ function CampaignDetail() {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{personName(recipient)}</p>
                       <p className="truncate text-xs text-muted-foreground">{recipient.email}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {recipient.phone || "Phone number not supplied"}
+                      </p>
                       {recipient.error ? (
                         <p className="truncate text-xs text-destructive" title={recipient.error}>
                           {recipient.error}
