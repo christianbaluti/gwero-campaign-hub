@@ -282,6 +282,8 @@ export const convertProspectToClient = createServerFn({ method: "POST" })
           phone: string | null;
           website: string | null;
           logo_path: string | null;
+          address: string | null;
+          industry: string | null;
         }>
       )[0];
       if (!prospect) throw new Error("Prospect not found.");
@@ -292,8 +294,9 @@ export const convertProspectToClient = createServerFn({ method: "POST" })
       const clientId = (existing as Array<{ id: string }>)[0]?.id || crypto.randomUUID();
       if (!(existing as Array<unknown>).length) {
         await connection.execute(
-          `INSERT INTO clients (id, name, company, email, phone, website, status, prospect_id, logo_path)
-           VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+          `INSERT INTO clients
+            (id, name, company, email, phone, website, industry, status, address, prospect_id, logo_path)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
           [
             clientId,
             prospect.company || prospect.email,
@@ -301,6 +304,8 @@ export const convertProspectToClient = createServerFn({ method: "POST" })
             prospect.email,
             prospect.phone,
             prospect.website,
+            prospect.industry,
+            prospect.address,
             data.prospectId,
             prospect.logo_path,
           ],
@@ -308,13 +313,29 @@ export const convertProspectToClient = createServerFn({ method: "POST" })
       }
       await connection.execute(
         `INSERT INTO client_contacts
-          (id, client_id, first_name, last_name, email, phone, raw_phone, gender, job_title, is_primary)
-         SELECT UUID(), ?, first_name, last_name, email, phone, raw_phone, gender, job_title, is_primary
+          (id, client_id, first_name, last_name, email, phone, raw_phone, gender, job_title,
+           location, location_source_url, location_is_inferred, is_primary)
+         SELECT UUID(), ?, first_name, last_name, email, phone, raw_phone, gender, job_title,
+                location, location_source_url, location_is_inferred, is_primary
            FROM prospect_contacts WHERE prospect_id = ?
          ON DUPLICATE KEY UPDATE client_id = VALUES(client_id), first_name = VALUES(first_name),
            last_name = VALUES(last_name), phone = VALUES(phone), raw_phone = VALUES(raw_phone), gender = VALUES(gender),
-           job_title = VALUES(job_title), is_primary = VALUES(is_primary)`,
+           job_title = VALUES(job_title), location = VALUES(location),
+           location_source_url = VALUES(location_source_url),
+           location_is_inferred = VALUES(location_is_inferred), is_primary = VALUES(is_primary)`,
         [clientId, data.prospectId],
+      );
+      await connection.execute(
+        `INSERT INTO organization_locations
+          (id, entity_type, entity_id, name, address_line, city, region, country, is_primary, source_url)
+         SELECT UUID(), 'client', ?, name, address_line, city, region, country, is_primary, source_url
+           FROM organization_locations source
+           LEFT JOIN organization_locations target
+             ON target.entity_type = 'client' AND target.entity_id = ?
+            AND target.name = source.name
+            AND COALESCE(target.address_line, '') = COALESCE(source.address_line, '')
+          WHERE source.entity_type = 'prospect' AND source.entity_id = ? AND target.id IS NULL`,
+        [clientId, clientId, data.prospectId],
       );
       await connection.execute("UPDATE prospects SET status = 'client' WHERE id = ?", [
         data.prospectId,

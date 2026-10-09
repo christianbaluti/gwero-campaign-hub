@@ -1,0 +1,1032 @@
+{
+  "campaignId": "1246daa3-73fc-4759-b0b8-0ba99ac4c8c1",
+  "campaignName": "MIPS Conference Follow-up - GWERO Introduction",
+  "organizations": [
+    {
+      "company": "Reserve Bank Of Malawi",
+      "emails": ["mnasiyaya@rbm.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Convention Drive, City Centre",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.rbm.mw/ContactUs/",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre branch",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.rbm.mw/ContactUs/"
+        }
+      ]
+    },
+    {
+      "company": "COSOMA",
+      "emails": ["dluka@cosoma.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Amina House, Crossroads",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://cosoma.mw/home-5-one-page/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Legal Aid Bureau",
+      "emails": ["elkachenje@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Shire Building",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://mail.legalaidbureau.org/resources",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre office",
+          "addressLine": "Government Office Building, Lower Victoria Avenue",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://legalaidbureau.org/documents/uploads/2022-07/Legal%20Aid%20Bureau%20Leaflet.pdf"
+        }
+      ]
+    },
+    {
+      "company": "KUHeS",
+      "emails": ["akunje@kuhes.ac.mw"],
+      "locations": [
+        {
+          "name": "Main campus",
+          "addressLine": "Mahatma Gandhi Road, Mount Pleasant",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.kuhes.ac.mw/campuses-and-directions/",
+          "isPrimary": true
+        },
+        {
+          "name": "Kameza campus",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.kuhes.ac.mw/campuses-and-directions/"
+        },
+        {
+          "name": "Lilongwe campus",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.kuhes.ac.mw/campuses-and-directions/"
+        }
+      ]
+    },
+    {
+      "company": "CFTC",
+      "emails": ["maggie.mjojo@cftc.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "MERA Office Complex",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.cftc.mw/contact-us/",
+          "isPrimary": true
+        },
+        {
+          "name": "Southern regional office",
+          "addressLine": "Government Building, Ministry of Trade offices",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.cftc.mw/contact-us/"
+        }
+      ]
+    },
+    {
+      "company": "ICAM",
+      "emails": ["monica.mwazangati@icam.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "ICAM House, Plot BE31, off Chipembere Highway",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.icam.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "TEVETA",
+      "emails": ["mmwasi@tevetamw.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "TEVETA House, Area 3",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.tevetamw.com/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "CMST",
+      "emails": ["rnkhoma@cmst.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Mzimba Street",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.cmst.mw/files/SBD_000521_POA-Co-approval_Medical_Supplies_Open_Tender_POA.pdf",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Mwaiwathu Private Hospital",
+      "emails": ["rmwalwimba@gmail.com"],
+      "locations": [
+        {
+          "name": "Hospital",
+          "addressLine": "Old Chileka Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://mwaiwathuhospital.org/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Airtel Malawi",
+      "emails": ["obester.thindwa@mw.airtel.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "City Centre, off Convention Drive",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.airtel.africa/our-offices-1",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Institute of People Management Malawi",
+      "emails": ["rhomlungu@gmail.com"],
+      "locations": [
+        {
+          "name": "Secretariat",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.ipmmw.org/index.php/en/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "MAGLA",
+      "emails": ["rchipofya@magla.org.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Magalasi Road, Nyambadwe",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://magla.org.mw/contact-us/",
+          "isPrimary": true
+        },
+        {
+          "name": "Lilongwe office",
+          "addressLine": "La Piazza, Area 4",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://magla.org.mw/contact-us/"
+        }
+      ]
+    },
+    {
+      "company": "Malawi Liverpool Wellcome Research Programme",
+      "emails": ["dmhera@mlw.mw"],
+      "locations": [
+        {
+          "name": "Blantyre research site",
+          "addressLine": "Queen Elizabeth Central Hospital Campus, Chipatala Avenue, Chichiri",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.mlw.mw/faqs/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Puma Energy Malawi",
+      "emails": ["dumisani.kumwenda@pumaenergy.com"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "addressLine": "2nd Floor, Standard Bank Building, corner Victoria Avenue and Glyn Jones Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.pumaenergy.com/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Mining and Minerals Regulatory Authority",
+      "emails": ["silungwecossam3@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://mining.gov.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Export Development Fund",
+      "emails": ["gkilli@edf.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Public Service Pension Trust Fund House, Presidential Way",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://edf.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Sunbird Tourism",
+      "emails": ["agness@sunbirdmalawi.com"],
+      "locations": [
+        {
+          "name": "Corporate office",
+          "addressLine": "28 Glyn Jones Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://sunbirdmalawi.com/expression-of-interest.html",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Anti-Corruption Bureau",
+      "emails": ["gchakalamba@acbmw.org"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Mulanje House",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://acbmw.org/contact-us/",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre office",
+          "addressLine": "Able House, Hannover Street",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://acbmw.org/contact-us/"
+        }
+      ]
+    },
+    {
+      "company": "Pyxus Agriculture",
+      "emails": ["kenyirenda@pyxus.com"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.pyxus.com/contact.php",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Evidence Action",
+      "emails": ["jonathan.mphongolo@evidenceaction.org"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "addressLine": "Area 6, Plot 160",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.evidenceaction.org/contact",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Family Health Services",
+      "emails": ["jsimfukwe@fhs.org.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Ufulu Road, Area 43, Plot 395",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://fhs.org.mw/about/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Ministry of Justice",
+      "emails": ["milcahchima@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Capital Hill",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.justice.gov.mw/index.php/contact",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Malawi College of Health Sciences",
+      "emails": ["mussaevelyn@yahoo.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.mchs.mw/",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre campus",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.mchs.mw/img/pdf/MCHS-Accomodation-Form.pdf"
+        }
+      ]
+    },
+    {
+      "company": "CARE International in Malawi",
+      "emails": ["angella.kachelenga@care.org"],
+      "locations": [
+        {
+          "name": "Country office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.care.org/our-work/where-we-work/malawi/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Malawi Electoral Commission",
+      "emails": ["gphalula@mec.org.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Chisankho House, Masuku Road",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://mec.org.mw/contact/",
+          "isPrimary": true
+        },
+        {
+          "name": "Southern regional office",
+          "addressLine": "Opposite Blantyre City Fire Department",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://mec.org.mw/contact/"
+        }
+      ]
+    },
+    {
+      "company": "HESLGB",
+      "emails": ["victor.matoga@heslgb.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Mbulo Office Complex, off Mchinji Road",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.heslgb.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Malawi Catering Services Ltd",
+      "emails": ["mkapito@mcslmw.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://mcslmw.com/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "NCIC",
+      "emails": ["judith.jere@ncic.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://website.ncic.mw/services/",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre office",
+          "addressLine": "Behind Chitawira Puma service station",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://website.ncic.mw/announcements/registration-of-construction-projects/"
+        }
+      ]
+    },
+    {
+      "company": "National Youth Council",
+      "emails": ["mbamusi@nycom.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Along Mphonongo Road, Area 10/579",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://nycom.vercel.app/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Roads Authority",
+      "emails": ["jkungwezo@ra.org.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Functional Building, off Paul Kagame Road",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.ra.org.mw/",
+          "isPrimary": true
+        },
+        {
+          "name": "Southern regional office",
+          "addressLine": "Lonrho Building, Churchill Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.ra.org.mw/"
+        }
+      ]
+    },
+    {
+      "company": "Protea Hotels",
+      "emails": ["lusungu.chipeta@proteahotels.com"],
+      "locations": [
+        {
+          "name": "Protea Hotel Blantyre Ryalls",
+          "addressLine": "2 Hannover Avenue",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://blantyrehotels.mw/wp-content/uploads/2025/08/RYALLS-FACT-SHEET.pdf",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Roads Fund Administration",
+      "emails": ["atambala@rfamw.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Ngerengere Complex, off Mchikii Road",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://ppda.mw/storage/documents/opentenders/SECURITY.pdf",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Malawi Against Physical Disabilities",
+      "emails": ["gracianonyaka.gn@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://mapmw.org/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "CHAI",
+      "emails": ["gmkandawire@clintonhealthaccess.org"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.clintonhealthaccess.org/malawi/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Malawi School of Government",
+      "emails": ["linlykachibade99@gmail.com"],
+      "locations": [
+        {
+          "name": "Lilongwe campus",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://msg.ac.mw/",
+          "isPrimary": true
+        },
+        {
+          "name": "Mpemba campus",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://msg.ac.mw/"
+        }
+      ]
+    },
+    {
+      "company": "Beit CURE",
+      "emails": ["innocent.madomba@cureinternational.org"],
+      "locations": [
+        {
+          "name": "CURE Children's Hospital of Malawi",
+          "addressLine": "Kachere Rehabilitation Centre Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://cureinternational.org/curekids/malawi/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Baylor Children's Foundation Malawi",
+      "emails": ["lmphepo@baylor-malawi.org"],
+      "locations": [
+        {
+          "name": "Centre of Excellence",
+          "addressLine": "Kamuzu Central Hospital campus",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.baylor-malawi.org/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "JTI Leaf Malawi",
+      "emails": ["mcluwendavid.kachipanda@jti.com"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.jti.com/africa/malawi",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Tobacco Commission",
+      "emails": ["rasheedagama9@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://tc.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Habitat For Humanity",
+      "emails": ["mchiwaula@habitat.mw"],
+      "locations": [
+        {
+          "name": "Malawi national office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.habitat.org/where-we-build/malawi",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Norwegian Church Aid",
+      "emails": ["enock.frank.kautsire@nca.no"],
+      "locations": [
+        {
+          "name": "Malawi country office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.kirkensnodhjelp.no/en/where-we-work/malawi",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Stephanos Foundation",
+      "emails": ["mmagalasi@stephanosfoundationmw.org"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://stephanosfoundationmw.org/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "NOCMA",
+      "emails": ["shumbamike166@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://nocma.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "National Registration Bureau",
+      "emails": ["383384@boma.gov.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.nrb.gov.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Alliance One Tobacco",
+      "emails": ["angwira@aointl.com"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.pyxus.com/contact.php",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "ARET",
+      "emails": ["czidana@aret.org.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "ARET premises",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://aret.org.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "PPDA",
+      "emails": ["graceangelmdala@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.ppda.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Administrator General Department",
+      "emails": ["kunsaukaprisca@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.justice.gov.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Open Connect Ltd",
+      "emails": ["chikwandakenneth@gmail.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.openconnect.mw/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Mary's Meals",
+      "emails": ["aarkasote@gmail.com"],
+      "locations": [
+        {
+          "name": "Malawi office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.marysmeals.org/what-we-do/where-we-work/malawi",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "PPPC",
+      "emails": ["mmwangwela@pppc.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.pppc.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "National Bank",
+      "emails": ["gmanyela@natbankmw.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "7 Henderson Street",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://natbank.co.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "MACRA",
+      "emails": ["happy.ngoma@usf.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "MACRA House, Salmin Amour Road, Ginnery Corner",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://macra.mw/contact-us/",
+          "isPrimary": true
+        },
+        {
+          "name": "Lilongwe office",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://macra.mw/contact-us/"
+        }
+      ]
+    },
+    {
+      "company": "Blantyre Water Board",
+      "emails": ["cmasowa@bwb.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Off-Makata Road, Mudi",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.bwb.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Old Mutual",
+      "emails": ["kmakowa@oldmutual.co.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Old Mutual Building, 30 Glyn Jones Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.oldmutual.co.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "MUBAS",
+      "emails": ["mduwa@mubas.ac.mw"],
+      "locations": [
+        {
+          "name": "Main campus",
+          "addressLine": "Chichiri",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.mubas.ac.mw/contact-us",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Standard Bank",
+      "emails": ["peter.tengatenga@standardbank.co.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Standard Bank Centre, African Unity Avenue",
+          "city": "Lilongwe",
+          "country": "Malawi",
+          "sourceUrl": "https://www.standardbank.co.mw/malawi/personal/contact-us",
+          "isPrimary": true
+        },
+        {
+          "name": "Blantyre office",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.standardbank.co.mw/malawi/personal/contact-us"
+        }
+      ]
+    },
+    {
+      "company": "TNM",
+      "emails": ["catherine.ngulube@tnm.co.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Livingstone Towers, Glyn Jones Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.tnm.co.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "ESCOM",
+      "emails": ["nkhoriyo@escom.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "ESCOM House, 9 Hailie Selassie Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.escom.mw/contact.php",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "First Capital Bank",
+      "emails": ["edwardchando@firstcapitalbank.co.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Livingstone Towers, Glyn Jones Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.firstcapitalbank.co.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "MBS",
+      "emails": ["chikondimadona@mbsmw.org"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Moirs Road",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://mbsmw.org/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Castel Malawi",
+      "emails": ["lulu.phiri@castel-afrique.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Makata Industrial Area",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://castelmalawi.com/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "FDH",
+      "emails": ["jmnembo@fdh.co.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Umoyo House, Victoria Avenue",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.fdh.co.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "Illovo Sugar Malawi",
+      "emails": ["amwangonde@illovo.co.za"],
+      "locations": [
+        {
+          "name": "Corporate office",
+          "addressLine": "Churchill Road, Limbe",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.illovosugarafrica.com/About-us/Malawi",
+          "isPrimary": true
+        },
+        {
+          "name": "Nchalo estate",
+          "city": "Chikwawa",
+          "country": "Malawi",
+          "sourceUrl": "https://www.illovosugarafrica.com/About-us/Malawi"
+        }
+      ]
+    },
+    {
+      "company": "MRA",
+      "emails": ["akalepa@mra.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Msonkho House, Independence Drive",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.mra.mw/contact-us",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "EGENCO",
+      "emails": ["skachala@egenco.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "Chichiri",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.egenco.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "CDH Investment Bank",
+      "emails": ["nmedi@cdh-malawi.com"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "CDH House, 5 Independence Drive",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.cdh-malawi.com/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    },
+    {
+      "company": "NBS Bank",
+      "emails": ["dorothy.bwanali@nbs.mw"],
+      "locations": [
+        {
+          "name": "Head office",
+          "addressLine": "NBS House, corner Victoria Avenue and Henderson Street",
+          "city": "Blantyre",
+          "country": "Malawi",
+          "sourceUrl": "https://www.nbs.mw/contact-us/",
+          "isPrimary": true
+        }
+      ]
+    }
+  ]
+}

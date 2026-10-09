@@ -629,6 +629,9 @@ export interface ProspectContact {
   gender: string | null;
   job_title: string | null;
   avatar_url: string | null;
+  location: string | null;
+  location_source_url: string | null;
+  location_is_inferred: boolean;
   is_primary: boolean;
   created_at: string;
   updated_at: string;
@@ -644,6 +647,9 @@ export interface ClientContact {
   gender: string | null;
   job_title: string | null;
   avatar_url: string | null;
+  location: string | null;
+  location_source_url: string | null;
+  location_is_inferred: boolean;
   is_primary: boolean;
   created_at: string;
   updated_at: string;

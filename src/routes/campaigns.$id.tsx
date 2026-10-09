@@ -9,9 +9,11 @@ import {
   Check,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   FileUp,
   ListChecks,
   Mail,
+  MapPin,
   Paperclip,
   Pause,
   Phone,
@@ -112,6 +114,12 @@ type Contact = {
   email: string;
   phone: string | null;
   job_title: string | null;
+  contact_location: string | null;
+  contact_location_source_url: string | null;
+  location_is_inferred: number;
+  company_location: string | null;
+  company_location_source_url: string | null;
+  company_locations: string | null;
   company: string | null;
   category_id: string | null;
   category_name: string | null;
@@ -399,7 +407,9 @@ function CampaignDetail() {
           contact.company?.toLowerCase().includes(needle) ||
           contact.email.toLowerCase().includes(needle) ||
           contact.phone?.toLowerCase().includes(needle) ||
-          contact.job_title?.toLowerCase().includes(needle)),
+          contact.job_title?.toLowerCase().includes(needle) ||
+          contact.contact_location?.toLowerCase().includes(needle) ||
+          contact.company_locations?.toLowerCase().includes(needle)),
     );
   }, [category, contactSearch, data?.contacts]);
   const campaign = data?.campaign;
@@ -1089,189 +1099,267 @@ function CampaignDetail() {
         </TabsContent>
 
         <TabsContent value="audience" className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Find eligible contact people</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Campaigns target people, not a generic company record. Suppressed contacts cannot be
-                enrolled.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px_auto]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    className="pl-9"
-                    value={contactSearch}
-                    onChange={(event) => setContactSearch(event.target.value)}
-                    placeholder="Search name, company, email, phone or position"
-                  />
-                </div>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    {categories.map(([categoryId, name]) => (
-                      <SelectItem key={categoryId} value={categoryId!}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  disabled={!editable || !selected.size || addAudience.isPending}
-                  onClick={() => addAudience.mutate()}
-                >
-                  <UserCheck className="mr-2 h-4 w-4" /> Enrol {selected.size || "selected"}
-                </Button>
-              </div>
-              <div className="max-h-[480px] overflow-auto rounded-xl border">
-                <div className="sticky top-0 z-10 grid grid-cols-[42px_minmax(180px,1fr)_minmax(180px,1fr)_150px] gap-3 border-b bg-background px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  <Checkbox
-                    aria-label="Select all visible contacts"
-                    disabled={!editable}
-                    checked={
-                      availableContacts.filter((item) => !item.suppressed).length > 0 &&
-                      availableContacts
-                        .filter((item) => !item.suppressed)
-                        .every((item) => selected.has(item.id))
-                    }
-                    onCheckedChange={(checked) =>
-                      setSelected(
-                        checked
-                          ? new Set(
-                              availableContacts
-                                .filter((item) => !item.suppressed)
-                                .map((item) => item.id),
-                            )
-                          : new Set(),
-                      )
-                    }
-                  />
-                  <span>Contact</span>
-                  <span>Company</span>
-                  <span>Eligibility</span>
-                </div>
-                {availableContacts.slice(0, 500).map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="grid grid-cols-[42px_minmax(180px,1fr)_minmax(180px,1fr)_150px] gap-3 border-b px-4 py-3 text-sm last:border-0"
-                  >
-                    <Checkbox
-                      disabled={!editable || Boolean(contact.suppressed)}
-                      checked={selected.has(contact.id)}
-                      onCheckedChange={(checked) =>
-                        setSelected((current) => {
-                          const next = new Set(current);
-                          if (checked) next.add(contact.id);
-                          else next.delete(contact.id);
-                          return next;
-                        })
-                      }
-                      aria-label={`Select ${personName(contact)}`}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{personName(contact)}</p>
-                      <p className="truncate text-xs text-muted-foreground">{contact.email}</p>
-                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                        <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
-                        {contact.phone || "Phone number not supplied"}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {contact.job_title || "Position not supplied"}
-                      </p>
+          <Tabs defaultValue="eligible" className="space-y-4">
+            <TabsList className="grid w-full max-w-xl grid-cols-2">
+              <TabsTrigger value="eligible">
+                Find eligible contacts ({availableContacts.length})
+              </TabsTrigger>
+              <TabsTrigger value="enrolled">Enrolled audience ({recipients.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="eligible" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Find eligible contact people</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Campaigns target people, not a generic company record. Suppressed contacts
+                    cannot be enrolled.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_240px_auto]">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        className="pl-9"
+                        value={contactSearch}
+                        onChange={(event) => setContactSearch(event.target.value)}
+                        placeholder="Search name, company, email, phone, position or location"
+                      />
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate">{contact.company || "Company not supplied"}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {contact.category_name || "Uncategorised"}
-                      </p>
-                    </div>
-                    <div>
-                      {contact.suppressed ? (
-                        <Badge variant="destructive">Suppressed</Badge>
-                      ) : (
-                        <Badge className="bg-emerald-100 text-emerald-800" variant="secondary">
-                          Eligible
-                        </Badge>
-                      )}
-                      {contact.suppression_reason ? (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {contact.suppression_reason}
-                        </p>
-                      ) : null}
-                    </div>
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All categories</SelectItem>
+                        {categories.map(([categoryId, name]) => (
+                          <SelectItem key={categoryId} value={categoryId!}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      disabled={!editable || !selected.size || addAudience.isPending}
+                      onClick={() => addAudience.mutate()}
+                    >
+                      <UserCheck className="mr-2 h-4 w-4" /> Enrol {selected.size || "selected"}
+                    </Button>
                   </div>
-                ))}
-              </div>
-              {availableContacts.length > 500 ? (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Showing the first 500 matches. Narrow the search or category to find more.
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Enrolled audience ({recipients.length})</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {recipients.map((recipient) => (
-                <div
-                  key={recipient.id}
-                  className="grid gap-3 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{personName(recipient)}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {recipient.email} · {recipient.job_title || "Position not supplied"}
-                    </p>
-                    <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                      <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
-                      {recipient.phone || "Phone number not supplied"}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm">
-                      {recipient.company || "Company not supplied"}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {recipient.category_name || "Uncategorised"}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-end gap-2">
-                    <Badge variant="secondary">{recipient.status}</Badge>
-                    {editable ? (
-                      <ConfirmAction
-                        title="Remove this contact?"
-                        description="They will no longer be part of this campaign audience."
-                        onConfirm={async () => {
-                          await removeRecipient.mutateAsync(recipient.id);
-                        }}
-                        trigger={
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            aria-label={`Remove ${personName(recipient)}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                  <div className="h-[480px] overflow-auto rounded-xl border">
+                    <div className="sticky top-0 z-10 grid grid-cols-[42px_minmax(180px,1fr)_minmax(180px,1fr)_150px] gap-3 border-b bg-background px-4 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <Checkbox
+                        aria-label="Select all visible contacts"
+                        disabled={!editable}
+                        checked={
+                          availableContacts.filter((item) => !item.suppressed).length > 0 &&
+                          availableContacts
+                            .filter((item) => !item.suppressed)
+                            .every((item) => selected.has(item.id))
+                        }
+                        onCheckedChange={(checked) =>
+                          setSelected(
+                            checked
+                              ? new Set(
+                                  availableContacts
+                                    .filter((item) => !item.suppressed)
+                                    .map((item) => item.id),
+                                )
+                              : new Set(),
+                          )
                         }
                       />
+                      <span>Contact</span>
+                      <span>Company</span>
+                      <span>Eligibility</span>
+                    </div>
+                    {availableContacts.slice(0, 500).map((contact) => (
+                      <div
+                        key={contact.id}
+                        className="grid grid-cols-[42px_minmax(180px,1fr)_minmax(180px,1fr)_150px] gap-3 border-b px-4 py-3 text-sm last:border-0"
+                      >
+                        <Checkbox
+                          disabled={!editable || Boolean(contact.suppressed)}
+                          checked={selected.has(contact.id)}
+                          onCheckedChange={(checked) =>
+                            setSelected((current) => {
+                              const next = new Set(current);
+                              if (checked) next.add(contact.id);
+                              else next.delete(contact.id);
+                              return next;
+                            })
+                          }
+                          aria-label={`Select ${personName(contact)}`}
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{personName(contact)}</p>
+                          <p className="truncate text-xs text-muted-foreground">{contact.email}</p>
+                          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {contact.phone || "Phone number not supplied"}
+                          </p>
+                          {contact.contact_location_source_url ? (
+                            <a
+                              href={contact.contact_location_source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              Contact location source <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
+                          <p className="truncate text-xs text-muted-foreground">
+                            {contact.job_title || "Position not supplied"}
+                          </p>
+                          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {contact.contact_location || "Contact location not supplied"}
+                            {contact.location_is_inferred ? " · company-based" : ""}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate">{contact.company || "Company not supplied"}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {contact.category_name || "Uncategorised"}
+                          </p>
+                          <p
+                            className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+                            title={contact.company_locations || undefined}
+                          >
+                            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {contact.company_location || "Company location not supplied"}
+                          </p>
+                          {contact.company_location_source_url ? (
+                            <a
+                              href={contact.company_location_source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              Company location source <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                        <div>
+                          {contact.suppressed ? (
+                            <Badge variant="destructive">Suppressed</Badge>
+                          ) : (
+                            <Badge className="bg-emerald-100 text-emerald-800" variant="secondary">
+                              Eligible
+                            </Badge>
+                          )}
+                          {contact.suppression_reason ? (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {contact.suppression_reason}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {availableContacts.length > 500 ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Showing the first 500 matches. Narrow the search or category to find more.
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="enrolled" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Enrolled audience ({recipients.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[480px] space-y-2 overflow-auto rounded-xl border p-2">
+                    {recipients.map((recipient) => (
+                      <div
+                        key={recipient.id}
+                        className="grid gap-3 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{personName(recipient)}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {recipient.email} · {recipient.job_title || "Position not supplied"}
+                          </p>
+                          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {recipient.phone || "Phone number not supplied"}
+                          </p>
+                          {recipient.contact_location_source_url ? (
+                            <a
+                              href={recipient.contact_location_source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              Contact location source <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
+                          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {recipient.contact_location || "Contact location not supplied"}
+                            {recipient.location_is_inferred ? " · company-based" : ""}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">
+                            {recipient.company || "Company not supplied"}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {recipient.category_name || "Uncategorised"}
+                          </p>
+                          <p
+                            className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+                            title={recipient.company_locations || undefined}
+                          >
+                            <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                            {recipient.company_location || "Company location not supplied"}
+                          </p>
+                          {recipient.company_location_source_url ? (
+                            <a
+                              href={recipient.company_location_source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              Company location source <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Badge variant="secondary">{recipient.status}</Badge>
+                          {editable ? (
+                            <ConfirmAction
+                              title="Remove this contact?"
+                              description="They will no longer be part of this campaign audience."
+                              onConfirm={async () => {
+                                await removeRecipient.mutateAsync(recipient.id);
+                              }}
+                              trigger={
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  aria-label={`Remove ${personName(recipient)}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              }
+                            />
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                    {!recipients.length ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground">
+                        No contact people have been enrolled yet.
+                      </div>
                     ) : null}
                   </div>
-                </div>
-              ))}
-              {!recipients.length ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">
-                  No contact people have been enrolled yet.
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent
@@ -1500,13 +1588,26 @@ function CampaignDetail() {
                         <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
                         {recipient.phone || "Phone number not supplied"}
                       </p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {recipient.contact_location || "Contact location not supplied"}
+                      </p>
                       {recipient.error ? (
                         <p className="truncate text-xs text-destructive" title={recipient.error}>
                           {recipient.error}
                         </p>
                       ) : null}
                     </div>
-                    <div className="truncate">{recipient.company || "—"}</div>
+                    <div className="min-w-0">
+                      <p className="truncate">{recipient.company || "—"}</p>
+                      <p
+                        className="flex items-center gap-1 truncate text-xs text-muted-foreground"
+                        title={recipient.company_locations || undefined}
+                      >
+                        <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        {recipient.company_location || "Company location not supplied"}
+                      </p>
+                    </div>
                     <div>
                       <Badge variant={recipient.status === "failed" ? "destructive" : "secondary"}>
                         {recipient.status}

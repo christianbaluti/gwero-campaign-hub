@@ -123,6 +123,24 @@ export const getCampaignWorkspace = createServerFn({ method: "GET" })
                   COALESCE(pc.email, p.email) AS email,
                   COALESCE(pc.phone, p.phone) AS phone,
                   COALESCE(pc.job_title, p.job_title) AS job_title,
+                  pc.location AS contact_location,
+                  pc.location_source_url AS contact_location_source_url,
+                  pc.location_is_inferred,
+                  (SELECT CONCAT_WS(', ', NULLIF(l.address_line, ''), NULLIF(l.city, ''),
+                                    NULLIF(l.region, ''), NULLIF(l.country, ''))
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+                    ORDER BY l.is_primary DESC, l.created_at ASC LIMIT 1) AS company_location,
+                  (SELECT l.source_url
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+                    ORDER BY l.is_primary DESC, l.created_at ASC LIMIT 1) AS company_location_source_url,
+                  (SELECT GROUP_CONCAT(
+                            CONCAT(l.name, ': ', CONCAT_WS(', ', NULLIF(l.address_line, ''),
+                                   NULLIF(l.city, ''), NULLIF(l.region, ''), NULLIF(l.country, '')))
+                            ORDER BY l.is_primary DESC, l.name ASC SEPARATOR ' | ')
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id) AS company_locations,
                   cat.name AS category_name
              FROM campaign_recipients r
              JOIN prospects p ON p.id = r.prospect_id
@@ -133,8 +151,25 @@ export const getCampaignWorkspace = createServerFn({ method: "GET" })
         ),
         db.execute(
           `SELECT pc.id, pc.prospect_id, pc.first_name, pc.last_name, pc.email, pc.phone,
-                  pc.job_title,
+                  pc.job_title, pc.location AS contact_location,
+                  pc.location_source_url AS contact_location_source_url,
+                  pc.location_is_inferred,
                   pc.is_primary, p.company, p.category_id, cat.name AS category_name,
+                  (SELECT CONCAT_WS(', ', NULLIF(l.address_line, ''), NULLIF(l.city, ''),
+                                    NULLIF(l.region, ''), NULLIF(l.country, ''))
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+                    ORDER BY l.is_primary DESC, l.created_at ASC LIMIT 1) AS company_location,
+                  (SELECT l.source_url
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+                    ORDER BY l.is_primary DESC, l.created_at ASC LIMIT 1) AS company_location_source_url,
+                  (SELECT GROUP_CONCAT(
+                            CONCAT(l.name, ': ', CONCAT_WS(', ', NULLIF(l.address_line, ''),
+                                   NULLIF(l.city, ''), NULLIF(l.region, ''), NULLIF(l.country, '')))
+                            ORDER BY l.is_primary DESC, l.name ASC SEPARATOR ' | ')
+                     FROM organization_locations l
+                    WHERE l.entity_type = 'prospect' AND l.entity_id = p.id) AS company_locations,
                   CASE WHEN s.id IS NULL THEN 0 ELSE 1 END AS suppressed,
                   s.reason AS suppression_reason,
                   CASE WHEN r.id IS NULL THEN 0 ELSE 1 END AS selected

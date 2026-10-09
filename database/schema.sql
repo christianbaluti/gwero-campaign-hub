@@ -537,6 +537,9 @@ CREATE TABLE IF NOT EXISTS prospect_contacts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
 ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location VARCHAR(500) NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location_source_url VARCHAR(1000) NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location_is_inferred BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_path VARCHAR(500) NULL;
 
@@ -552,6 +555,46 @@ CREATE TABLE IF NOT EXISTS client_contacts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
 ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location VARCHAR(500) NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location_source_url VARCHAR(1000) NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location_is_inferred BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS organization_locations (
+  id CHAR(36) PRIMARY KEY,
+  entity_type VARCHAR(20) NOT NULL,
+  entity_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL DEFAULT 'Main office',
+  address_line TEXT,
+  city VARCHAR(160),
+  region VARCHAR(160),
+  country VARCHAR(160),
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  source_url VARCHAR(1000),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY organization_locations_entity (entity_type, entity_id),
+  KEY organization_locations_primary (entity_type, entity_id, is_primary)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO organization_locations
+  (id, entity_type, entity_id, name, address_line, city, country, is_primary)
+SELECT UUID(), 'prospect', p.id, 'Main office', p.address, p.city, p.country, TRUE
+  FROM prospects p
+ WHERE (NULLIF(TRIM(p.address), '') IS NOT NULL OR NULLIF(TRIM(p.city), '') IS NOT NULL OR NULLIF(TRIM(p.country), '') IS NOT NULL)
+   AND NOT EXISTS (
+     SELECT 1 FROM organization_locations l
+      WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+   );
+
+INSERT INTO organization_locations
+  (id, entity_type, entity_id, name, address_line, is_primary)
+SELECT UUID(), 'client', c.id, 'Main office', c.address, TRUE
+  FROM clients c
+ WHERE NULLIF(TRIM(c.address), '') IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM organization_locations l
+      WHERE l.entity_type = 'client' AND l.entity_id = c.id
+   );
 
 CREATE TABLE IF NOT EXISTS prospect_interactions (
   id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,
