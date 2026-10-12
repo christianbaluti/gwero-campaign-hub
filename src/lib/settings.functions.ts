@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getSecret, getSecretStatus, setSecret } from "./settings.server";
-import { authMiddleware, permissionMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 
 async function admin() {
   return (await import("./db.server")).serverDb;
@@ -110,7 +110,7 @@ export type AiProspect = {
 };
 
 export const discoverProspects = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("prospects.manage")])
   .validator((data: { prompt: string; categoryId?: string | null; limit?: number }) => data)
   .handler(async ({ data }) => {
     const apiKey = await getSecret("openai_api_key");

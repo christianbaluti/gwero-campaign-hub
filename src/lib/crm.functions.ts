@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { personalize, htmlToText } from "./personalize";
-import { authMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 
 type Json = Record<string, unknown>;
 
@@ -90,7 +90,7 @@ export async function gatewayFetch(
 /* ------------------------------------------------------------------ */
 
 export const saveMailboxCredentials = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("settings.manage")])
   .validator((data: { mailboxId: string; smtpPassword?: string; imapPassword?: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -105,7 +105,7 @@ export const saveMailboxCredentials = createServerFn({ method: "POST" })
   });
 
 export const testMailbox = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("settings.manage")])
   .validator((data: { mailboxId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -189,7 +189,7 @@ function trackHtml(
 }
 
 export const sendCampaign = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("campaigns.manage")])
   .validator((data: { campaignId: string }) => data)
   .handler(async ({ data }) => {
     const db = await admin();
@@ -421,7 +421,7 @@ function googleAttachmentParts(payload?: GooglePayload): GooglePayload[] {
 }
 
 export const sendProspectEmail = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("campaigns.manage")])
   .validator(
     (data: {
       prospectId: string;
@@ -562,7 +562,7 @@ export const sendProspectEmail = createServerFn({ method: "POST" })
   });
 
 export const syncReplies = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("campaigns.manage")])
   .handler(async () => {
     const db = await admin();
     const { data: mailboxes } = await db.from("mailboxes").select("*");
