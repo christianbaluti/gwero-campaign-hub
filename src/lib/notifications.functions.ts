@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware } from "./auth.middleware";
+import { authMiddleware, permissionMiddleware } from "./auth.middleware";
 
 export type AppNotification = {
   id: string;
@@ -55,7 +55,7 @@ export const markAllNotificationsRead = createServerFn({ method: "POST" })
   });
 
 export const processNotificationEmails = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("settings.manage")])
   .handler(async () => {
     const { runNotificationEscalations } = await import("./notifications.server");
     return runNotificationEscalations();
