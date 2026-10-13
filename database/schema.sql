@@ -212,6 +212,25 @@ CREATE TABLE IF NOT EXISTS cost_sheet_items (
   CONSTRAINT cost_sheet_items_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE cost_sheet_items ADD COLUMN IF NOT EXISTS custom_values LONGTEXT NULL;
+ALTER TABLE cost_sheet_items ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+
+CREATE TABLE IF NOT EXISTS cost_sheet_columns (
+  id CHAR(36) PRIMARY KEY,
+  cost_sheet_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  column_key VARCHAR(80) NOT NULL,
+  data_type VARCHAR(20) NOT NULL DEFAULT 'text',
+  default_value VARCHAR(255) NULL,
+  formula_expression TEXT NULL,
+  display_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY cost_sheet_columns_key (cost_sheet_id, column_key),
+  KEY cost_sheet_columns_sheet (cost_sheet_id, display_order),
+  CONSTRAINT cost_sheet_columns_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS jobs (
   id CHAR(36) PRIMARY KEY, title VARCHAR(255) NOT NULL, client_id CHAR(36), project_id CHAR(36),
   job_type VARCHAR(60) NOT NULL DEFAULT 'once-off', assignee VARCHAR(255),

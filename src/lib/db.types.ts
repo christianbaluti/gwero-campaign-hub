@@ -308,6 +308,20 @@ export interface CostSheetItem {
   quantity: number;
   unit_cost: number;
   markup_percent: number;
+  custom_values: Record<string, string | number>;
+  attachments: Array<{ path: string; name: string; type: string; size: number }>;
+  created_at: string;
+  updated_at: string;
+}
+export interface CostSheetColumn {
+  id: string;
+  cost_sheet_id: string;
+  name: string;
+  column_key: string;
+  data_type: "text" | "number" | "formula";
+  default_value: string | null;
+  formula_expression: string | null;
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -753,6 +767,7 @@ export interface Tables {
   bids: Bid;
   cost_sheets: CostSheet;
   cost_sheet_items: CostSheetItem;
+  cost_sheet_columns: CostSheetColumn;
   jobs: Job;
   tasks: Task;
   suppliers: Supplier;
