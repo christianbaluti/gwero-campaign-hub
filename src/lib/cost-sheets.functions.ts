@@ -51,10 +51,29 @@ export type CostSheetRecord = {
   updated_at: string;
 };
 
+export type CostSheetSourceQuote = {
+  id: string;
+  supplier_id: string | null;
+  source_name: string;
+  supplier_name: string | null;
+  quote_reference: string | null;
+  quote_date: string | null;
+  valid_until: string | null;
+  currency: string;
+  amount: number;
+  notes: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  attachment_size: number | null;
+  is_linked: number;
+};
+
 export type CostSheetWorkspaceData = {
   sheet: CostSheetRecord;
   columns: CostSheetColumn[];
   items: CostSheetItem[];
+  sourceQuotes: CostSheetSourceQuote[];
 };
 
 type ItemInput = {
@@ -143,7 +162,7 @@ export const getCostSheetWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");
     const db = getPool();
-    const [[sheetRows], [columnRows], [itemRows]] = await Promise.all([
+    const [[sheetRows], [columnRows], [itemRows], [quoteRows]] = await Promise.all([
       db.execute(
         `SELECT cs.*, c.name AS client_name, c.logo_path AS client_logo
            FROM cost_sheets cs
@@ -161,6 +180,16 @@ export const getCostSheetWorkspace = createServerFn({ method: "GET" })
           WHERE cost_sheet_id = ? ORDER BY created_at ASC`,
         [data.costSheetId],
       ),
+      db.execute(
+        `SELECT q.*, s.name AS supplier_name,
+                CASE WHEN l.cost_sheet_id IS NULL THEN 0 ELSE 1 END AS is_linked
+           FROM supplier_quotes q
+           LEFT JOIN suppliers s ON s.id = q.supplier_id
+           LEFT JOIN cost_sheet_supplier_quotes l
+             ON l.supplier_quote_id = q.id AND l.cost_sheet_id = ?
+          ORDER BY is_linked DESC, COALESCE(q.quote_date, DATE(q.created_at)) DESC`,
+        [data.costSheetId],
+      ),
     ]);
     const sheet = (sheetRows as unknown as CostSheetRecord[])[0];
     if (!sheet) throw new Error("Cost sheet not found.");
@@ -173,7 +202,33 @@ export const getCostSheetWorkspace = createServerFn({ method: "GET" })
       sheet,
       columns: columnRows as unknown as CostSheetColumn[],
       items,
+      sourceQuotes: quoteRows as unknown as CostSheetSourceQuote[],
     });
+  });
+
+export const setCostSheetSourceQuote = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((data: { costSheetId: string; quoteId: string; linked: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    const { getPool } = await import("./db.server");
+    const db = getPool();
+    if (data.linked) {
+      const [quoteRows] = await db.execute("SELECT id FROM supplier_quotes WHERE id = ? LIMIT 1", [
+        data.quoteId,
+      ]);
+      if (!(quoteRows as Array<{ id: string }>).length) throw new Error("Quotation not found.");
+      await db.execute(
+        `INSERT IGNORE INTO cost_sheet_supplier_quotes
+          (cost_sheet_id, supplier_quote_id, created_by) VALUES (?, ?, ?)`,
+        [data.costSheetId, data.quoteId, context.user.id],
+      );
+    } else {
+      await db.execute(
+        "DELETE FROM cost_sheet_supplier_quotes WHERE cost_sheet_id = ? AND supplier_quote_id = ?",
+        [data.costSheetId, data.quoteId],
+      );
+    }
+    return { ok: true };
   });
 
 export const saveCostSheetItem = createServerFn({ method: "POST" })

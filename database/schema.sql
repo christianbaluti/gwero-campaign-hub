@@ -256,6 +256,38 @@ CREATE TABLE IF NOT EXISTS suppliers (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS supplier_quotes (
+  id CHAR(36) PRIMARY KEY,
+  supplier_id CHAR(36) NULL,
+  source_name VARCHAR(255) NOT NULL,
+  quote_reference VARCHAR(120) NULL,
+  quote_date DATE NULL,
+  valid_until DATE NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'MWK',
+  amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  notes TEXT NULL,
+  attachment_path VARCHAR(1000) NULL,
+  attachment_name VARCHAR(500) NULL,
+  attachment_type VARCHAR(255) NULL,
+  attachment_size INT UNSIGNED NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY supplier_quotes_supplier_idx (supplier_id, quote_date),
+  CONSTRAINT supplier_quotes_supplier_fk FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS cost_sheet_supplier_quotes (
+  cost_sheet_id CHAR(36) NOT NULL,
+  supplier_quote_id CHAR(36) NOT NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (cost_sheet_id, supplier_quote_id),
+  KEY cost_sheet_supplier_quotes_quote_idx (supplier_quote_id),
+  CONSTRAINT cost_sheet_supplier_quotes_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT cost_sheet_supplier_quotes_quote_fk FOREIGN KEY (supplier_quote_id) REFERENCES supplier_quotes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id CHAR(36) PRIMARY KEY, po_number VARCHAR(60) NOT NULL, supplier_id CHAR(36), project_id CHAR(36),
   status VARCHAR(40) NOT NULL DEFAULT 'requested', order_date DATE, expected_date DATE,
@@ -281,6 +313,22 @@ CREATE TABLE IF NOT EXISTS prequalifications (
   submitted_date DATE, valid_until DATE, outcome VARCHAR(120), notes TEXT,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS title VARCHAR(255) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS client_id CHAR(36) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS due_date DATE NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS value DECIMAL(15,2) NOT NULL DEFAULT 0;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'MWK';
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS response_channel VARCHAR(30) NOT NULL DEFAULT 'email';
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_cc LONGTEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS delivery_location TEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS portal_url VARCHAR(1000) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS portal_username VARCHAR(320) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
 
 CREATE TABLE IF NOT EXISTS requests (
   id CHAR(36) PRIMARY KEY, reference VARCHAR(80), title VARCHAR(255) NOT NULL, issuer VARCHAR(255),
@@ -354,6 +402,14 @@ CREATE TABLE IF NOT EXISTS opportunity_comments (
   id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
   body TEXT NOT NULL, author_id CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY opportunity_comments_parent_idx (opportunity_type, opportunity_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opportunity_comment_mentions (
+  comment_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (comment_id, user_id),
+  KEY opportunity_comment_mentions_user (user_id, created_at),
+  CONSTRAINT opportunity_comment_mentions_comment_fk FOREIGN KEY (comment_id) REFERENCES opportunity_comments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS opportunity_submissions (

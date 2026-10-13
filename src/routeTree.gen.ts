@@ -33,12 +33,14 @@ import { Route as RfpsRouteImport } from './routes/rfps'
 import { Route as RfqsRouteImport } from './routes/rfqs'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TasksRouteImport } from './routes/tasks'
+import { Route as VendorsRouteImport } from './routes/vendors'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as BidsIdRouteImport } from './routes/bids.$id'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
 import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
+import { Route as PrequalificationsIdRouteImport } from './routes/prequalifications.$id'
 import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
 import { Route as RfpsIdRouteImport } from './routes/rfps.$id'
@@ -176,6 +178,11 @@ const TasksRoute = TasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VendorsRoute = VendorsRouteImport.update({
+  id: '/vendors',
+  path: '/vendors',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -205,6 +212,11 @@ const CostSheetsIdRoute = CostSheetsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => CostSheetsRoute,
+} as any)
+const PrequalificationsIdRoute = PrequalificationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PrequalificationsRoute,
 } as any)
 const ProspectsIdRoute = ProspectsIdRouteImport.update({
   id: '/$id',
@@ -305,7 +317,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
-  '/prequalifications': typeof PrequalificationsRoute
+  '/prequalifications': typeof PrequalificationsRouteWithChildren
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
   '/prospects': typeof ProspectsRouteWithChildren
@@ -315,11 +327,13 @@ export interface FileRoutesByFullPath {
   '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/vendors': typeof VendorsRoute
   '/api/health': typeof ApiHealthRoute
   '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
@@ -353,7 +367,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
-  '/prequalifications': typeof PrequalificationsRoute
+  '/prequalifications': typeof PrequalificationsRouteWithChildren
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
   '/prospects': typeof ProspectsRouteWithChildren
@@ -363,11 +377,13 @@ export interface FileRoutesByTo {
   '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/vendors': typeof VendorsRoute
   '/api/health': typeof ApiHealthRoute
   '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
@@ -402,7 +418,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/payroll': typeof PayrollRoute
-  '/prequalifications': typeof PrequalificationsRoute
+  '/prequalifications': typeof PrequalificationsRouteWithChildren
   '/procurement': typeof ProcurementRoute
   '/projects': typeof ProjectsRoute
   '/prospects': typeof ProspectsRouteWithChildren
@@ -412,11 +428,13 @@ export interface FileRoutesById {
   '/rfqs': typeof RfqsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/tasks': typeof TasksRoute
+  '/vendors': typeof VendorsRoute
   '/api/health': typeof ApiHealthRoute
   '/bids/$id': typeof BidsIdRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
@@ -462,11 +480,13 @@ export interface FileRouteTypes {
     | '/rfqs'
     | '/settings'
     | '/tasks'
+    | '/vendors'
     | '/api/health'
     | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
@@ -510,11 +530,13 @@ export interface FileRouteTypes {
     | '/rfqs'
     | '/settings'
     | '/tasks'
+    | '/vendors'
     | '/api/health'
     | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
@@ -558,11 +580,13 @@ export interface FileRouteTypes {
     | '/rfqs'
     | '/settings'
     | '/tasks'
+    | '/vendors'
     | '/api/health'
     | '/bids/$id'
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
@@ -597,7 +621,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MarketingRoute: typeof MarketingRoute
   PayrollRoute: typeof PayrollRoute
-  PrequalificationsRoute: typeof PrequalificationsRoute
+  PrequalificationsRoute: typeof PrequalificationsRouteWithChildren
   ProcurementRoute: typeof ProcurementRoute
   ProjectsRoute: typeof ProjectsRoute
   ProspectsRoute: typeof ProspectsRouteWithChildren
@@ -607,6 +631,7 @@ export interface RootRouteChildren {
   RfqsRoute: typeof RfqsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   TasksRoute: typeof TasksRoute
+  VendorsRoute: typeof VendorsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
@@ -793,6 +818,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TasksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vendors': {
+      id: '/vendors'
+      path: '/vendors'
+      fullPath: '/vendors'
+      preLoaderRoute: typeof VendorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -834,6 +866,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/cost-sheets/$id'
       preLoaderRoute: typeof CostSheetsIdRouteImport
       parentRoute: typeof CostSheetsRoute
+    }
+    '/prequalifications/$id': {
+      id: '/prequalifications/$id'
+      path: '/$id'
+      fullPath: '/prequalifications/$id'
+      preLoaderRoute: typeof PrequalificationsIdRouteImport
+      parentRoute: typeof PrequalificationsRoute
     }
     '/prospects/$id': {
       id: '/prospects/$id'
@@ -983,6 +1022,17 @@ const CostSheetsRouteWithChildren = CostSheetsRoute._addFileChildren(
   CostSheetsRouteChildren,
 )
 
+interface PrequalificationsRouteChildren {
+  PrequalificationsIdRoute: typeof PrequalificationsIdRoute
+}
+
+const PrequalificationsRouteChildren: PrequalificationsRouteChildren = {
+  PrequalificationsIdRoute: PrequalificationsIdRoute,
+}
+
+const PrequalificationsRouteWithChildren =
+  PrequalificationsRoute._addFileChildren(PrequalificationsRouteChildren)
+
 interface ProspectsIdRouteChildren {
   ProspectsIdContactsContactIdRoute: typeof ProspectsIdContactsContactIdRoute
 }
@@ -1054,7 +1104,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MarketingRoute: MarketingRoute,
   PayrollRoute: PayrollRoute,
-  PrequalificationsRoute: PrequalificationsRoute,
+  PrequalificationsRoute: PrequalificationsRouteWithChildren,
   ProcurementRoute: ProcurementRoute,
   ProjectsRoute: ProjectsRoute,
   ProspectsRoute: ProspectsRouteWithChildren,
@@ -1064,6 +1114,7 @@ const rootRouteChildren: RootRouteChildren = {
   RfqsRoute: RfqsRouteWithChildren,
   SettingsRoute: SettingsRoute,
   TasksRoute: TasksRoute,
+  VendorsRoute: VendorsRoute,
   ApiHealthRoute: ApiHealthRoute,
   CampaignsIdRoute: CampaignsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,

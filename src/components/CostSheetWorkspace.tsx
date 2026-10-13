@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Calculator,
+  ExternalLink,
+  FileText,
   FileImage,
   ImagePlus,
   Pencil,
@@ -41,10 +43,12 @@ import {
   getCostSheetWorkspace,
   saveCostSheetColumn,
   saveCostSheetItem,
+  setCostSheetSourceQuote,
   updateCostSheet,
   type CostSheetAttachment,
   type CostSheetColumn,
   type CostSheetItem,
+  type CostSheetSourceQuote,
 } from "@/lib/cost-sheets.functions";
 import {
   columnKey,
@@ -189,6 +193,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const saveColumn = useServerFn(saveCostSheetColumn);
   const removeColumn = useServerFn(deleteCostSheetColumn);
   const saveSheet = useServerFn(updateCostSheet);
+  const setSourceQuote = useServerFn(setCostSheetSourceQuote);
   const queryKey = ["cost-sheet-workspace", costSheetId];
   const { data, isLoading, error } = useQuery({
     queryKey,
@@ -197,6 +202,8 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const sheet = data?.sheet as SheetRecord | undefined;
   const columns = data?.columns || emptyColumns;
   const items = data?.items || emptyItems;
+  const sourceQuotes = data?.sourceQuotes || [];
+  const linkedQuotes = sourceQuotes.filter((quote) => Boolean(quote.is_linked));
   const calculations = useMemo(
     () => new Map(items.map((item) => [item.id, calculateRow(item, columns)])),
     [columns, items],
@@ -225,6 +232,8 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const [columnForm, setColumnForm] = useState<ColumnForm>(emptyColumn);
   const [preview, setPreview] = useState<CostSheetAttachment | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState("");
   const [sheetForm, setSheetForm] = useState({ name: "", status: "draft", notes: "" });
 
   const refresh = () => queryClient.invalidateQueries({ queryKey });
@@ -349,6 +358,17 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
     },
     onError: (mutationError: Error) => toast.error(mutationError.message),
   });
+  const quoteMutation = useMutation({
+    mutationFn: (payload: { quoteId: string; linked: boolean }) =>
+      setSourceQuote({ data: { costSheetId, ...payload } }),
+    onSuccess: async (_result, payload) => {
+      toast.success(payload.linked ? "Source quotation linked." : "Source quotation unlinked.");
+      setQuoteOpen(false);
+      setSelectedQuoteId("");
+      await refresh();
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  });
 
   if (isLoading)
     return (
@@ -423,6 +443,50 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         <Metric label="Gross profit" value={money(totals.profit, currency)} icon={Calculator} />
         <Metric label="Margin" value={`${totals.margin.toFixed(1)}%`} icon={Sigma} />
       </section>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b bg-muted/20">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>Supporting quotations</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Link the vendor or external quotations that support the figures in this sheet.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <a href="/vendors">
+                  <FileText className="mr-2 size-4" /> Manage quotations
+                </a>
+              </Button>
+              <Button onClick={() => setQuoteOpen(true)}>
+                <Plus className="mr-2 size-4" /> Link quotation
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5">
+          {linkedQuotes.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {linkedQuotes.map((quote) => (
+                <SourceQuoteCard
+                  key={quote.id}
+                  quote={quote}
+                  onUnlink={() => quoteMutation.mutate({ quoteId: quote.id, linked: false })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed p-7 text-center">
+              <FileText className="mx-auto size-8 text-muted-foreground" />
+              <p className="mt-2 font-medium">No supporting quotation linked</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Add a quote from a saved vendor or any other external source, then link it here.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="min-w-0 overflow-hidden">
         <CardHeader className="border-b bg-muted/20">
@@ -698,6 +762,48 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         saving={sheetMutation.isPending}
         onSave={() => sheetMutation.mutate()}
       />
+      <Dialog open={quoteOpen} onOpenChange={setQuoteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link a supporting quotation</DialogTitle>
+            <DialogDescription>
+              Choose a quotation already recorded in the Vendors module.
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="Quotation">
+            <Select value={selectedQuoteId} onValueChange={setSelectedQuoteId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose vendor or external quote" />
+              </SelectTrigger>
+              <SelectContent>
+                {sourceQuotes
+                  .filter((quote) => !quote.is_linked)
+                  .map((quote) => (
+                    <SelectItem key={quote.id} value={quote.id}>
+                      {quote.source_name} · {quote.currency} {Number(quote.amount).toLocaleString()}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </Field>
+          {!sourceQuotes.some((quote) => !quote.is_linked) ? (
+            <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+              Every recorded quote is already linked. Add another from the Vendors module first.
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuoteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!selectedQuoteId || quoteMutation.isPending}
+              onClick={() => quoteMutation.mutate({ quoteId: selectedQuoteId, linked: true })}
+            >
+              {quoteMutation.isPending ? "Linking…" : "Link quotation"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={Boolean(preview)}
         onOpenChange={(open) => {
@@ -719,6 +825,59 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function SourceQuoteCard({
+  quote,
+  onUnlink,
+}: {
+  quote: CostSheetSourceQuote;
+  onUnlink: () => void;
+}) {
+  return (
+    <article className="rounded-2xl border bg-background p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold">{quote.source_name}</h3>
+            <Badge variant="outline">{quote.supplier_id ? "Vendor" : "External source"}</Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {quote.quote_reference || "No reference"}
+            {quote.quote_date ? ` · ${String(quote.quote_date).slice(0, 10)}` : ""}
+          </p>
+        </div>
+        <p className="shrink-0 font-semibold tabular-nums">
+          {money(Number(quote.amount || 0), quote.currency)}
+        </p>
+      </div>
+      {quote.notes ? (
+        <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">{quote.notes}</p>
+      ) : null}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+        {quote.attachment_path ? (
+          <Button variant="ghost" size="sm" asChild>
+            <a href={attachmentUrl(quote.attachment_path)} target="_blank" rel="noreferrer">
+              <ExternalLink className="mr-2 size-4" />
+              {quote.attachment_name || "Open quotation"}
+            </a>
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">No document attached</span>
+        )}
+        <ConfirmAction
+          title="Unlink this quotation?"
+          description="The quotation remains available in the Vendors module."
+          onConfirm={async () => onUnlink()}
+          trigger={
+            <Button variant="ghost" size="sm">
+              Unlink
+            </Button>
+          }
+        />
+      </div>
+    </article>
   );
 }
 

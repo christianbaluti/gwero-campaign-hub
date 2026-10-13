@@ -364,6 +364,30 @@ export interface Supplier {
   created_at: string;
   updated_at: string;
 }
+export interface SupplierQuote {
+  id: string;
+  supplier_id: string | null;
+  source_name: string;
+  quote_reference: string | null;
+  quote_date: string | null;
+  valid_until: string | null;
+  currency: string;
+  amount: number;
+  notes: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  attachment_size: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface CostSheetSupplierQuote {
+  cost_sheet_id: string;
+  supplier_quote_id: string;
+  created_by: string | null;
+  created_at: string;
+}
 export interface PurchaseOrder {
   id: string;
   po_number: string;
@@ -390,12 +414,27 @@ export interface PurchaseOrderItem {
 export interface Prequalification {
   id: string;
   reference: string | null;
+  title: string | null;
   buyer: string;
+  client_id: string | null;
   category: string | null;
   submission_type: string;
   status: string;
   submitted_date: string | null;
   valid_until: string | null;
+  due_date: string | null;
+  value: number;
+  currency: string;
+  response_channel: string;
+  submission_email: string | null;
+  submission_cc: string | null;
+  delivery_location: string | null;
+  portal_url: string | null;
+  portal_username: string | null;
+  submission_instructions: string | null;
+  submission_time: string | null;
+  cost_sheet_id: string | null;
+  submitted_at: string | null;
   outcome: string | null;
   notes: string | null;
   created_at: string;
@@ -771,6 +810,8 @@ export interface Tables {
   jobs: Job;
   tasks: Task;
   suppliers: Supplier;
+  supplier_quotes: SupplierQuote;
+  cost_sheet_supplier_quotes: CostSheetSupplierQuote;
   purchase_orders: PurchaseOrder;
   purchase_order_items: PurchaseOrderItem;
   prequalifications: Prequalification;
