@@ -1,26 +1,30 @@
+import { validateAttachmentBytes } from "./attachment-policy";
 import { randomUUID } from "node:crypto";
 import { getPool } from "./db.server";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function saveAttachment(campaignId: string, file: File) {
+export async function saveAttachment(campaignId: string, file: File, userId: string) {
   if (!uuid.test(campaignId)) throw new Error("Invalid campaign ID");
   if (file.size > 20 * 1024 * 1024) throw new Error("Attachment exceeds 20 MB");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const contentType = validateAttachmentBytes(file.name, bytes);
   const fileId = randomUUID();
   const path = `${campaignId}/${fileId}`;
   await getPool().execute(
-    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       fileId,
       campaignId,
       file.name,
-      file.type || "application/octet-stream",
-      file.size,
-      Buffer.from(await file.arrayBuffer()),
+      contentType,
+      bytes.length,
+      Buffer.from(bytes),
+      userId,
     ],
   );
-  return { path, name: file.name, type: file.type || "application/octet-stream", size: file.size };
+  return { path, name: file.name, type: contentType, size: bytes.length };
 }
 
 export async function saveAttachmentBuffer(

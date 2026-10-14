@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware, permissionMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 
 export type OpportunityKind = "rfp" | "rfq" | "bid" | "eoi";
 
@@ -131,7 +131,7 @@ function safeFilename(value: string) {
 }
 
 export const listOpportunityDependencies = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .handler(async () => {
     const db = await pool();
     const [clients, currencies, documents, users, mailboxes, costSheets] = await Promise.all([
@@ -165,7 +165,7 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
   });
 
 export const listOpportunities = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { kind: OpportunityKind }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
@@ -198,7 +198,7 @@ export const listOpportunities = createServerFn({ method: "GET" })
   });
 
 export const createOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: OpportunityInput & { sourceDocuments?: AttachmentMeta[] }) => data)
   .handler(async ({ data, context }) => {
     assertKind(data.kind);
@@ -302,7 +302,7 @@ export const createOpportunity = createServerFn({ method: "POST" })
   });
 
 export const getOpportunityWorkspace = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { kind: OpportunityKind; id: string }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
@@ -392,7 +392,7 @@ export const getOpportunityWorkspace = createServerFn({ method: "GET" })
   });
 
 export const updateOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: OpportunityInput & { id: string }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
@@ -466,7 +466,7 @@ export const updateOpportunity = createServerFn({ method: "POST" })
   });
 
 export const saveChecklistItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       id?: string;
@@ -538,7 +538,7 @@ export const saveChecklistItem = createServerFn({ method: "POST" })
   });
 
 export const setChecklistStatus = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string; complete: boolean }) => data)
   .handler(async ({ data, context }) => {
     const db = await pool();
@@ -570,7 +570,7 @@ export const setChecklistStatus = createServerFn({ method: "POST" })
   });
 
 export const deleteChecklistItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await (await pool()).execute("DELETE FROM opportunity_checklist_items WHERE id = ?", [data.id]);
@@ -578,7 +578,7 @@ export const deleteChecklistItem = createServerFn({ method: "POST" })
   });
 
 export const addOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;
@@ -644,7 +644,7 @@ export const addOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const updateOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string; outgoingName: string; include: boolean }) => data)
   .handler(async ({ data }) => {
     await (
@@ -657,7 +657,7 @@ export const updateOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const deleteOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await (await pool()).execute("DELETE FROM opportunity_documents WHERE id = ?", [data.id]);
@@ -665,7 +665,7 @@ export const deleteOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const addOpportunityComment = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: { kind: OpportunityKind; opportunityId: string; body: string; mentionIds?: string[] }) =>
       data,
@@ -719,7 +719,7 @@ export const addOpportunityComment = createServerFn({ method: "POST" })
   });
 
 export const linkCostSheet = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;
@@ -757,7 +757,7 @@ export const linkCostSheet = createServerFn({ method: "POST" })
   });
 
 export const submitOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;

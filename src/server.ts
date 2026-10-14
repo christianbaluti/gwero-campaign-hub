@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -44,18 +45,40 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+async function secureResponse(response: Response): Promise<Response> {
+  const headers = new Headers(response.headers);
+  headers.set("X-Security-Release", "20261012-gwero");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+  headers.set("Strict-Transport-Security", "max-age=2592000");
+  headers.set("Cache-Control", "private, no-store");
+  let body: BodyInit | null = response.body;
+  if ((headers.get("content-type") || "").includes("text/html") && response.body) {
+    const html = await response.text();
+    const nonce = randomBytes(24).toString("base64");
+    headers.set("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'`);
+    // TanStack reads this meta value when hydrating dynamically inserted scripts.
+    const protectedHtml = html.replace(/<head([^>]*)>/i, `$&<meta property="csp-nonce" content="${nonce}">`)
+      .replace(/<script\b([^>]*)>/gi, (tag, attrs) => /\bnonce\s*=/i.test(attrs) ? tag : `<script nonce="${nonce}"${attrs}>`);
+    headers.delete("content-length"); body = protectedHtml;
+  }
+  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return await secureResponse(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
-      return new Response(renderErrorPage(), {
+      return await secureResponse(new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      }));
     }
   },
 };
