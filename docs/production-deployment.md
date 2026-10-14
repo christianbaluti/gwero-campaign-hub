@@ -9,6 +9,10 @@
 
 ## Production gate
 
+Before the first pull request is merged, explicitly enable GitHub Actions in the Owen fork. GitHub
+does not automatically enable inherited workflows in a newly created fork, and repository secrets
+are never inherited from the upstream repository.
+
 1. Changes enter Owen `main` only through a pull request.
 2. The `CI / verify` check and one approving review are required before merge.
 3. The production workflow runs only when the `CI` workflow succeeds for Owen `main`.
