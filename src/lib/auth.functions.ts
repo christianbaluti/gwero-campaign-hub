@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
+import { consumeLoginAttempt } from "./login-limit.server";
 import {
   currentUser,
   hashPassword,
@@ -8,20 +8,6 @@ import {
   verifyPassword,
 } from "./auth.server";
 import { permissionMiddleware } from "./auth.middleware";
-
-const attempts = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit() {
-  const key = getRequestHeader("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  const now = Date.now();
-  const item = attempts.get(key);
-  if (!item || item.resetAt <= now) {
-    attempts.set(key, { count: 1, resetAt: now + 15 * 60_000 });
-    return;
-  }
-  if (item.count >= 10) throw new Error("Too many login attempts. Try again in 15 minutes.");
-  item.count += 1;
-}
 
 export const getAuthStatus = createServerFn({ method: "GET" }).handler(async () => {
   const { getPool } = await import("./db.server");
@@ -37,7 +23,14 @@ export const getAuthStatus = createServerFn({ method: "GET" }).handler(async () 
 export const login = createServerFn({ method: "POST" })
   .validator((data: { email: string; password: string }) => data)
   .handler(async ({ data }) => {
-    checkRateLimit();
+    if (
+      typeof data?.email !== "string" ||
+      typeof data?.password !== "string" ||
+      data.email.length > 254 ||
+      data.password.length > 200
+    )
+      throw new Error("Invalid email or password.");
+    await consumeLoginAttempt(data.email);
     const { getPool } = await import("./db.server");
     const [rows] = await getPool().execute(
       "SELECT id, password_hash, status FROM system_users WHERE email = ? LIMIT 1",

@@ -308,6 +308,20 @@ export interface CostSheetItem {
   quantity: number;
   unit_cost: number;
   markup_percent: number;
+  custom_values: Record<string, string | number>;
+  attachments: Array<{ path: string; name: string; type: string; size: number }>;
+  created_at: string;
+  updated_at: string;
+}
+export interface CostSheetColumn {
+  id: string;
+  cost_sheet_id: string;
+  name: string;
+  column_key: string;
+  data_type: "text" | "number" | "formula";
+  default_value: string | null;
+  formula_expression: string | null;
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -350,6 +364,30 @@ export interface Supplier {
   created_at: string;
   updated_at: string;
 }
+export interface SupplierQuote {
+  id: string;
+  supplier_id: string | null;
+  source_name: string;
+  quote_reference: string | null;
+  quote_date: string | null;
+  valid_until: string | null;
+  currency: string;
+  amount: number;
+  notes: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  attachment_size: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface CostSheetSupplierQuote {
+  cost_sheet_id: string;
+  supplier_quote_id: string;
+  created_by: string | null;
+  created_at: string;
+}
 export interface PurchaseOrder {
   id: string;
   po_number: string;
@@ -376,12 +414,27 @@ export interface PurchaseOrderItem {
 export interface Prequalification {
   id: string;
   reference: string | null;
+  title: string | null;
   buyer: string;
+  client_id: string | null;
   category: string | null;
   submission_type: string;
   status: string;
   submitted_date: string | null;
   valid_until: string | null;
+  due_date: string | null;
+  value: number;
+  currency: string;
+  response_channel: string;
+  submission_email: string | null;
+  submission_cc: string | null;
+  delivery_location: string | null;
+  portal_url: string | null;
+  portal_username: string | null;
+  submission_instructions: string | null;
+  submission_time: string | null;
+  cost_sheet_id: string | null;
+  submitted_at: string | null;
   outcome: string | null;
   notes: string | null;
   created_at: string;
@@ -629,6 +682,9 @@ export interface ProspectContact {
   gender: string | null;
   job_title: string | null;
   avatar_url: string | null;
+  location: string | null;
+  location_source_url: string | null;
+  location_is_inferred: boolean;
   is_primary: boolean;
   created_at: string;
   updated_at: string;
@@ -644,6 +700,9 @@ export interface ClientContact {
   gender: string | null;
   job_title: string | null;
   avatar_url: string | null;
+  location: string | null;
+  location_source_url: string | null;
+  location_is_inferred: boolean;
   is_primary: boolean;
   created_at: string;
   updated_at: string;
@@ -747,9 +806,12 @@ export interface Tables {
   bids: Bid;
   cost_sheets: CostSheet;
   cost_sheet_items: CostSheetItem;
+  cost_sheet_columns: CostSheetColumn;
   jobs: Job;
   tasks: Task;
   suppliers: Supplier;
+  supplier_quotes: SupplierQuote;
+  cost_sheet_supplier_quotes: CostSheetSupplierQuote;
   purchase_orders: PurchaseOrder;
   purchase_order_items: PurchaseOrderItem;
   prequalifications: Prequalification;

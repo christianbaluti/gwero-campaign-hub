@@ -1,0 +1,73 @@
+export const tablePermissions: Readonly<Record<string, string>> = {
+  system_settings: "settings.manage",
+  email_templates: "settings.manage",
+  mailboxes: "settings.manage",
+  roles: "users.manage",
+  permissions: "users.manage",
+  role_permissions: "users.manage",
+  clients: "clients.manage",
+  client_contacts: "clients.manage",
+  campaigns: "campaigns.manage",
+  campaign_recipients: "campaigns.manage",
+  campaign_steps: "campaigns.manage",
+  campaign_events: "campaigns.manage",
+  email_suppressions: "campaigns.manage",
+  replies: "campaigns.manage",
+  bids: "opportunities.manage",
+  requests: "opportunities.manage",
+  cost_sheets: "opportunities.manage",
+  cost_sheet_items: "opportunities.manage",
+  cost_sheet_columns: "opportunities.manage",
+  cost_sheet_supplier_quotes: "opportunities.manage",
+  supplier_quotes: "procurement.manage",
+  quotations: "opportunities.manage",
+  quotation_items: "opportunities.manage",
+  prequalifications: "opportunities.manage",
+  deals: "operations.manage",
+  agreements: "operations.manage",
+  agreement_items: "operations.manage",
+  activities: "operations.manage",
+  projects: "operations.manage",
+  jobs: "operations.manage",
+  tasks: "operations.manage",
+  marketing_activities: "operations.manage",
+  suppliers: "procurement.manage",
+  purchase_orders: "procurement.manage",
+  purchase_order_items: "procurement.manage",
+  vacancies: "hr.manage",
+  applicants: "hr.manage",
+  employees: "hr.manage",
+  leave_requests: "hr.manage",
+  payroll_runs: "finance.manage",
+  payroll_items: "finance.manage",
+  invoices: "finance.manage",
+  expenses: "finance.manage",
+  payments: "finance.manage",
+  documents: "documents.manage",
+  page_notes: "notes.manage",
+  page_note_mentions: "notes.manage",
+  organization_locations: "clients.manage",
+  opportunity_checklist_items: "opportunities.manage",
+  opportunity_documents: "opportunities.manage",
+  opportunity_comments: "opportunities.manage",
+  opportunity_comment_mentions: "opportunities.manage",
+  opportunity_submissions: "opportunities.manage",
+  currencies: "settings.manage",
+};
+export function requiredTablePermission(table: string, action: string): string {
+  if (!["select", "insert", "upsert", "update", "delete"].includes(action))
+    throw new Error("Invalid action");
+  if (
+    [
+      "prospects",
+      "prospect_categories",
+      "prospect_contacts",
+      "prospect_interactions",
+      "ai_prospect_searches",
+    ].includes(table)
+  )
+    return action === "select" ? "prospects.view" : "prospects.manage";
+  const permission = Object.hasOwn(tablePermissions, table) ? tablePermissions[table] : undefined;
+  if (!permission) throw new Error("Permission denied");
+  return permission;
+}

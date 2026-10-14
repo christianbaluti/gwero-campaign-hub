@@ -619,13 +619,27 @@ function ImportDialog({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
 
   async function handleFile(file: File) {
+    if (!/\.(xlsx|xls|csv)$/i.test(file.name) || file.size > 5 * 1024 * 1024) {
+      toast.error("Choose an XLSX, XLS or CSV file smaller than 5 MB.");
+      return;
+    }
     const buffer = await file.arrayBuffer();
-    const book = XLSX.read(buffer);
+    let book: XLSX.WorkBook;
+    try {
+      book = XLSX.read(buffer, { sheetRows: 10002 });
+    } catch {
+      toast.error("That spreadsheet could not be read. Check the file and try again.");
+      return;
+    }
     const sheetName = book.SheetNames[0];
     if (!sheetName) return;
     const sheet = book.Sheets[sheetName];
     if (!sheet) return;
     const data = XLSX.utils.sheet_to_json<Row>(sheet, { defval: "" });
+    if (data.length > 10000) {
+      toast.error("Import up to 10,000 rows at a time.");
+      return;
+    }
     if (!data.length) {
       toast.error("That file has no rows.");
       return;

@@ -7,6 +7,7 @@ import {
   Italic,
   Link2,
   Mail,
+  MapPin,
   Paperclip,
   Phone,
   Send,
@@ -290,6 +291,27 @@ function ProspectContactPage() {
                   {contact.phone}
                 </a>
               ) : null}
+              <div className="flex items-start gap-2">
+                <MapPin className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  {contact.location || "Location not supplied"}
+                  {contact.location_is_inferred ? (
+                    <span className="block text-xs text-muted-foreground">
+                      Based on the organisation location
+                    </span>
+                  ) : null}
+                  {contact.location_source_url ? (
+                    <a
+                      href={contact.location_source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-xs text-primary hover:underline"
+                    >
+                      View verification source
+                    </a>
+                  ) : null}
+                </span>
+              </div>
             </div>
             <Button className="mt-6 w-full" variant="outline" asChild>
               <Link to="/prospects/$id" params={{ id }}>

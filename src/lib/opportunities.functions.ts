@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware, permissionMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 
-export type OpportunityKind = "rfp" | "rfq" | "bid";
+export type OpportunityKind = "rfp" | "rfq" | "bid" | "eoi";
 
 export type OpportunityInput = {
   id?: string;
@@ -31,11 +31,79 @@ type SerializableValue =
 type SerializableRecord = { [key: string]: SerializableValue };
 
 function assertKind(kind: string): asserts kind is OpportunityKind {
-  if (!["rfp", "rfq", "bid"].includes(kind)) throw new Error("Invalid opportunity type");
+  if (!["rfp", "rfq", "bid", "eoi"].includes(kind)) throw new Error("Invalid opportunity type");
 }
 
 async function pool() {
   return (await import("./db.server")).getPool();
+}
+
+type Database = Awaited<ReturnType<typeof pool>>;
+
+function opportunityPath(kind: OpportunityKind, id: string) {
+  const route = kind === "bid" ? "bids" : kind === "eoi" ? "prequalifications" : `${kind}s`;
+  return `/${route}/${id}`;
+}
+
+function opportunityLabel(kind: OpportunityKind) {
+  return kind === "eoi" ? "EOI / Prequalification" : kind.toUpperCase();
+}
+
+async function opportunitySummary(db: Database, kind: OpportunityKind, id: string) {
+  const result =
+    kind === "bid"
+      ? await db.query(
+          `SELECT b.title, b.reference, b.closing_date AS due_date,
+                  COALESCE(c.company, c.name) AS client_name
+             FROM bids b LEFT JOIN clients c ON c.id = b.client_id WHERE b.id = ? LIMIT 1`,
+          [id],
+        )
+      : kind === "eoi"
+        ? await db.query(
+            `SELECT COALESCE(p.title, p.buyer) AS title, p.reference,
+                    COALESCE(p.due_date, p.valid_until) AS due_date,
+                    COALESCE(c.company, c.name, p.buyer) AS client_name
+               FROM prequalifications p LEFT JOIN clients c ON c.id = p.client_id
+              WHERE p.id = ? LIMIT 1`,
+            [id],
+          )
+        : await db.query(
+            `SELECT r.title, r.reference, r.due_date,
+                    COALESCE(c.company, c.name) AS client_name
+               FROM requests r LEFT JOIN clients c ON c.id = r.client_id
+              WHERE r.id = ? AND r.request_type = ? LIMIT 1`,
+            [id, kind],
+          );
+  const summary = rows<{
+    title: string;
+    reference: string | null;
+    due_date: string | null;
+    client_name: string | null;
+  }>(result)[0];
+  if (!summary) throw new Error("Opportunity not found.");
+  return summary;
+}
+
+function notificationDetails(summary: {
+  title: string;
+  reference: string | null;
+  due_date: string | null;
+  client_name: string | null;
+}) {
+  return [
+    summary.title,
+    summary.reference ? `Reference: ${summary.reference}` : "",
+    summary.client_name ? `Client: ${summary.client_name}` : "",
+    summary.due_date ? `Due: ${String(summary.due_date).slice(0, 16).replace("T", " ")}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+async function sendOpportunityNotifications(notificationIds: string[]) {
+  if (!notificationIds.length) return { sent: 0, failed: 0 };
+  const { sendPendingNotificationEmails } = await import("./notifications.server");
+  return sendPendingNotificationEmails({ notificationIds, ignoreDelay: true });
 }
 
 function rows<T = SerializableRecord>(result: unknown): T[] {
@@ -63,7 +131,7 @@ function safeFilename(value: string) {
 }
 
 export const listOpportunityDependencies = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .handler(async () => {
     const db = await pool();
     const [clients, currencies, documents, users, mailboxes, costSheets] = await Promise.all([
@@ -97,7 +165,7 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
   });
 
 export const listOpportunities = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { kind: OpportunityKind }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
@@ -109,18 +177,28 @@ export const listOpportunities = createServerFn({ method: "GET" })
                   c.company AS client_company, c.logo_path AS client_logo
              FROM bids b LEFT JOIN clients c ON c.id = b.client_id
             ORDER BY b.created_at DESC`
-        : `SELECT r.id, r.title, r.reference, r.status, r.due_date,
+        : data.kind === "eoi"
+          ? `SELECT p.id, COALESCE(p.title, p.buyer) AS title, p.reference, p.status,
+                    COALESCE(p.due_date, p.valid_until) AS due_date,
+                    p.value, p.currency, p.response_channel AS submission_type,
+                    c.name AS client_name, COALESCE(c.company, p.buyer) AS client_company,
+                    c.logo_path AS client_logo
+               FROM prequalifications p LEFT JOIN clients c ON c.id = p.client_id
+              ORDER BY p.created_at DESC`
+          : `SELECT r.id, r.title, r.reference, r.status, r.due_date,
                   r.value, r.currency, r.submission_type, c.name AS client_name,
                   c.company AS client_company, c.logo_path AS client_logo
              FROM requests r LEFT JOIN clients c ON c.id = r.client_id
             WHERE r.request_type = ? ORDER BY r.created_at DESC`;
     return serial(
-      rows<SerializableRecord>(await db.query(query, data.kind === "bid" ? [] : [data.kind])),
+      rows<SerializableRecord>(
+        await db.query(query, data.kind === "bid" || data.kind === "eoi" ? [] : [data.kind]),
+      ),
     );
   });
 
 export const createOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: OpportunityInput & { sourceDocuments?: AttachmentMeta[] }) => data)
   .handler(async ({ data, context }) => {
     assertKind(data.kind);
@@ -128,42 +206,77 @@ export const createOpportunity = createServerFn({ method: "POST" })
     if (!data.clientId) throw new Error("Choose a client.");
     const db = await pool();
     const id = data.id || crypto.randomUUID();
-    const common = [
-      data.reference?.trim() || null,
-      data.title.trim(),
-      data.clientId,
-      data.status || "received",
-      data.dueDate || null,
-      Number(data.value || 0),
-      data.currency || "MWK",
-      data.notes?.trim() || null,
-      data.submissionType,
-      data.submissionEmail?.trim() || null,
-      JSON.stringify(splitEmails(data.submissionCc)),
-      data.deliveryLocation?.trim() || null,
-      data.portalUrl?.trim() || null,
-      data.portalUsername?.trim() || null,
-      data.submissionInstructions?.trim() || null,
-      data.submissionTime || null,
-    ];
-    if (data.kind === "bid") {
+    if (data.kind === "eoi") {
+      const client = rows<{ name: string; company: string | null }>(
+        await db.query("SELECT name, company FROM clients WHERE id = ? LIMIT 1", [data.clientId]),
+      )[0];
+      if (!client) throw new Error("Client not found.");
       await db.execute(
-        `INSERT INTO bids
+        `INSERT INTO prequalifications
+          (id, reference, title, buyer, client_id, status, due_date, valid_until, value, currency,
+           notes, response_channel, submission_email, submission_cc, delivery_location, portal_url,
+           portal_username, submission_instructions, submission_time, submission_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'eoi')`,
+        [
+          id,
+          data.reference?.trim() || null,
+          data.title.trim(),
+          client.company || client.name,
+          data.clientId,
+          data.status || "preparing",
+          data.dueDate || null,
+          data.dueDate || null,
+          Number(data.value || 0),
+          data.currency || "MWK",
+          data.notes?.trim() || null,
+          data.submissionType,
+          data.submissionEmail?.trim() || null,
+          JSON.stringify(splitEmails(data.submissionCc)),
+          data.deliveryLocation?.trim() || null,
+          data.portalUrl?.trim() || null,
+          data.portalUsername?.trim() || null,
+          data.submissionInstructions?.trim() || null,
+          data.submissionTime || null,
+        ],
+      );
+    } else {
+      const common = [
+        data.reference?.trim() || null,
+        data.title.trim(),
+        data.clientId,
+        data.status || "received",
+        data.dueDate || null,
+        Number(data.value || 0),
+        data.currency || "MWK",
+        data.notes?.trim() || null,
+        data.submissionType,
+        data.submissionEmail?.trim() || null,
+        JSON.stringify(splitEmails(data.submissionCc)),
+        data.deliveryLocation?.trim() || null,
+        data.portalUrl?.trim() || null,
+        data.portalUsername?.trim() || null,
+        data.submissionInstructions?.trim() || null,
+        data.submissionTime || null,
+      ];
+      if (data.kind === "bid") {
+        await db.execute(
+          `INSERT INTO bids
           (id, reference, title, client_id, status, closing_date, value, currency, notes,
            submission_type, submission_email, submission_cc, delivery_location, portal_url,
            portal_username, submission_instructions, submission_time)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, ...common],
-      );
-    } else {
-      await db.execute(
-        `INSERT INTO requests
+          [id, ...common],
+        );
+      } else {
+        await db.execute(
+          `INSERT INTO requests
           (id, reference, title, client_id, status, due_date, value, currency, notes,
            submission_type, submission_email, submission_cc, delivery_location, portal_url,
            portal_username, submission_instructions, submission_time, request_type, received_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, ...common, data.kind, data.receivedDate || null],
-      );
+          [id, ...common, data.kind, data.receivedDate || null],
+        );
+      }
     }
     for (const file of data.sourceDocuments || []) {
       if (!file.path.startsWith(`${id}/`)) continue;
@@ -189,72 +302,139 @@ export const createOpportunity = createServerFn({ method: "POST" })
   });
 
 export const getOpportunityWorkspace = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { kind: OpportunityKind; id: string }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
     const db = await pool();
-    const table = data.kind === "bid" ? "bids" : "requests";
-    const [opportunity, checklist, replies, documents, comments, submissions] = await Promise.all([
-      db.query(
-        `SELECT o.*, c.name AS client_name, c.company AS client_company,
-                c.logo_path AS client_logo, c.email AS client_email, cs.name AS cost_sheet_name
-           FROM ${table} o LEFT JOIN clients c ON c.id = o.client_id
-           LEFT JOIN cost_sheets cs ON cs.id = o.cost_sheet_id
-          WHERE o.id = ? ${data.kind === "bid" ? "" : "AND o.request_type = ?"} LIMIT 1`,
-        data.kind === "bid" ? [data.id] : [data.id, data.kind],
-      ),
-      db.query(
-        `SELECT i.*, u.full_name AS assignee_name
+    const opportunityQuery =
+      data.kind === "eoi"
+        ? db.query(
+            `SELECT p.*, COALESCE(p.title, p.buyer) AS title,
+                    COALESCE(p.due_date, p.valid_until) AS due_date,
+                    p.response_channel AS submission_type,
+                    c.name AS client_name, COALESCE(c.company, p.buyer) AS client_company,
+                    c.logo_path AS client_logo, c.email AS client_email, cs.name AS cost_sheet_name
+               FROM prequalifications p LEFT JOIN clients c ON c.id = p.client_id
+               LEFT JOIN cost_sheets cs ON cs.id = p.cost_sheet_id
+              WHERE p.id = ? LIMIT 1`,
+            [data.id],
+          )
+        : db.query(
+            `SELECT o.*, c.name AS client_name, c.company AS client_company,
+                    c.logo_path AS client_logo, c.email AS client_email, cs.name AS cost_sheet_name
+               FROM ${data.kind === "bid" ? "bids" : "requests"} o
+               LEFT JOIN clients c ON c.id = o.client_id
+               LEFT JOIN cost_sheets cs ON cs.id = o.cost_sheet_id
+              WHERE o.id = ? ${data.kind === "bid" ? "" : "AND o.request_type = ?"} LIMIT 1`,
+            data.kind === "bid" ? [data.id] : [data.id, data.kind],
+          );
+    const [opportunity, checklist, replies, documents, comments, submissions, commentMentions] =
+      await Promise.all([
+        opportunityQuery,
+        db.query(
+          `SELECT i.*, u.full_name AS assignee_name
            FROM opportunity_checklist_items i LEFT JOIN system_users u ON u.id = i.assignee_id
           WHERE opportunity_type = ? AND opportunity_id = ? ORDER BY position, created_at`,
-        [data.kind, data.id],
-      ),
-      db.query(
-        `SELECT id, from_email, subject, snippet, body, body_html, attachments, received_at
+          [data.kind, data.id],
+        ),
+        db.query(
+          `SELECT id, from_email, subject, snippet, body, body_html, attachments, received_at
            FROM replies WHERE opportunity_type = ? AND opportunity_id = ?
           ORDER BY received_at DESC`,
-        [data.kind, data.id],
-      ),
-      db.query(
-        `SELECT od.*, d.category, d.owner, d.version
+          [data.kind, data.id],
+        ),
+        db.query(
+          `SELECT od.*, d.category, d.owner, d.version
            FROM opportunity_documents od LEFT JOIN documents d ON d.id = od.document_id
           WHERE od.opportunity_type = ? AND od.opportunity_id = ? ORDER BY od.created_at`,
-        [data.kind, data.id],
-      ),
-      db.query(
-        `SELECT c.*, u.full_name AS author_name
+          [data.kind, data.id],
+        ),
+        db.query(
+          `SELECT c.*, u.full_name AS author_name
            FROM opportunity_comments c LEFT JOIN system_users u ON u.id = c.author_id
           WHERE opportunity_type = ? AND opportunity_id = ? ORDER BY c.created_at DESC`,
-        [data.kind, data.id],
-      ),
-      db.query(
-        `SELECT s.*, u.full_name AS submitted_by_name, m.from_email AS mailbox_email
+          [data.kind, data.id],
+        ),
+        db.query(
+          `SELECT s.*, u.full_name AS submitted_by_name, m.from_email AS mailbox_email
            FROM opportunity_submissions s
            LEFT JOIN system_users u ON u.id = s.submitted_by
            LEFT JOIN mailboxes m ON m.id = s.mailbox_id
           WHERE opportunity_type = ? AND opportunity_id = ? ORDER BY s.created_at DESC`,
-        [data.kind, data.id],
-      ),
-    ]);
+          [data.kind, data.id],
+        ),
+        db.query(
+          `SELECT m.comment_id, u.id, u.full_name, u.email
+           FROM opportunity_comment_mentions m
+           JOIN opportunity_comments c ON c.id = m.comment_id
+           JOIN system_users u ON u.id = m.user_id
+          WHERE c.opportunity_type = ? AND c.opportunity_id = ?
+          ORDER BY u.full_name`,
+          [data.kind, data.id],
+        ),
+      ]);
     const record = rows<SerializableRecord>(opportunity)[0];
     if (!record) throw new Error("Opportunity not found.");
     return serial({
       opportunity: record,
       checklist: rows(checklist),
       documents: rows(documents),
-      comments: rows(comments),
+      comments: rows<Record<string, unknown>>(comments).map((comment) => ({
+        ...comment,
+        mentions: rows<{ comment_id: string; id: string; full_name: string; email: string }>(
+          commentMentions,
+        ).filter((mention) => mention.comment_id === comment["id"]),
+      })),
       submissions: rows(submissions),
       replies: rows(replies),
     });
   });
 
 export const updateOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: OpportunityInput & { id: string }) => data)
   .handler(async ({ data }) => {
     assertKind(data.kind);
     const db = await pool();
+    if (data.kind === "eoi") {
+      const client = data.clientId
+        ? rows<{ name: string; company: string | null }>(
+            await db.query("SELECT name, company FROM clients WHERE id = ? LIMIT 1", [
+              data.clientId,
+            ]),
+          )[0]
+        : null;
+      await db.execute(
+        `UPDATE prequalifications SET title = ?, reference = ?, buyer = ?, client_id = ?,
+          status = ?, due_date = ?, valid_until = ?, value = ?, currency = ?, notes = ?,
+          response_channel = ?, submission_email = ?, submission_cc = ?, delivery_location = ?,
+          portal_url = ?, portal_username = ?, submission_instructions = ?, submission_time = ?
+         WHERE id = ?`,
+        [
+          data.title.trim(),
+          data.reference?.trim() || null,
+          client?.company || client?.name || data.title.trim(),
+          data.clientId || null,
+          data.status || "preparing",
+          data.dueDate || null,
+          data.dueDate || null,
+          Number(data.value || 0),
+          data.currency || "MWK",
+          data.notes?.trim() || null,
+          data.submissionType,
+          data.submissionEmail?.trim() || null,
+          JSON.stringify(splitEmails(data.submissionCc)),
+          data.deliveryLocation?.trim() || null,
+          data.portalUrl?.trim() || null,
+          data.portalUsername?.trim() || null,
+          data.submissionInstructions?.trim() || null,
+          data.submissionTime || null,
+          data.id,
+        ],
+      );
+      return { ok: true };
+    }
     const table = data.kind === "bid" ? "bids" : "requests";
     const dueColumn = data.kind === "bid" ? "closing_date" : "due_date";
     await db.execute(
@@ -286,7 +466,7 @@ export const updateOpportunity = createServerFn({ method: "POST" })
   });
 
 export const saveChecklistItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       id?: string;
@@ -304,6 +484,11 @@ export const saveChecklistItem = createServerFn({ method: "POST" })
     const db = await pool();
     if (!data.title.trim()) throw new Error("Add a checklist item name.");
     const id = data.id || crypto.randomUUID();
+    const previous = rows<{ assignee_id: string | null }>(
+      await db.query("SELECT assignee_id FROM opportunity_checklist_items WHERE id = ? LIMIT 1", [
+        id,
+      ]),
+    )[0];
     await db.execute(
       `INSERT INTO opportunity_checklist_items
         (id, opportunity_type, opportunity_id, title, notes, assignee_id, due_at, document_required, created_by)
@@ -322,27 +507,38 @@ export const saveChecklistItem = createServerFn({ method: "POST" })
         context.user.id,
       ],
     );
-    if (data.assigneeId && data.assigneeId !== context.user.id) {
+    let email: { sent: number; failed?: number; skipped?: string } = { sent: 0 };
+    if (
+      data.assigneeId &&
+      data.assigneeId !== context.user.id &&
+      data.assigneeId !== previous?.assignee_id
+    ) {
+      const summary = await opportunitySummary(db, data.kind, data.opportunityId);
+      const notificationId = crypto.randomUUID();
       await db.execute(
         `INSERT INTO notifications
           (id, user_id, notification_type, title, body, action_url, entity_type, entity_id)
          VALUES (?, ?, 'opportunity.assignment', ?, ?, ?, ?, ?)`,
         [
-          crypto.randomUUID(),
+          notificationId,
           data.assigneeId,
-          `New ${data.kind.toUpperCase()} requirement assigned`,
-          data.title.trim(),
-          `/${data.kind === "bid" ? "bids" : `${data.kind}s`}/${data.opportunityId}`,
+          `New ${opportunityLabel(data.kind)} requirement assigned`,
+          `${context.user.fullName} assigned you "${data.title.trim()}". ${notificationDetails(summary)}${data.notes?.trim() ? ` · Notes: ${data.notes.trim()}` : ""}`.slice(
+            0,
+            2000,
+          ),
+          opportunityPath(data.kind, data.opportunityId),
           data.kind,
           data.opportunityId,
         ],
       );
+      email = await sendOpportunityNotifications([notificationId]);
     }
-    return { id };
+    return { id, email };
   });
 
 export const setChecklistStatus = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string; complete: boolean }) => data)
   .handler(async ({ data, context }) => {
     const db = await pool();
@@ -374,7 +570,7 @@ export const setChecklistStatus = createServerFn({ method: "POST" })
   });
 
 export const deleteChecklistItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await (await pool()).execute("DELETE FROM opportunity_checklist_items WHERE id = ?", [data.id]);
@@ -382,7 +578,7 @@ export const deleteChecklistItem = createServerFn({ method: "POST" })
   });
 
 export const addOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;
@@ -448,7 +644,7 @@ export const addOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const updateOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string; outgoingName: string; include: boolean }) => data)
   .handler(async ({ data }) => {
     await (
@@ -461,7 +657,7 @@ export const updateOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const deleteOpportunityDocument = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     await (await pool()).execute("DELETE FROM opportunity_documents WHERE id = ?", [data.id]);
@@ -469,23 +665,61 @@ export const deleteOpportunityDocument = createServerFn({ method: "POST" })
   });
 
 export const addOpportunityComment = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
-  .validator((data: { kind: OpportunityKind; opportunityId: string; body: string }) => data)
+  .middleware([permissionMiddleware("opportunities.manage")])
+  .validator(
+    (data: { kind: OpportunityKind; opportunityId: string; body: string; mentionIds?: string[] }) =>
+      data,
+  )
   .handler(async ({ data, context }) => {
     assertKind(data.kind);
     if (!data.body.trim()) throw new Error("Write a note first.");
-    await (
-      await pool()
-    ).execute(
+    if (data.body.trim().length > 10_000)
+      throw new Error("A collaboration note can contain up to 10,000 characters.");
+    const db = await pool();
+    const commentId = crypto.randomUUID();
+    await db.execute(
       `INSERT INTO opportunity_comments (id, opportunity_type, opportunity_id, body, author_id)
        VALUES (?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), data.kind, data.opportunityId, data.body.trim(), context.user.id],
+      [commentId, data.kind, data.opportunityId, data.body.trim(), context.user.id],
     );
-    return { ok: true };
+    const mentionIds = [...new Set(data.mentionIds || [])]
+      .filter((userId) => userId !== context.user.id)
+      .slice(0, 100);
+    const summary = mentionIds.length
+      ? await opportunitySummary(db, data.kind, data.opportunityId)
+      : null;
+    const notificationIds: string[] = [];
+    for (const userId of mentionIds) {
+      const notificationId = crypto.randomUUID();
+      const [result] = await db.execute(
+        `INSERT INTO notifications
+          (id, user_id, notification_type, title, body, action_url, entity_type, entity_id)
+         SELECT ?, id, 'opportunity.mention', ?, ?, ?, ?, ?
+           FROM system_users WHERE id = ? AND status = 'active'`,
+        [
+          notificationId,
+          `${context.user.fullName} mentioned you on ${opportunityLabel(data.kind)}`,
+          `${data.body.trim()} · ${notificationDetails(summary!)}`.slice(0, 2000),
+          opportunityPath(data.kind, data.opportunityId),
+          data.kind,
+          data.opportunityId,
+          userId,
+        ],
+      );
+      if ((result as { affectedRows?: number }).affectedRows) {
+        await db.execute(
+          "INSERT IGNORE INTO opportunity_comment_mentions (comment_id, user_id) VALUES (?, ?)",
+          [commentId, userId],
+        );
+        notificationIds.push(notificationId);
+      }
+    }
+    const email = await sendOpportunityNotifications(notificationIds);
+    return { ok: true, email };
   });
 
 export const linkCostSheet = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;
@@ -513,7 +747,8 @@ export const linkCostSheet = createServerFn({ method: "POST" })
         ],
       );
     }
-    const table = data.kind === "bid" ? "bids" : "requests";
+    const table =
+      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
     await db.execute(`UPDATE ${table} SET cost_sheet_id = ? WHERE id = ?`, [
       id,
       data.opportunityId,
@@ -522,7 +757,7 @@ export const linkCostSheet = createServerFn({ method: "POST" })
   });
 
 export const submitOpportunity = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       kind: OpportunityKind;
@@ -548,7 +783,8 @@ export const submitOpportunity = createServerFn({ method: "POST" })
         ),
       )[0]?.count || 0;
     if (Number(pending) > 0) throw new Error("Complete every checklist item before submission.");
-    const table = data.kind === "bid" ? "bids" : "requests";
+    const table =
+      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
     const opportunity = rows<SerializableRecord>(
       await db.query(`SELECT * FROM ${table} WHERE id = ? LIMIT 1`, [data.opportunityId]),
     )[0];
@@ -608,7 +844,7 @@ export const submitOpportunity = createServerFn({ method: "POST" })
         }
         attachments = [
           {
-            filename: `${String(opportunity["title"])} submission.pdf`,
+            filename: `${String(opportunity["title"] || opportunity["buyer"] || "Opportunity")} submission.pdf`,
             contentType: "application/pdf",
             content: await merged.save(),
           },

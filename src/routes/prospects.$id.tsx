@@ -3,10 +3,21 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Building2, Globe2, Linkedin, Mail, Pencil, Phone, Trash2, UserCheck } from "lucide-react";
+import {
+  Building2,
+  Globe2,
+  Linkedin,
+  Mail,
+  MapPin,
+  Pencil,
+  Phone,
+  Trash2,
+  UserCheck,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { EmailMessageContent } from "@/components/EmailMessageContent";
+import { OrganizationLocations } from "@/components/OrganizationLocations";
 import { parseEmailAttachments } from "@/lib/email-message";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/contact-normalization";
@@ -72,6 +83,8 @@ function ProspectDetail() {
     email: "",
     phone: "",
     job_title: "",
+    location: "",
+    location_source_url: "",
   });
   const { data: prospect, isLoading } = useQuery({
     queryKey: ["prospect", id],
@@ -204,6 +217,9 @@ function ProspectDetail() {
         raw_phone: values.phone || null,
         job_title: values.job_title || null,
         avatar_url: values.avatar_url || null,
+        location: values.location.trim() || null,
+        location_source_url: values.location_source_url.trim() || null,
+        location_is_inferred: false,
       })
       .eq("id", contactId);
     if (result.error) {
@@ -232,7 +248,15 @@ function ProspectDetail() {
       toast.error(result.error.message);
       return;
     }
-    setNewContact({ first_name: "", last_name: "", email: "", phone: "", job_title: "" });
+    setNewContact({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      job_title: "",
+      location: "",
+      location_source_url: "",
+    });
     toast.success("Contact person added.");
     void qc.invalidateQueries({ queryKey: ["prospect-contacts", id] });
   };
@@ -534,6 +558,9 @@ function ProspectDetail() {
                 </div>
               </>
             )}
+            <div className="border-t pt-5">
+              <OrganizationLocations entityType="prospect" entityId={id} />
+            </div>
           </CardContent>
         </Card>
         <div className="min-w-0 space-y-5">
@@ -553,19 +580,34 @@ function ProspectDetail() {
               ))}
               <div className="rounded-xl border border-dashed p-4">
                 <p className="mb-3 font-medium">Add another contact</p>
-                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-                  {(["first_name", "last_name", "email", "phone", "job_title"] as const).map(
-                    (key) => (
-                      <Input
-                        key={key}
-                        placeholder={key.replace("_", " ")}
-                        value={newContact[key]}
-                        onChange={(event) =>
-                          setNewContact((old) => ({ ...old, [key]: event.target.value }))
-                        }
-                      />
-                    ),
-                  )}
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {(
+                    [
+                      "first_name",
+                      "last_name",
+                      "email",
+                      "phone",
+                      "job_title",
+                      "location",
+                      "location_source_url",
+                    ] as const
+                  ).map((key) => (
+                    <Input
+                      key={key}
+                      className={
+                        key === "location_source_url" ? "sm:col-span-2 xl:col-span-3" : undefined
+                      }
+                      placeholder={
+                        key === "location_source_url"
+                          ? "Location verification source URL (optional)"
+                          : key.replaceAll("_", " ")
+                      }
+                      value={newContact[key]}
+                      onChange={(event) =>
+                        setNewContact((old) => ({ ...old, [key]: event.target.value }))
+                      }
+                    />
+                  ))}
                 </div>
                 <Button className="mt-3" variant="outline" onClick={() => void addContact()}>
                   Add contact person
@@ -676,6 +718,9 @@ function ContactEditor({
     phone: string | null;
     job_title: string | null;
     avatar_url: string | null;
+    location: string | null;
+    location_source_url: string | null;
+    location_is_inferred: boolean;
   };
   prospectId: string;
   onSave: (values: {
@@ -684,6 +729,8 @@ function ContactEditor({
     email: string;
     phone: string;
     job_title: string;
+    location: string;
+    location_source_url: string;
     avatar_url?: string;
   }) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -695,6 +742,8 @@ function ContactEditor({
     email: person.email || "",
     phone: person.phone || "",
     job_title: person.job_title || "",
+    location: person.location || "",
+    location_source_url: person.location_source_url || "",
     avatar_url: person.avatar_url || "",
   });
   const name =
@@ -725,6 +774,11 @@ function ContactEditor({
             {values.job_title || "Position not set"}
             {values.email ? ` · ${values.email}` : ""}
           </p>
+          <p className="truncate text-xs text-muted-foreground">
+            <MapPin className="mr-1 inline size-3" />
+            {values.location || "Location not set"}
+            {person.location_is_inferred ? " · based on company location" : ""}
+          </p>
         </div>
         <div className="flex shrink-0 gap-2">
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
@@ -746,16 +800,29 @@ function ContactEditor({
   return (
     <div className="rounded-xl border p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(["first_name", "last_name", "email", "phone", "job_title"] as const).map((key) => (
-          <div key={key}>
-            <Label className="text-xs">{key.replace("_", " ")}</Label>
-            <Input
-              className="mt-1"
-              value={values[key]}
-              onChange={(event) => setValues((old) => ({ ...old, [key]: event.target.value }))}
-            />
-          </div>
-        ))}
+        {(["first_name", "last_name", "email", "phone", "job_title", "location"] as const).map(
+          (key) => (
+            <div key={key}>
+              <Label className="text-xs">{key.replace("_", " ")}</Label>
+              <Input
+                className="mt-1"
+                value={values[key]}
+                onChange={(event) => setValues((old) => ({ ...old, [key]: event.target.value }))}
+              />
+            </div>
+          ),
+        )}
+        <div className="sm:col-span-2 lg:col-span-3">
+          <Label className="text-xs">Location verification source URL</Label>
+          <Input
+            className="mt-1"
+            type="url"
+            value={values.location_source_url}
+            onChange={(event) =>
+              setValues((old) => ({ ...old, location_source_url: event.target.value }))
+            }
+          />
+        </div>
         <div>
           <Label htmlFor={`avatar-${person.id}`} className="text-xs">
             Profile image

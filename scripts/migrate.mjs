@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import mysql from "mysql2/promise";
 
@@ -43,6 +44,135 @@ async function connectToDatabase() {
 }
 
 const connection = await connectToDatabase();
+
+function locationLabel(location) {
+  return [location.addressLine, location.city, location.region, location.country]
+    .filter(Boolean)
+    .join(", ");
+}
+
+async function enrichCampaignLocations() {
+  const enrichmentPath = resolve("database/campaign-location-enrichment.json");
+  if (!existsSync(enrichmentPath)) return;
+
+  const enrichment = JSON.parse(readFileSync(enrichmentPath, "utf8"));
+  const [campaignRows] = await connection.execute("SELECT id FROM campaigns WHERE id = ? LIMIT 1", [
+    enrichment.campaignId,
+  ]);
+  if (!campaignRows.length) return;
+
+  const [audienceRows] = await connection.execute(
+    `SELECT cr.prospect_id, cr.contact_id, LOWER(pc.email) AS email,
+            c.id AS client_id, cc.id AS client_contact_id
+       FROM campaign_recipients cr
+       JOIN prospect_contacts pc ON pc.id = cr.contact_id
+       LEFT JOIN clients c ON c.prospect_id = cr.prospect_id
+       LEFT JOIN client_contacts cc
+         ON c.id = cc.client_id AND BINARY LOWER(cc.email) = BINARY LOWER(pc.email)
+      WHERE cr.campaign_id = ?`,
+    [enrichment.campaignId],
+  );
+  const audienceByEmail = new Map(
+    audienceRows.map((row) => [String(row.email).toLowerCase(), row]),
+  );
+  const enrichedContacts = new Set();
+  const enrichedEntities = new Set();
+
+  for (const organization of enrichment.organizations) {
+    const matches = organization.emails
+      .map((email) => audienceByEmail.get(email.toLowerCase()))
+      .filter(Boolean);
+    if (!matches.length || !organization.locations.length) continue;
+
+    const primary =
+      organization.locations.find((location) => location.isPrimary) || organization.locations[0];
+    const contactLocation = locationLabel(primary);
+
+    for (const match of matches) {
+      if (!enrichedContacts.has(match.contact_id)) {
+        await connection.execute(
+          `UPDATE prospect_contacts
+              SET location = ?, location_source_url = ?, location_is_inferred = TRUE
+            WHERE id = ?`,
+          [contactLocation, primary.sourceUrl || null, match.contact_id],
+        );
+        enrichedContacts.add(match.contact_id);
+      }
+      if (match.client_contact_id) {
+        await connection.execute(
+          `UPDATE client_contacts
+              SET location = ?, location_source_url = ?, location_is_inferred = TRUE
+            WHERE id = ?`,
+          [contactLocation, primary.sourceUrl || null, match.client_contact_id],
+        );
+      }
+
+      const entities = [{ type: "prospect", id: match.prospect_id }];
+      if (match.client_id) entities.push({ type: "client", id: match.client_id });
+      for (const entity of entities) {
+        const entityKey = `${entity.type}:${entity.id}`;
+        if (enrichedEntities.has(entityKey)) continue;
+        if (organization.locations.some((location) => location.isPrimary)) {
+          await connection.execute(
+            `UPDATE organization_locations SET is_primary = FALSE
+              WHERE entity_type = ? AND entity_id = ?`,
+            [entity.type, entity.id],
+          );
+        }
+        for (const location of organization.locations) {
+          const [existingRows] = await connection.execute(
+            `SELECT id FROM organization_locations
+              WHERE entity_type = ? AND entity_id = ? AND BINARY name = BINARY ? LIMIT 1`,
+            [entity.type, entity.id, location.name],
+          );
+          const values = [
+            location.name,
+            location.addressLine || null,
+            location.city || null,
+            location.region || null,
+            location.country || null,
+            Boolean(location.isPrimary),
+            location.sourceUrl || null,
+          ];
+          if (existingRows.length) {
+            await connection.execute(
+              `UPDATE organization_locations
+                  SET name = ?, address_line = ?, city = ?, region = ?, country = ?,
+                      is_primary = ?, source_url = ?
+                WHERE id = ?`,
+              [...values, existingRows[0].id],
+            );
+          } else {
+            await connection.execute(
+              `INSERT INTO organization_locations
+                (id, entity_type, entity_id, name, address_line, city, region, country,
+                 is_primary, source_url)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [randomUUID(), entity.type, entity.id, ...values],
+            );
+          }
+        }
+        if (entity.type === "prospect") {
+          await connection.execute(
+            `UPDATE prospects SET address = ?, city = ?, country = ? WHERE id = ?`,
+            [contactLocation, primary.city || null, primary.country || null, entity.id],
+          );
+        } else {
+          await connection.execute("UPDATE clients SET address = ? WHERE id = ?", [
+            contactLocation,
+            entity.id,
+          ]);
+        }
+        enrichedEntities.add(entityKey);
+      }
+    }
+  }
+
+  console.log(
+    `Campaign location enrichment ready: ${enrichedEntities.size} organization records, ${enrichedContacts.size} contact people`,
+  );
+}
+
 try {
   const schema = readFileSync(resolve("database/schema.sql"), "utf8");
   for (const statement of schema
@@ -92,7 +222,14 @@ try {
     }
     await connection.query(statement);
   }
-  console.log(`MySQL schema ready: ${database}`);
+  await enrichCampaignLocations();
+  const checksum = createHash("sha256").update(schema).digest("hex");
+  await connection.execute(
+    `INSERT IGNORE INTO schema_migrations (id, checksum)
+     VALUES (?, ?)`,
+    [`core-${checksum.slice(0, 16)}`, checksum],
+  );
+  console.log("MySQL schema migration completed.");
 } finally {
   await connection.end();
 }

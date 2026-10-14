@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { MapPin, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, money } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/lib/db";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { OrganizationLocations } from "@/components/OrganizationLocations";
 import { normalizePhone } from "@/lib/contact-normalization";
 
 export const Route = createFileRoute("/clients/$id")({ component: ClientDetail });
@@ -23,7 +25,19 @@ function ClientDetail() {
     email: "",
     phone: "",
     job_title: "",
+    location: "",
+    location_source_url: "",
   });
+  const [editingContact, setEditingContact] = useState<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    job_title: string;
+    location: string;
+    location_source_url: string;
+  } | null>(null);
   const { data: client } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
@@ -110,13 +124,51 @@ function ClientDetail() {
         phone: normalizedPhone || null,
         raw_phone: contact.phone.trim() || null,
         job_title: contact.job_title.trim() || null,
+        location: contact.location.trim() || null,
+        location_source_url: contact.location_source_url.trim() || null,
+        location_is_inferred: false,
         is_primary: contacts.length === 0,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      setContact({ first_name: "", last_name: "", email: "", phone: "", job_title: "" });
+      setContact({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        job_title: "",
+        location: "",
+        location_source_url: "",
+      });
       toast.success("Contact person added.");
+      void qc.invalidateQueries({ queryKey: ["client-contacts", id] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const updateContact = useMutation({
+    mutationFn: async () => {
+      if (!editingContact) return;
+      const { error } = await db
+        .from("client_contacts")
+        .update({
+          first_name: editingContact.first_name.trim() || null,
+          last_name: editingContact.last_name.trim() || null,
+          email: editingContact.email.trim().toLowerCase() || null,
+          phone: normalizePhone(editingContact.phone) || null,
+          raw_phone: editingContact.phone.trim() || null,
+          job_title: editingContact.job_title.trim() || null,
+          location: editingContact.location.trim() || null,
+          location_source_url: editingContact.location_source_url.trim() || null,
+          location_is_inferred: false,
+        })
+        .eq("id", editingContact.id)
+        .eq("client_id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingContact(null);
+      toast.success("Contact details updated.");
       void qc.invalidateQueries({ queryKey: ["client-contacts", id] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -154,6 +206,11 @@ function ClientDetail() {
               <p>{client?.phone || "No phone"}</p>
               <p>{client?.website || "No website"}</p>
               <p className="text-muted-foreground">{client?.address || "No address"}</p>
+              {client ? (
+                <div className="mt-5 border-t pt-5">
+                  <OrganizationLocations entityType="client" entityId={id} />
+                </div>
+              ) : null}
             </CardContent>
           </Card>
           <Card>
@@ -195,6 +252,23 @@ function ClientDetail() {
                     setContact((old) => ({ ...old, job_title: event.target.value }))
                   }
                 />
+                <Input
+                  className="sm:col-span-2"
+                  placeholder="Contact person's professional location"
+                  value={contact.location}
+                  onChange={(event) =>
+                    setContact((old) => ({ ...old, location: event.target.value }))
+                  }
+                />
+                <Input
+                  className="sm:col-span-2"
+                  type="url"
+                  placeholder="Location verification source URL (optional)"
+                  value={contact.location_source_url}
+                  onChange={(event) =>
+                    setContact((old) => ({ ...old, location_source_url: event.target.value }))
+                  }
+                />
               </div>
               <Button
                 variant="outline"
@@ -204,35 +278,103 @@ function ClientDetail() {
                 Add contact person
               </Button>
               <div className="space-y-2">
-                {contacts.map((person) => (
-                  <div
-                    key={person.id}
-                    className="flex items-start justify-between gap-3 rounded-xl border p-3 text-sm"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-medium">
-                        {[person.first_name, person.last_name].filter(Boolean).join(" ") ||
-                          person.email ||
-                          "Unnamed contact"}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {[person.job_title, person.email, person.phone || person.raw_phone]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <ConfirmAction
-                      title="Delete contact person?"
-                      description="This removes the contact from this client."
-                      onConfirm={() => removeContact(person.id)}
-                      trigger={
-                        <Button size="sm" variant="ghost">
-                          Delete
+                {contacts.map((person) =>
+                  editingContact?.id === person.id ? (
+                    <div key={person.id} className="rounded-xl border p-3">
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {(
+                          [
+                            "first_name",
+                            "last_name",
+                            "email",
+                            "phone",
+                            "job_title",
+                            "location",
+                            "location_source_url",
+                          ] as const
+                        ).map((key) => (
+                          <Input
+                            key={key}
+                            className={key === "location_source_url" ? "sm:col-span-2" : undefined}
+                            placeholder={key.replaceAll("_", " ")}
+                            value={editingContact[key]}
+                            onChange={(event) =>
+                              setEditingContact((current) =>
+                                current ? { ...current, [key]: event.target.value } : current,
+                              )
+                            }
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={updateContact.isPending}
+                          onClick={() => updateContact.mutate()}
+                        >
+                          {updateContact.isPending ? "Saving…" : "Save contact"}
                         </Button>
-                      }
-                    />
-                  </div>
-                ))}
+                        <Button size="sm" variant="ghost" onClick={() => setEditingContact(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      key={person.id}
+                      className="flex items-start justify-between gap-3 rounded-xl border p-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium">
+                          {[person.first_name, person.last_name].filter(Boolean).join(" ") ||
+                            person.email ||
+                            "Unnamed contact"}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {[person.job_title, person.email, person.phone || person.raw_phone]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                          <MapPin className="size-3 shrink-0" />
+                          {person.location || "Location not supplied"}
+                          {person.location_is_inferred ? " · based on company location" : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          aria-label="Edit contact"
+                          onClick={() =>
+                            setEditingContact({
+                              id: person.id,
+                              first_name: person.first_name || "",
+                              last_name: person.last_name || "",
+                              email: person.email || "",
+                              phone: person.phone || person.raw_phone || "",
+                              job_title: person.job_title || "",
+                              location: person.location || "",
+                              location_source_url: person.location_source_url || "",
+                            })
+                          }
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <ConfirmAction
+                          title="Delete contact person?"
+                          description="This removes the contact from this client."
+                          onConfirm={() => removeContact(person.id)}
+                          trigger={
+                            <Button size="icon" variant="ghost" aria-label="Delete contact">
+                              <Trash2 className="size-4" />
+                            </Button>
+                          }
+                        />
+                      </div>
+                    </div>
+                  ),
+                )}
                 {!contacts.length ? (
                   <p className="text-sm text-muted-foreground">No contact people yet.</p>
                 ) : null}

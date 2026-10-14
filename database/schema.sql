@@ -1,3 +1,9 @@
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  id VARCHAR(191) PRIMARY KEY,
+  checksum CHAR(64) NOT NULL,
+  applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS prospects (
   id CHAR(36) PRIMARY KEY, email VARCHAR(320) NOT NULL, first_name VARCHAR(255), last_name VARCHAR(255),
   company VARCHAR(255), job_title VARCHAR(255), phone VARCHAR(100), status VARCHAR(40) NOT NULL DEFAULT 'new',
@@ -212,6 +218,25 @@ CREATE TABLE IF NOT EXISTS cost_sheet_items (
   CONSTRAINT cost_sheet_items_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE cost_sheet_items ADD COLUMN IF NOT EXISTS custom_values LONGTEXT NULL;
+ALTER TABLE cost_sheet_items ADD COLUMN IF NOT EXISTS attachments LONGTEXT NULL;
+
+CREATE TABLE IF NOT EXISTS cost_sheet_columns (
+  id CHAR(36) PRIMARY KEY,
+  cost_sheet_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL,
+  column_key VARCHAR(80) NOT NULL,
+  data_type VARCHAR(20) NOT NULL DEFAULT 'text',
+  default_value VARCHAR(255) NULL,
+  formula_expression TEXT NULL,
+  display_order INT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY cost_sheet_columns_key (cost_sheet_id, column_key),
+  KEY cost_sheet_columns_sheet (cost_sheet_id, display_order),
+  CONSTRAINT cost_sheet_columns_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS jobs (
   id CHAR(36) PRIMARY KEY, title VARCHAR(255) NOT NULL, client_id CHAR(36), project_id CHAR(36),
   job_type VARCHAR(60) NOT NULL DEFAULT 'once-off', assignee VARCHAR(255),
@@ -235,6 +260,38 @@ CREATE TABLE IF NOT EXISTS suppliers (
   id CHAR(36) PRIMARY KEY, name VARCHAR(255) NOT NULL, contact_name VARCHAR(255), email VARCHAR(320),
   phone VARCHAR(100), category VARCHAR(120), notes TEXT,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS supplier_quotes (
+  id CHAR(36) PRIMARY KEY,
+  supplier_id CHAR(36) NULL,
+  source_name VARCHAR(255) NOT NULL,
+  quote_reference VARCHAR(120) NULL,
+  quote_date DATE NULL,
+  valid_until DATE NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'MWK',
+  amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+  notes TEXT NULL,
+  attachment_path VARCHAR(1000) NULL,
+  attachment_name VARCHAR(500) NULL,
+  attachment_type VARCHAR(255) NULL,
+  attachment_size INT UNSIGNED NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY supplier_quotes_supplier_idx (supplier_id, quote_date),
+  CONSTRAINT supplier_quotes_supplier_fk FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS cost_sheet_supplier_quotes (
+  cost_sheet_id CHAR(36) NOT NULL,
+  supplier_quote_id CHAR(36) NOT NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (cost_sheet_id, supplier_quote_id),
+  KEY cost_sheet_supplier_quotes_quote_idx (supplier_quote_id),
+  CONSTRAINT cost_sheet_supplier_quotes_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE,
+  CONSTRAINT cost_sheet_supplier_quotes_quote_fk FOREIGN KEY (supplier_quote_id) REFERENCES supplier_quotes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -262,6 +319,22 @@ CREATE TABLE IF NOT EXISTS prequalifications (
   submitted_date DATE, valid_until DATE, outcome VARCHAR(120), notes TEXT,
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS title VARCHAR(255) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS client_id CHAR(36) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS due_date DATE NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS value DECIMAL(15,2) NOT NULL DEFAULT 0;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS currency VARCHAR(10) NOT NULL DEFAULT 'MWK';
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS response_channel VARCHAR(30) NOT NULL DEFAULT 'email';
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_cc LONGTEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS delivery_location TEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS portal_url VARCHAR(1000) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS portal_username VARCHAR(320) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
 
 CREATE TABLE IF NOT EXISTS requests (
   id CHAR(36) PRIMARY KEY, reference VARCHAR(80), title VARCHAR(255) NOT NULL, issuer VARCHAR(255),
@@ -335,6 +408,14 @@ CREATE TABLE IF NOT EXISTS opportunity_comments (
   id CHAR(36) PRIMARY KEY, opportunity_type VARCHAR(20) NOT NULL, opportunity_id CHAR(36) NOT NULL,
   body TEXT NOT NULL, author_id CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY opportunity_comments_parent_idx (opportunity_type, opportunity_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS opportunity_comment_mentions (
+  comment_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (comment_id, user_id),
+  KEY opportunity_comment_mentions_user (user_id, created_at),
+  CONSTRAINT opportunity_comment_mentions_comment_fk FOREIGN KEY (comment_id) REFERENCES opportunity_comments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS opportunity_submissions (
@@ -537,6 +618,9 @@ CREATE TABLE IF NOT EXISTS prospect_contacts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
 ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location VARCHAR(500) NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location_source_url VARCHAR(1000) NULL;
+ALTER TABLE prospect_contacts ADD COLUMN IF NOT EXISTS location_is_inferred BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_path VARCHAR(500) NULL;
 
@@ -552,6 +636,46 @@ CREATE TABLE IF NOT EXISTS client_contacts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS raw_phone VARCHAR(120) NULL;
 ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS avatar_url LONGTEXT NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location VARCHAR(500) NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location_source_url VARCHAR(1000) NULL;
+ALTER TABLE client_contacts ADD COLUMN IF NOT EXISTS location_is_inferred BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS organization_locations (
+  id CHAR(36) PRIMARY KEY,
+  entity_type VARCHAR(20) NOT NULL,
+  entity_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL DEFAULT 'Main office',
+  address_line TEXT,
+  city VARCHAR(160),
+  region VARCHAR(160),
+  country VARCHAR(160),
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  source_url VARCHAR(1000),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY organization_locations_entity (entity_type, entity_id),
+  KEY organization_locations_primary (entity_type, entity_id, is_primary)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO organization_locations
+  (id, entity_type, entity_id, name, address_line, city, country, is_primary)
+SELECT UUID(), 'prospect', p.id, 'Main office', p.address, p.city, p.country, TRUE
+  FROM prospects p
+ WHERE (NULLIF(TRIM(p.address), '') IS NOT NULL OR NULLIF(TRIM(p.city), '') IS NOT NULL OR NULLIF(TRIM(p.country), '') IS NOT NULL)
+   AND NOT EXISTS (
+     SELECT 1 FROM organization_locations l
+      WHERE l.entity_type = 'prospect' AND l.entity_id = p.id
+   );
+
+INSERT INTO organization_locations
+  (id, entity_type, entity_id, name, address_line, is_primary)
+SELECT UUID(), 'client', c.id, 'Main office', c.address, TRUE
+  FROM clients c
+ WHERE NULLIF(TRIM(c.address), '') IS NOT NULL
+   AND NOT EXISTS (
+     SELECT 1 FROM organization_locations l
+      WHERE l.entity_type = 'client' AND l.entity_id = c.id
+   );
 
 CREATE TABLE IF NOT EXISTS prospect_interactions (
   id CHAR(36) PRIMARY KEY, prospect_id CHAR(36) NOT NULL,

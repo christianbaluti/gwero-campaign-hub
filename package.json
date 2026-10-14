@@ -7,7 +7,8 @@
     "dev": "vite dev",
     "build": "npm run db:migrate && vite build",
     "deploy:build": "npm run build",
-    "db:migrate": "node scripts/migrate.mjs",
+    "db:migrate": "node scripts/migrate.mjs && node scripts/security-migrate.mjs",
+    "db:verify": "node scripts/verify-migrations.mjs",
     "contacts:import": "node --experimental-strip-types scripts/import-contacts.mjs",
     "contacts:logos": "node scripts/enrich-prospect-logos.mjs",
     "prospects:categorize": "node scripts/categorize-prospects.mjs",
@@ -16,13 +17,21 @@
     "start": "node dist/server/index.mjs",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
+    "security:audit": "npm audit --audit-level=high",
+    "repository:check": "node scripts/check-repository.mjs",
+    "format": "prettier --write src scripts tests .github package.json vite.config.ts",
+    "format:check": "prettier --check src scripts tests .github package.json vite.config.ts"
   },
   "engines": {
     "node": "22.x"
   },
   "overrides": {
-    "rolldown": "1.2.1"
+    "rolldown": "1.2.1",
+    "source-map-js": "^1.2.2",
+    "brace-expansion@^1.0.0": "^1.1.21",
+    "brace-expansion@^5.0.0": "^5.0.12"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -78,7 +87,7 @@
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
     "vaul": "^1.1.2",
-    "xlsx": "0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.25.76"
   },
   "devDependencies": {

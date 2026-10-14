@@ -1,3 +1,4 @@
+import { requireUser } from "./auth.server";
 import { randomBytes } from "node:crypto";
 
 export type OAuthProvider = "google" | "microsoft";
@@ -37,6 +38,7 @@ async function env(provider: OAuthProvider) {
   return { ...item, clientId, clientSecret };
 }
 export async function beginMailOAuth(provider: OAuthProvider, request: Request) {
+  await requireUser("settings.manage");
   const item = await env(provider);
   const origin = new URL(request.url).origin;
   const state = randomBytes(24).toString("hex");
@@ -58,6 +60,7 @@ export async function beginMailOAuth(provider: OAuthProvider, request: Request) 
   });
 }
 export async function finishMailOAuth(provider: OAuthProvider, request: Request) {
+  await requireUser("settings.manage");
   const item = await env(provider);
   const url = new URL(request.url);
   const origin = url.origin;
