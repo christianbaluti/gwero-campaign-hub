@@ -2,6 +2,8 @@ name: CI
 
 on:
   pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -15,8 +17,9 @@ concurrency:
 
 jobs:
   verify:
+    name: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       mysql:
         image: mysql:8.4
@@ -30,29 +33,49 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: ci-test-password
+      DB_NAME: gwero_ci
+      RELEASE_COMMIT_SHA: ${{ github.sha }}
+
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Reject secrets and deployment artifacts
+        run: npm run repository:check
+
+      - name: Check formatting
+        run: npm run format:check
 
       - name: Lint
         run: npm run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
-      - name: Verify migration and production build
+      - name: Run unit and security tests
+        run: npm test
+
+      - name: Audit production dependencies
+        run: npm run security:audit -- --omit=dev
+
+      - name: Apply migrations twice to prove idempotence
+        run: npm run db:migrate && npm run db:migrate && npm run db:verify
+
+      - name: Build production application
         run: npm run deploy:build
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: root
-          DB_PASSWORD: ci-test-password

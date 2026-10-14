@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 
 export type VendorAttachment = {
   path: string;
@@ -48,7 +48,7 @@ function validEmail(value: string) {
 }
 
 export const getVendorWorkspace = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("procurement.manage")])
   .handler(async () => {
     const { getPool } = await import("./db.server");
     const db = getPool();
@@ -70,7 +70,7 @@ export const getVendorWorkspace = createServerFn({ method: "GET" })
   });
 
 export const saveVendor = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("procurement.manage")])
   .validator((data: VendorInput) => data)
   .handler(async ({ data }) => {
     if (!data.name.trim()) throw new Error("Add the vendor name.");
@@ -96,7 +96,7 @@ export const saveVendor = createServerFn({ method: "POST" })
   });
 
 export const deleteVendor = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("procurement.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");
@@ -105,7 +105,7 @@ export const deleteVendor = createServerFn({ method: "POST" })
   });
 
 export const saveVendorQuote = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("procurement.manage")])
   .validator((data: QuoteInput) => data)
   .handler(async ({ data, context }) => {
     if (!Number.isFinite(data.amount) || data.amount < 0)
@@ -159,7 +159,7 @@ export const saveVendorQuote = createServerFn({ method: "POST" })
   });
 
 export const deleteVendorQuote = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("procurement.manage")])
   .validator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");

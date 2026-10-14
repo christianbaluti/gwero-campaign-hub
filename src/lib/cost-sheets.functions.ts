@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
-import { authMiddleware } from "./auth.middleware";
+import { permissionMiddleware } from "./auth.middleware";
 import { columnKey, formulaIdentifiers } from "./cost-sheet-formula";
 
 export type CostSheetAttachment = {
@@ -157,7 +157,7 @@ function validateFormulaGraph(columns: CostSheetColumn[]) {
 }
 
 export const getCostSheetWorkspace = createServerFn({ method: "GET" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string }) => data)
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");
@@ -207,7 +207,7 @@ export const getCostSheetWorkspace = createServerFn({ method: "GET" })
   });
 
 export const setCostSheetSourceQuote = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string; quoteId: string; linked: boolean }) => data)
   .handler(async ({ data, context }) => {
     const { getPool } = await import("./db.server");
@@ -232,7 +232,7 @@ export const setCostSheetSourceQuote = createServerFn({ method: "POST" })
   });
 
 export const saveCostSheetItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: ItemInput) => data)
   .handler(async ({ data }) => {
     if (!data.description.trim()) throw new Error("Add an item description.");
@@ -291,7 +291,7 @@ export const saveCostSheetItem = createServerFn({ method: "POST" })
   });
 
 export const deleteCostSheetItem = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string; itemId: string }) => data)
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");
@@ -304,7 +304,7 @@ export const deleteCostSheetItem = createServerFn({ method: "POST" })
   });
 
 export const saveCostSheetColumn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator(
     (data: {
       costSheetId: string;
@@ -391,7 +391,7 @@ export const saveCostSheetColumn = createServerFn({ method: "POST" })
   });
 
 export const deleteCostSheetColumn = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string; columnId: string }) => data)
   .handler(async ({ data }) => {
     const { getPool } = await import("./db.server");
@@ -438,7 +438,7 @@ export const deleteCostSheetColumn = createServerFn({ method: "POST" })
   });
 
 export const updateCostSheet = createServerFn({ method: "POST" })
-  .middleware([authMiddleware])
+  .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string; name: string; status: string; notes: string }) => data)
   .handler(async ({ data }) => {
     if (!data.name.trim()) throw new Error("Add a cost sheet name.");

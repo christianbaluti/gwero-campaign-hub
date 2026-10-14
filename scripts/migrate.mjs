@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import mysql from "mysql2/promise";
@@ -223,7 +223,13 @@ try {
     await connection.query(statement);
   }
   await enrichCampaignLocations();
-  console.log(`MySQL schema ready: ${database}`);
+  const checksum = createHash("sha256").update(schema).digest("hex");
+  await connection.execute(
+    `INSERT IGNORE INTO schema_migrations (id, checksum)
+     VALUES (?, ?)`,
+    [`core-${checksum.slice(0, 16)}`, checksum],
+  );
+  console.log("MySQL schema migration completed.");
 } finally {
   await connection.end();
 }

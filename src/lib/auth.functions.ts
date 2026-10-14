@@ -23,7 +23,13 @@ export const getAuthStatus = createServerFn({ method: "GET" }).handler(async () 
 export const login = createServerFn({ method: "POST" })
   .validator((data: { email: string; password: string }) => data)
   .handler(async ({ data }) => {
-    if (typeof data?.email !== "string" || typeof data?.password !== "string" || data.email.length > 254 || data.password.length > 200) throw new Error("Invalid email or password.");
+    if (
+      typeof data?.email !== "string" ||
+      typeof data?.password !== "string" ||
+      data.email.length > 254 ||
+      data.password.length > 200
+    )
+      throw new Error("Invalid email or password.");
     await consumeLoginAttempt(data.email);
     const { getPool } = await import("./db.server");
     const [rows] = await getPool().execute(

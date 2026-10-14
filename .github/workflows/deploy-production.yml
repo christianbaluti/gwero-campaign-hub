@@ -1,0 +1,59 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gwero-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'owenk-bonhoga/gwero-campaign-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://os.gwerosolutions.com
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install verification dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Trigger the Hostinger deployment
+        env:
+          HOSTINGER_DEPLOY_WEBHOOK: ${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}
+        run: >-
+          test -n "$HOSTINGER_DEPLOY_WEBHOOK" &&
+          curl --fail --silent --show-error --retry 3
+          --output /dev/null "$HOSTINGER_DEPLOY_WEBHOOK"
+
+      - name: Verify the exact commit is live
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_URL: https://os.gwerosolutions.com
+        run: node scripts/verify-production.mjs
