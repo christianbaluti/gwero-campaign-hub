@@ -770,7 +770,8 @@ export function StickyNotes() {
                           );
                         } else if (event.key === "Enter" || event.key === "Tab") {
                           event.preventDefault();
-                          chooseMention(mentionSuggestions[mentionIndex] || mentionSuggestions[0]);
+                          const suggestion = mentionSuggestions[mentionIndex] || mentionSuggestions[0];
+                          if (suggestion) chooseMention(suggestion);
                         } else if (event.key === "Escape") {
                           event.preventDefault();
                           setMentionTrigger(null);
