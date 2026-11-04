@@ -1,58 +1,53 @@
 # Gwero OS production delivery
 
-## Repository roles
+## Canonical repository
 
-- `origin`: `https://github.com/owenk-bonhoga/gwero-campaign-hub.git` — reviewed production repository.
-- `upstream`: `https://github.com/christianbaluti/gwero-campaign-hub.git` — source repository only.
-- Production branch: `origin/main`.
-- Hostinger must watch only `owenk-bonhoga/gwero-campaign-hub`, branch `main`.
+`https://github.com/owenk-bonhoga/gwero-campaign-hub` is the shared production repository.
+Owen and Christian should make new changes on branches in this repository and open pull requests
+into `main`. The Christian repository is retained for historical work; changes pushed there are
+not automatically copied into this repository.
 
-## Production gate
+Hostinger must watch `owenk-bonhoga/gwero-campaign-hub`, branch `main`. Reconnecting and verifying
+that integration is a separate hosting task; passing repository CI does not establish a live deployment.
 
-Before the first pull request is merged, explicitly enable GitHub Actions in the Owen fork. GitHub
-does not automatically enable inherited workflows in a newly created fork, and repository secrets
-are never inherited from the upstream repository.
+## Contribution and verification
 
-1. Changes enter Owen `main` only through a pull request.
-2. The `CI / verify` check and one approving review are required before merge.
-3. The production workflow runs only when the `CI` workflow succeeds for Owen `main`.
-4. The production workflow calls the Hostinger deployment webhook stored as the
-   `HOSTINGER_DEPLOY_WEBHOOK` GitHub Actions secret. The secret must never be committed or logged.
-5. Hostinger installs from the lockfile, runs `npm run build`, and starts with `npm start`.
-6. `npm run build` applies the checked-in, idempotent MySQL schema and security migrations before
-   building. The scripts never drop, truncate, recreate, or seed the production database.
-7. The workflow waits until `https://os.gwerosolutions.com` returns HTTP 200 and the exact merged
-   SHA in `X-Release-Commit`.
+1. Branch from the latest `main`, make regular commits, and open a pull request into `main`.
+2. The protected branch requires an up-to-date `verify` check. CI checks repository safety,
+   formatting, lint, types, tests, production dependency vulnerabilities, repeatable MySQL
+   migrations, and the production build.
+3. The existing trusted-source automation merges the exact verified pull request. It explicitly
+   dispatches CI on `main`, because merges made with `GITHUB_TOKEN` do not trigger push workflows.
+   Manual merges trigger main CI through the normal push event.
+4. After main CI succeeds, `Deploy production` waits for Hostinger and verifies HTTP 200 and the
+   exact merged SHA in `X-Release-Commit`. This workflow verifies deployment; it does not call a
+   deployment webhook or reconnect Hostinger.
+5. Hostinger installs from `package-lock.json`, runs `npm run build`, and starts with `npm start`.
+   Production uses Node.js 22.
 
-Only one production deployment may run at once. The workflow deliberately does not cancel a running
-deployment when a newer one is queued.
-
-## Persistent data and rollback
-
-`ATTACHMENT_DIR` must point outside the application checkout so replacing application files does not
-remove uploads. Database and application environment variables remain in Hostinger and are not
-copied into GitHub.
-
-For code rollback, open a pull request that reverts the bad merge commit. Passing CI and merging the
-revert deploys a new, auditable commit. Hostinger's previous completed deployment remains available
-as the emergency application rollback, but database changes are forward-only and idempotent.
-
-## Synchronizing future upstream work
+Local checks:
 
 ```bash
-git fetch upstream --prune
-git fetch origin --prune
-git switch -c sync/upstream-YYYYMMDD origin/main
-git merge --no-ff upstream/main
 npm ci
+npm run repository:check
 npm run format:check
 npm run lint
 npm run typecheck
 npm test
-npm run repository:check
-npm run security:audit
-git push -u origin sync/upstream-YYYYMMDD
+npm run security:audit -- --omit=dev
 ```
 
-Review the diff and preserve Owen-only security and deployment files. Open a pull request into Owen
-`main`, wait for CI and approval, then merge. Never deploy the Christian repository directly.
+Use a separate test MySQL database for `npm run db:migrate`, `npm run db:verify`, and
+`npm run deploy:build`. CI provisions its own MySQL service. Never use production credentials
+for local verification or commit credentials, environment files, uploads, or database backups.
+
+## Persistent data and rollback
+
+Database and application environment variables remain in Hostinger. Attachments are stored in
+MySQL; include them in database backups. Keep any legacy attachment directory outside the checkout.
+The build applies checked-in, idempotent schema and security migrations before bundling.
+Migrations do not drop, truncate, recreate, or seed the production database.
+
+For code rollback, open a pull request reverting the bad merge, verify it, and merge it. Hostinger's
+previous completed deployment remains an emergency application rollback; database migrations
+are forward-only and idempotent. Do not rewrite published history or force-sync away production changes.
