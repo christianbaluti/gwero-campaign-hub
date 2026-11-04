@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 concurrency:
   group: gwero-production-merge
@@ -65,7 +66,15 @@ jobs:
             exit 1
           }
 
-          gh api --method PUT "/repos/${REPOSITORY}/pulls/${pr_number}/merge" \
+          merged="$(gh api --method PUT "/repos/${REPOSITORY}/pulls/${pr_number}/merge" \
             -f merge_method=merge \
             -f sha="$HEAD_SHA" \
-            --jq '.message'
+            --jq '.merged')"
+          [[ "$merged" == "true" ]] || {
+            echo "GitHub did not merge the verified pull request." >&2
+            exit 1
+          }
+
+          # GITHUB_TOKEN merges do not trigger push workflows. Explicit dispatch
+          # verifies the resulting main commit and starts deployment verification.
+          gh workflow run ci.yml --repo "$REPOSITORY" --ref main
