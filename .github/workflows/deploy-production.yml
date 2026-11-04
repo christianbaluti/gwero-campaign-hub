@@ -19,6 +19,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
+      vars.HOSTINGER_DEPLOYMENT_ENABLED == 'true' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main' &&
       github.event.workflow_run.head_repository.full_name == 'owenk-bonhoga/gwero-campaign-hub'

@@ -9,6 +9,8 @@ not automatically copied into this repository.
 
 Hostinger must watch `owenk-bonhoga/gwero-campaign-hub`, branch `main`. Reconnecting and verifying
 that integration is a separate hosting task; passing repository CI does not establish a live deployment.
+Deployment verification remains paused until the repository Actions variable
+`HOSTINGER_DEPLOYMENT_ENABLED` is set to `true` after the Hostinger connection is restored.
 
 ## Contribution and verification
 
