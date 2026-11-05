@@ -28,6 +28,7 @@ const requiredTables = [
 
 const requiredColumns = [
   ["attachment_files", "uploaded_by"],
+  ["cost_sheets", "column_rules"],
   ["cost_sheet_items", "attachments"],
   ["cost_sheet_items", "custom_values"],
   ["prospect_contacts", "location"],

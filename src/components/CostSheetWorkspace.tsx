@@ -42,6 +42,7 @@ import {
   deleteCostSheetItem,
   getCostSheetWorkspace,
   saveCostSheetColumn,
+  saveCostSheetColumnRules,
   saveCostSheetItem,
   setCostSheetSourceQuote,
   updateCostSheet,
@@ -51,10 +52,11 @@ import {
   type CostSheetSourceQuote,
 } from "@/lib/cost-sheets.functions";
 import {
+  calculateCostSheetRow,
   columnKey,
-  evaluateCostSheetFormula,
-  formulaIdentifiers,
-  type FormulaContext,
+  costSheetSystemColumnKeys,
+  normalizeCostSheetColumnRules,
+  type CostSheetSystemColumnRules,
 } from "@/lib/cost-sheet-formula";
 
 const categories = ["labour", "materials", "equipment", "logistics", "services", "other"];
@@ -65,6 +67,7 @@ type SheetRecord = {
   status: string;
   currency: string;
   notes: string | null;
+  column_rules: CostSheetSystemColumnRules;
   client_name: string | null;
   client_logo: string | null;
   updated_at: string;
@@ -88,14 +91,6 @@ type ColumnForm = {
   formulaExpression: string;
 };
 
-type RowCalculation = {
-  lineCost: number;
-  sellPrice: number;
-  grossProfit: number;
-  custom: Record<string, string | number>;
-  errors: Record<string, string>;
-};
-
 const emptyColumn: ColumnForm = {
   name: "",
   key: "",
@@ -111,13 +106,14 @@ function attachmentUrl(path: string) {
   return `/api/attachments/${encodeURIComponent(ownerId || "")}/${encodeURIComponent(fileId || "")}`;
 }
 
-function itemDefaults(columns: CostSheetColumn[]): ItemForm {
+function itemDefaults(columns: CostSheetColumn[], rulesInput?: unknown): ItemForm {
+  const rules = normalizeCostSheetColumnRules(rulesInput);
   return {
     category: "labour",
     description: "",
-    quantity: "1",
-    unitCost: "0",
-    markupPercent: "0",
+    quantity: String(rules.quantity.defaultValue),
+    unitCost: String(rules.unit_cost.defaultValue),
+    markupPercent: String(rules.markup_percent.defaultValue),
     customValues: Object.fromEntries(
       columns
         .filter((column) => column.data_type !== "formula")
@@ -132,65 +128,13 @@ function valueForColumn(item: CostSheetItem, column: CostSheetColumn) {
   return value === undefined || value === "" ? column.default_value || "" : value;
 }
 
-function calculateRow(item: CostSheetItem, columns: CostSheetColumn[]): RowCalculation {
-  const lineCost = Number(item.quantity || 0) * Number(item.unit_cost || 0);
-  const sellPrice = lineCost * (1 + Number(item.markup_percent || 0) / 100);
-  const context: FormulaContext = {
-    quantity: Number(item.quantity || 0),
-    unit_cost: Number(item.unit_cost || 0),
-    markup_percent: Number(item.markup_percent || 0),
-    line_cost: lineCost,
-    sell_price: sellPrice,
-    gross_profit: sellPrice - lineCost,
-  };
-  const custom: Record<string, string | number> = {};
-  const errors: Record<string, string> = {};
-  for (const column of columns) {
-    if (column.data_type === "text")
-      custom[column.column_key] = String(valueForColumn(item, column));
-    if (column.data_type === "number") {
-      const value = Number(valueForColumn(item, column) || 0);
-      custom[column.column_key] = Number.isFinite(value) ? value : 0;
-      context[column.column_key] = Number.isFinite(value) ? value : 0;
-    }
-  }
-  const formulas = new Map(
-    columns
-      .filter((column) => column.data_type === "formula")
-      .map((column) => [column.column_key, column]),
-  );
-  const evaluating = new Set<string>();
-  const evaluate = (key: string): number => {
-    if (key in context) return context[key]!;
-    if (evaluating.has(key)) throw new Error("Circular formula reference.");
-    const column = formulas.get(key);
-    if (!column) throw new Error(`Unknown column "${key}".`);
-    evaluating.add(key);
-    for (const identifier of formulaIdentifiers(column.formula_expression || ""))
-      if (formulas.has(identifier) && !(identifier in context))
-        context[identifier] = evaluate(identifier);
-    const result = evaluateCostSheetFormula(column.formula_expression || "", context);
-    evaluating.delete(key);
-    context[key] = result;
-    return result;
-  };
-  for (const [key] of formulas) {
-    try {
-      custom[key] = evaluate(key);
-    } catch (error) {
-      custom[key] = "#ERROR";
-      errors[key] = error instanceof Error ? error.message : "Formula error";
-    }
-  }
-  return { lineCost, sellPrice, grossProfit: sellPrice - lineCost, custom, errors };
-}
-
 export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const queryClient = useQueryClient();
   const loadWorkspace = useServerFn(getCostSheetWorkspace);
   const saveItem = useServerFn(saveCostSheetItem);
   const removeItem = useServerFn(deleteCostSheetItem);
   const saveColumn = useServerFn(saveCostSheetColumn);
+  const saveRules = useServerFn(saveCostSheetColumnRules);
   const removeColumn = useServerFn(deleteCostSheetColumn);
   const saveSheet = useServerFn(updateCostSheet);
   const setSourceQuote = useServerFn(setCostSheetSourceQuote);
@@ -202,11 +146,15 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const sheet = data?.sheet as SheetRecord | undefined;
   const columns = data?.columns || emptyColumns;
   const items = data?.items || emptyItems;
+  const rules = useMemo(
+    () => normalizeCostSheetColumnRules(sheet?.column_rules),
+    [sheet?.column_rules],
+  );
   const sourceQuotes = data?.sourceQuotes || [];
   const linkedQuotes = sourceQuotes.filter((quote) => Boolean(quote.is_linked));
   const calculations = useMemo(
-    () => new Map(items.map((item) => [item.id, calculateRow(item, columns)])),
-    [columns, items],
+    () => new Map(items.map((item) => [item.id, calculateCostSheetRow(item, columns, rules)])),
+    [columns, items, rules],
   );
   const totals = useMemo(() => {
     let cost = 0;
@@ -218,8 +166,11 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
     return {
       cost,
       sell,
-      profit: sell - cost,
-      margin: sell ? ((sell - cost) / sell) * 100 : 0,
+      profit: [...calculations.values()].reduce((sum, value) => sum + value.grossProfit, 0),
+      margin: sell
+        ? ([...calculations.values()].reduce((sum, value) => sum + value.grossProfit, 0) / sell) *
+          100
+        : 0,
     };
   }, [calculations]);
 
@@ -232,6 +183,10 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const [columnForm, setColumnForm] = useState<ColumnForm>(emptyColumn);
   const [preview, setPreview] = useState<CostSheetAttachment | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [rulesForm, setRulesForm] = useState<CostSheetSystemColumnRules>(() =>
+    normalizeCostSheetColumnRules(undefined),
+  );
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState("");
   const [sheetForm, setSheetForm] = useState({ name: "", status: "draft", notes: "" });
@@ -239,7 +194,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const refresh = () => queryClient.invalidateQueries({ queryKey });
   const openNewItem = () => {
     setEditingItem(null);
-    setItemForm(itemDefaults(columns));
+    setItemForm(itemDefaults(columns, rules));
     setPendingImages([]);
     setItemOpen(true);
   };
@@ -358,6 +313,15 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
     },
     onError: (mutationError: Error) => toast.error(mutationError.message),
   });
+  const rulesMutation = useMutation({
+    mutationFn: () => saveRules({ data: { costSheetId, rules: rulesForm } }),
+    onSuccess: async () => {
+      toast.success("Default column rules updated.");
+      setRulesOpen(false);
+      await refresh();
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  });
   const quoteMutation = useMutation({
     mutationFn: (payload: { quoteId: string; linked: boolean }) =>
       setSourceQuote({ data: { costSheetId, ...payload } }),
@@ -430,6 +394,15 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
             <Button variant="outline" onClick={openNewColumn}>
               <Plus className="mr-2 size-4" /> Custom column
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRulesForm(rules);
+                setRulesOpen(true);
+              }}
+            >
+              <Sigma className="mr-2 size-4" /> Column rules
+            </Button>
             <Button onClick={openNewItem}>
               <Plus className="mr-2 size-4" /> Add item
             </Button>
@@ -438,9 +411,17 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Total cost" value={money(totals.cost, currency)} icon={Calculator} />
-        <Metric label="Selling value" value={money(totals.sell, currency)} icon={Sigma} />
-        <Metric label="Gross profit" value={money(totals.profit, currency)} icon={Calculator} />
+        <Metric
+          label={rules.line_cost.label}
+          value={money(totals.cost, currency)}
+          icon={Calculator}
+        />
+        <Metric label={rules.sell_price.label} value={money(totals.sell, currency)} icon={Sigma} />
+        <Metric
+          label={rules.gross_profit.label}
+          value={money(totals.profit, currency)}
+          icon={Calculator}
+        />
         <Metric label="Margin" value={`${totals.margin.toFixed(1)}%`} icon={Sigma} />
       </section>
 
@@ -511,11 +492,15 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                     Item
                   </th>
                   <th className="min-w-32 border-b px-3 py-3 font-semibold">Category</th>
-                  <th className="min-w-24 border-b px-3 py-3 text-right font-semibold">Qty</th>
-                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    Unit cost
+                  <th className="min-w-24 border-b px-3 py-3 text-right font-semibold">
+                    {rules.quantity.label}
                   </th>
-                  <th className="min-w-28 border-b px-3 py-3 text-right font-semibold">Markup</th>
+                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                    {rules.unit_cost.label}
+                  </th>
+                  <th className="min-w-28 border-b px-3 py-3 text-right font-semibold">
+                    {rules.markup_percent.label}
+                  </th>
                   {columns.map((column) => (
                     <th
                       key={column.id}
@@ -558,10 +543,13 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                     </th>
                   ))}
                   <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    Line cost
+                    {rules.line_cost.label}
                   </th>
                   <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    Sell price
+                    {rules.sell_price.label}
+                  </th>
+                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                    {rules.gross_profit.label}
                   </th>
                   <th className="min-w-36 border-b px-3 py-3 font-semibold">Images</th>
                   <th className="w-24 border-b px-3 py-3 text-right font-semibold">Actions</th>
@@ -614,10 +602,40 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                         );
                       })}
                       <td className="px-3 py-4 text-right font-medium tabular-nums">
-                        {money(calculation.lineCost, currency)}
+                        {calculation.errors["line_cost"] ? (
+                          <span
+                            className="text-destructive"
+                            title={calculation.errors["line_cost"]}
+                          >
+                            #ERROR
+                          </span>
+                        ) : (
+                          money(calculation.lineCost, currency)
+                        )}
                       </td>
                       <td className="px-3 py-4 text-right font-semibold tabular-nums text-primary">
-                        {money(calculation.sellPrice, currency)}
+                        {calculation.errors["sell_price"] ? (
+                          <span
+                            className="text-destructive"
+                            title={calculation.errors["sell_price"]}
+                          >
+                            #ERROR
+                          </span>
+                        ) : (
+                          money(calculation.sellPrice, currency)
+                        )}
+                      </td>
+                      <td className="px-3 py-4 text-right font-medium tabular-nums">
+                        {calculation.errors["gross_profit"] ? (
+                          <span
+                            className="text-destructive"
+                            title={calculation.errors["gross_profit"]}
+                          >
+                            #ERROR
+                          </span>
+                        ) : (
+                          money(calculation.grossProfit, currency)
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex min-h-10 items-center -space-x-2">
@@ -677,7 +695,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                 })}
                 {!items.length ? (
                   <tr>
-                    <td colSpan={10 + columns.length} className="px-6 py-16 text-center">
+                    <td colSpan={11 + columns.length} className="px-6 py-16 text-center">
                       <FileImage className="mx-auto mb-3 size-9 text-muted-foreground/60" />
                       <p className="font-medium">No cost items yet</p>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -712,6 +730,9 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                     <td className="px-3 py-4 text-right tabular-nums text-primary">
                       {money(totals.sell, currency)}
                     </td>
+                    <td className="px-3 py-4 text-right tabular-nums">
+                      {money(totals.profit, currency)}
+                    </td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>
@@ -739,6 +760,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         form={itemForm}
         setForm={setItemForm}
         columns={columns}
+        rules={rules}
         pendingImages={pendingImages}
         setPendingImages={setPendingImages}
         saving={itemMutation.isPending}
@@ -753,6 +775,15 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         columns={columns}
         saving={columnMutation.isPending}
         onSave={() => columnMutation.mutate()}
+      />
+      <ColumnRulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        rules={rulesForm}
+        setRules={setRulesForm}
+        columns={columns}
+        saving={rulesMutation.isPending}
+        onSave={() => rulesMutation.mutate()}
       />
       <SheetDialog
         open={settingsOpen}
@@ -914,6 +945,7 @@ function ItemDialog({
   form,
   setForm,
   columns,
+  rules,
   pendingImages,
   setPendingImages,
   saving,
@@ -925,6 +957,7 @@ function ItemDialog({
   form: ItemForm;
   setForm: React.Dispatch<React.SetStateAction<ItemForm>>;
   columns: CostSheetColumn[];
+  rules: CostSheetSystemColumnRules;
   pendingImages: File[];
   setPendingImages: React.Dispatch<React.SetStateAction<File[]>>;
   saving: boolean;
@@ -965,7 +998,7 @@ function ItemDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Quantity">
+          <Field label={rules.quantity.label}>
             <Input
               type="number"
               min="0"
@@ -976,7 +1009,7 @@ function ItemDialog({
               }
             />
           </Field>
-          <Field label="Unit cost">
+          <Field label={rules.unit_cost.label}>
             <Input
               type="number"
               min="0"
@@ -987,7 +1020,7 @@ function ItemDialog({
               }
             />
           </Field>
-          <Field label="Markup percentage">
+          <Field label={rules.markup_percent.label}>
             <Input
               type="number"
               step="any"
@@ -1140,7 +1173,9 @@ function ColumnDialog({
     "sell_price",
     "gross_profit",
     ...columns
-      .filter((column) => !editing || column.column_key !== form.key)
+      .filter(
+        (column) => column.data_type !== "text" && (!editing || column.column_key !== form.key),
+      )
       .map((column) => column.column_key),
   ];
   return (
@@ -1250,6 +1285,143 @@ function ColumnDialog({
           </Button>
           <Button disabled={saving} onClick={onSave}>
             {saving ? "Saving…" : editing ? "Save column" : "Add column"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ColumnRulesDialog({
+  open,
+  onOpenChange,
+  rules,
+  setRules,
+  columns,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  rules: CostSheetSystemColumnRules;
+  setRules: React.Dispatch<React.SetStateAction<CostSheetSystemColumnRules>>;
+  columns: CostSheetColumn[];
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const inputKeys = ["quantity", "unit_cost", "markup_percent"] as const;
+  const formulaKeys = ["line_cost", "sell_price", "gross_profit"] as const;
+  const references = [
+    ...costSheetSystemColumnKeys,
+    ...columns.filter((column) => column.data_type !== "text").map((column) => column.column_key),
+  ];
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Configure default columns</DialogTitle>
+          <DialogDescription>
+            Rename built-in columns, set new-row defaults, and control how calculated values are
+            produced for this cost sheet.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-semibold">Input columns</h3>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {inputKeys.map((key) => (
+                <div key={key} className="rounded-xl border p-4">
+                  <p className="mb-3 font-mono text-xs text-muted-foreground">{key}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Label">
+                      <Input
+                        value={rules[key].label}
+                        onChange={(event) =>
+                          setRules((current) => ({
+                            ...current,
+                            [key]: { ...current[key], label: event.target.value },
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="New-row default">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={rules[key].defaultValue ?? 0}
+                        onChange={(event) =>
+                          setRules((current) => ({
+                            ...current,
+                            [key]: { ...current[key], defaultValue: Number(event.target.value) },
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Calculated columns</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Example: add a numeric custom column named Delivery Fee, then use
+              <code className="mx-1 rounded bg-muted px-1 py-0.5">line_cost + delivery_fee</code>
+              for Sell Price.
+            </p>
+            <div className="mt-3 space-y-4">
+              {formulaKeys.map((key) => (
+                <div key={key} className="rounded-xl border p-4">
+                  <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
+                    <Field label={`Label · ${key}`}>
+                      <Input
+                        value={rules[key].label}
+                        onChange={(event) =>
+                          setRules((current) => ({
+                            ...current,
+                            [key]: { ...current[key], label: event.target.value },
+                          }))
+                        }
+                      />
+                    </Field>
+                    <Field label="Formula">
+                      <Input
+                        className="font-mono"
+                        value={rules[key].formulaExpression || ""}
+                        onChange={(event) =>
+                          setRules((current) => ({
+                            ...current,
+                            [key]: {
+                              ...current[key],
+                              formulaExpression: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {references.map((reference) => (
+                <span
+                  key={reference}
+                  className="rounded-md bg-muted px-2 py-1 font-mono text-[11px]"
+                >
+                  {reference}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={saving} onClick={onSave}>
+            {saving ? "Saving…" : "Save column rules"}
           </Button>
         </DialogFooter>
       </DialogContent>
