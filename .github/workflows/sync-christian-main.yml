@@ -1,0 +1,86 @@
+name: Sync Christian main
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-christian-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'owenk-bonhoga/gwero-campaign-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CHRISTIAN_REPOSITORY: christianbaluti/gwero-campaign-hub
+      SYNC_BRANCH: sync/christian-main
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Check out Owen main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Christian main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git remote add christian "https://github.com/${CHRISTIAN_REPOSITORY}.git"
+          git fetch --no-tags christian main
+
+      - name: Detect new Christian commits
+        id: compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          ahead_by="$(git rev-list --count origin/main..christian/main)"
+          echo "ahead_by=${ahead_by}" >> "${GITHUB_OUTPUT}"
+
+          if [[ "${ahead_by}" == "0" ]]; then
+            echo "Christian main has no commits missing from Owen main."
+          else
+            echo "Christian main has ${ahead_by} commit(s) to synchronize."
+          fi
+
+      - name: Update the synchronization branch
+        if: steps.compare.outputs.ahead_by != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin "christian/main:refs/heads/${SYNC_BRANCH}"
+
+      - name: Open a pull request when needed
+        if: steps.compare.outputs.ahead_by != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing_pr="$(
+            gh pr list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base main \
+              --head "${SYNC_BRANCH}" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -n "${existing_pr}" ]]; then
+            echo "Updated existing pull request #${existing_pr}."
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base main \
+            --head "${SYNC_BRANCH}" \
+            --title "Sync Christian main into Owen main" \
+            --body "Automated synchronization from christianbaluti/gwero-campaign-hub main. Required checks must pass before Owen's protected main branch is updated."
