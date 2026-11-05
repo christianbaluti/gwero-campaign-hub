@@ -1,0 +1,56 @@
+name: Deploy production
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gwero-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.HOSTINGER_DEPLOYMENT_ENABLED == 'true' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == 'owenk-bonhoga/gwero-campaign-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://os.gwerosolutions.com
+
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install verification dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      # Hostinger's native Git integration watches this repository's protected
+      # main branch. The PR check has already verified this exact commit; this
+      # job starts after main CI succeeds and waits for Hostinger to finish its
+      # migration, build, and restart before accepting the deployment.
+      - name: Verify the Hostinger deployment and exact live commit
+        env:
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha }}
+          PRODUCTION_URL: https://os.gwerosolutions.com
+        run: node scripts/verify-production.mjs

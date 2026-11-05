@@ -1,12 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ModulePage } from "@/components/ModulePage";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
+import { OpportunityListPage } from "@/components/OpportunityListPage";
 
 export const Route = createFileRoute("/prequalifications")({
   component: PrequalificationsPage,
   head: () => ({
     meta: [
       { title: "EOI & prequalification | Gwero OS" },
-      { name: "description", content: "Registrations and prequalification submissions." },
+      {
+        name: "description",
+        content: "Build, collaborate on and submit EOI and prequalification responses.",
+      },
       { property: "og:title", content: "EOI & prequalification | Gwero OS" },
       { property: "og:description", content: "Registrations and prequalification submissions." },
       { property: "og:type", content: "website" },
@@ -16,44 +19,11 @@ export const Route = createFileRoute("/prequalifications")({
 });
 
 function PrequalificationsPage() {
-  return (
-    <ModulePage
-      title="EOI / Prequalification"
-      description="Buyer registrations, categories, validity and outcomes."
-      table="prequalifications"
-      searchKeys={["reference", "buyer", "category"]}
-      createLabel="New submission"
-      columns={[
-        { key: "buyer", label: "Buyer" },
-        { key: "reference", label: "Reference" },
-        { key: "category", label: "Category" },
-        { key: "submission_type", label: "Type", className: "capitalize" },
-        { key: "status", label: "Status", className: "capitalize" },
-        { key: "valid_until", label: "Valid until" },
-      ]}
-      fields={[
-        { name: "buyer", label: "Buyer" },
-        { name: "reference", label: "Reference" },
-        { name: "category", label: "Category" },
-        {
-          name: "submission_type",
-          label: "Type",
-          type: "select",
-          options: ["eoi", "prequalification", "registration"],
-          defaultValue: "prequalification",
-        },
-        {
-          name: "status",
-          label: "Status",
-          type: "select",
-          options: ["preparing", "submitted", "approved", "rejected"],
-          defaultValue: "preparing",
-        },
-        { name: "submitted_date", label: "Submitted on", type: "date" },
-        { name: "valid_until", label: "Valid until", type: "date" },
-        { name: "outcome", label: "Outcome" },
-        { name: "notes", label: "Notes", type: "textarea" },
-      ]}
-    />
+  const location = useLocation();
+  return location.pathname !== "/prequalifications" &&
+    location.pathname !== "/prequalifications/" ? (
+    <Outlet />
+  ) : (
+    <OpportunityListPage kind="eoi" />
   );
 }

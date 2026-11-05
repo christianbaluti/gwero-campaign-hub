@@ -52,6 +52,12 @@ const labels = {
     title: "Bids",
     description: "Coordinate tender requirements, costing and final submissions.",
   },
+  eoi: {
+    singular: "EOI / Prequalification",
+    title: "EOI & Prequalification",
+    description:
+      "Coordinate expressions of interest, registrations and prequalification responses.",
+  },
 } as const;
 
 const initialForm = {
@@ -84,7 +90,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
   const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     ...initialForm,
-    status: kind === "bid" ? "identified" : "received",
+    status: kind === "bid" ? "identified" : kind === "eoi" ? "preparing" : "received",
   });
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["opportunities", kind],
@@ -138,7 +144,10 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
       setOpen(false);
       setOwnerId(crypto.randomUUID());
       setFiles([]);
-      setForm({ ...initialForm, status: kind === "bid" ? "identified" : "received" });
+      setForm({
+        ...initialForm,
+        status: kind === "bid" ? "identified" : kind === "eoi" ? "preparing" : "received",
+      });
       void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -171,7 +180,14 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
 
   const set = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
-  const basePath = kind === "bid" ? "/bids" : kind === "rfp" ? "/rfps" : "/rfqs";
+  const basePath =
+    kind === "bid"
+      ? "/bids"
+      : kind === "rfp"
+        ? "/rfps"
+        : kind === "eoi"
+          ? "/prequalifications"
+          : "/rfqs";
   return (
     <AppShell title={copy.title} description={copy.description}>
       <div className="mb-5 flex flex-wrap gap-3">
@@ -298,10 +314,12 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
               onChange={(v) => set("status", v)}
               options={(kind === "bid"
                 ? ["identified", "preparing", "submitted", "won", "lost"]
-                : ["received", "reviewing", "responding", "submitted", "won", "lost"]
+                : kind === "eoi"
+                  ? ["preparing", "submitted", "approved", "rejected"]
+                  : ["received", "reviewing", "responding", "submitted", "won", "lost"]
               ).map((v) => ({ value: v, label: v }))}
             />
-            {kind !== "bid" ? (
+            {kind !== "bid" && kind !== "eoi" ? (
               <Field
                 label="Received date"
                 type="date"

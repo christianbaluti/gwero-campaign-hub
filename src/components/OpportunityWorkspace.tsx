@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bold,
@@ -78,8 +78,13 @@ type Workspace = {
 };
 type Attachment = { path: string; name: string; type: string; size: number };
 
-const plural = { rfp: "rfps", rfq: "rfqs", bid: "bids" } as const;
-const names = { rfp: "RFP", rfq: "RFQ", bid: "Bid" } as const;
+const plural = {
+  rfp: "rfps",
+  rfq: "rfqs",
+  bid: "bids",
+  eoi: "prequalifications",
+} as const;
+const names = { rfp: "RFP", rfq: "RFQ", bid: "Bid", eoi: "EOI / Prequalification" } as const;
 
 function parseList(value: unknown) {
   if (Array.isArray(value)) return value.join(", ");
@@ -215,7 +220,13 @@ export function OpportunityWorkspace({ kind, id }: { kind: OpportunityKind; id: 
           />
         </TabsContent>
         <TabsContent value="collaboration">
-          <Collaboration comments={data.comments} kind={kind} id={id} refresh={refresh} />
+          <Collaboration
+            comments={data.comments}
+            users={dependencies?.users || []}
+            kind={kind}
+            id={id}
+            refresh={refresh}
+          />
         </TabsContent>
         <TabsContent value="submission">
           <Submission
@@ -276,7 +287,11 @@ function Requirements({
   const save = useMutation({
     mutationFn: () => saveChecklistItem({ data: { kind, opportunityId: id, ...form } }),
     onSuccess: () => {
-      toast.success("Requirement added.");
+      toast.success(
+        form.assigneeId
+          ? "Requirement added and the assignee was notified by email and in the app."
+          : "Requirement added.",
+      );
       setOpen(false);
       setForm({ title: "", notes: "", assigneeId: "", dueAt: "", documentRequired: true });
       refresh();
@@ -409,6 +424,12 @@ function Requirements({
                   label: String(user["full_name"]),
                 }))}
               />
+              {form.assigneeId ? (
+                <p className="-mt-2 text-xs text-muted-foreground">
+                  The assignee receives an immediate in-app alert and email with the opportunity
+                  details.
+                </p>
+              ) : null}
               <Field
                 label="Due date and time"
                 type="datetime-local"
@@ -751,22 +772,80 @@ function Costing({
 
 function Collaboration({
   comments,
+  users,
   kind,
   id,
   refresh,
 }: {
   comments: Row[];
+  users: Row[];
   kind: OpportunityKind;
   id: string;
   refresh: () => void;
 }) {
+  const queryClient = useQueryClient();
+  const editor = useRef<HTMLTextAreaElement>(null);
   const [body, setBody] = useState("");
+  const [mentionIds, setMentionIds] = useState<string[]>([]);
+  const [mentionTrigger, setMentionTrigger] = useState<{ start: number; query: string } | null>(
+    null,
+  );
+  const suggestions = useMemo(() => {
+    if (!mentionTrigger) return [];
+    const query = mentionTrigger.query.trim().toLowerCase();
+    return users
+      .filter(
+        (user) =>
+          !mentionIds.includes(String(user["id"])) &&
+          (!query ||
+            String(user["full_name"] || "")
+              .toLowerCase()
+              .includes(query) ||
+            String(user["email"] || "")
+              .toLowerCase()
+              .includes(query)),
+      )
+      .slice(0, 7);
+  }, [mentionIds, mentionTrigger, users]);
+  const findMention = (value: string, cursor: number | null) => {
+    if (cursor === null) return null;
+    const before = value.slice(0, cursor);
+    const start = before.lastIndexOf("@");
+    if (start < 0 || before.slice(start + 1).includes("\n")) return null;
+    const preceding = start > 0 ? before[start - 1] : "";
+    if (preceding && !/[\s([{,:;]/.test(preceding)) return null;
+    const query = before.slice(start + 1);
+    return query.length <= 80 ? { start, query } : null;
+  };
+  const chooseMention = (user: Row) => {
+    if (!mentionTrigger) return;
+    const cursor = editor.current?.selectionStart ?? body.length;
+    const name = String(user["full_name"]);
+    const inserted = `@${name} `;
+    const nextBody = body.slice(0, mentionTrigger.start) + inserted + body.slice(cursor);
+    const nextCursor = mentionTrigger.start + inserted.length;
+    setBody(nextBody);
+    setMentionIds((current) => [...new Set([...current, String(user["id"])])]);
+    setMentionTrigger(null);
+    requestAnimationFrame(() => {
+      editor.current?.focus();
+      editor.current?.setSelectionRange(nextCursor, nextCursor);
+    });
+  };
   const add = useMutation({
-    mutationFn: () => addOpportunityComment({ data: { kind, opportunityId: id, body } }),
-    onSuccess: () => {
+    mutationFn: () =>
+      addOpportunityComment({ data: { kind, opportunityId: id, body, mentionIds } }),
+    onSuccess: async () => {
       setBody("");
-      toast.success("Team note added.");
+      setMentionIds([]);
+      setMentionTrigger(null);
+      toast.success(
+        mentionIds.length
+          ? "Team note added and mentioned teammates notified."
+          : "Team note added.",
+      );
       refresh();
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -779,15 +858,80 @@ function Collaboration({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-3">
-          <Textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Share an update or ask a teammate a question…"
-          />
-          <Button onClick={() => add.mutate()} disabled={add.isPending}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="relative min-w-0 flex-1">
+            <Textarea
+              ref={editor}
+              value={body}
+              rows={5}
+              onChange={(event) => {
+                setBody(event.target.value);
+                setMentionTrigger(findMention(event.target.value, event.target.selectionStart));
+              }}
+              onClick={(event) =>
+                setMentionTrigger(
+                  findMention(event.currentTarget.value, event.currentTarget.selectionStart),
+                )
+              }
+              placeholder="Share an update or type @ to notify a teammate…"
+              aria-label="Team collaboration note"
+              aria-autocomplete="list"
+              aria-expanded={Boolean(mentionTrigger && suggestions.length)}
+            />
+            {mentionTrigger ? (
+              <div
+                className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-xl border bg-popover p-1 shadow-xl"
+                role="listbox"
+                aria-label="Teammate suggestions"
+              >
+                {suggestions.length ? (
+                  suggestions.map((user) => (
+                    <button
+                      key={String(user["id"])}
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent"
+                      onClick={() => chooseMention(user)}
+                    >
+                      <Avatar className="size-8">
+                        <AvatarFallback>
+                          {String(user["full_name"] || "U")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {String(user["full_name"])}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {String(user["email"])}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-2 text-sm text-muted-foreground">No matching users.</p>
+                )}
+              </div>
+            ) : null}
+            {mentionIds.length ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {mentionIds.map((userId) => {
+                  const user = users.find((candidate) => String(candidate["id"]) === userId);
+                  return (
+                    <Badge key={userId} variant="secondary">
+                      @{String(user?.["full_name"] || "Team member")}
+                    </Badge>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+          <Button onClick={() => add.mutate()} disabled={add.isPending || !body.trim()}>
             <MessageSquare className="mr-2 size-4" />
-            Post
+            {add.isPending ? "Posting…" : "Post"}
           </Button>
         </div>
         <div className="mt-6 space-y-3">
@@ -800,6 +944,15 @@ function Collaboration({
                 </p>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm">{String(comment["body"])}</p>
+              {Array.isArray(comment["mentions"]) && comment["mentions"].length ? (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {(comment["mentions"] as Row[]).map((mention) => (
+                    <Badge key={String(mention["id"])} variant="secondary">
+                      @{String(mention["full_name"])}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
           {!comments.length ? (
@@ -1169,14 +1322,18 @@ function Details({
           value={form.status}
           onChange={(v) => set("status", v)}
           options={[
-            "received",
-            "identified",
-            "reviewing",
-            "responding",
-            "preparing",
-            "submitted",
-            "won",
-            "lost",
+            ...(kind === "eoi"
+              ? ["preparing", "submitted", "approved", "rejected"]
+              : [
+                  "received",
+                  "identified",
+                  "reviewing",
+                  "responding",
+                  "preparing",
+                  "submitted",
+                  "won",
+                  "lost",
+                ]),
           ].map((v) => ({ value: v, label: v }))}
         />
         <Field

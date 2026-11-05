@@ -17,6 +17,9 @@ export const tablePermissions: Readonly<Record<string, string>> = {
   requests: "opportunities.manage",
   cost_sheets: "opportunities.manage",
   cost_sheet_items: "opportunities.manage",
+  cost_sheet_columns: "opportunities.manage",
+  cost_sheet_supplier_quotes: "opportunities.manage",
+  supplier_quotes: "procurement.manage",
   quotations: "opportunities.manage",
   quotation_items: "opportunities.manage",
   prequalifications: "opportunities.manage",
@@ -43,10 +46,27 @@ export const tablePermissions: Readonly<Record<string, string>> = {
   documents: "documents.manage",
   page_notes: "notes.manage",
   page_note_mentions: "notes.manage",
+  organization_locations: "clients.manage",
+  opportunity_checklist_items: "opportunities.manage",
+  opportunity_documents: "opportunities.manage",
+  opportunity_comments: "opportunities.manage",
+  opportunity_comment_mentions: "opportunities.manage",
+  opportunity_submissions: "opportunities.manage",
+  currencies: "settings.manage",
 };
 export function requiredTablePermission(table: string, action: string): string {
-  if (!["select", "insert", "upsert", "update", "delete"].includes(action)) throw new Error("Invalid action");
-  if (["prospects", "prospect_categories", "prospect_contacts", "prospect_interactions", "ai_prospect_searches"].includes(table)) return action === "select" ? "prospects.view" : "prospects.manage";
+  if (!["select", "insert", "upsert", "update", "delete"].includes(action))
+    throw new Error("Invalid action");
+  if (
+    [
+      "prospects",
+      "prospect_categories",
+      "prospect_contacts",
+      "prospect_interactions",
+      "ai_prospect_searches",
+    ].includes(table)
+  )
+    return action === "select" ? "prospects.view" : "prospects.manage";
   const permission = Object.hasOwn(tablePermissions, table) ? tablePermissions[table] : undefined;
   if (!permission) throw new Error("Permission denied");
   return permission;

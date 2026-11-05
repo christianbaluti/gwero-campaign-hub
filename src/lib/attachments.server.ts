@@ -14,15 +14,7 @@ export async function saveAttachment(campaignId: string, file: File, userId: str
   await getPool().execute(
     `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content, uploaded_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [
-      fileId,
-      campaignId,
-      file.name,
-      contentType,
-      bytes.length,
-      Buffer.from(bytes),
-      userId,
-    ],
+    [fileId, campaignId, file.name, contentType, bytes.length, Buffer.from(bytes), userId],
   );
   return { path, name: file.name, type: contentType, size: bytes.length };
 }

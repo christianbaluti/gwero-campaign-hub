@@ -11,14 +11,16 @@ import {
   MapPin,
   MessageSquareText,
   Phone,
+  Pencil,
+  Trash2,
   ReceiptText,
   Send,
-  UserRoundPlus,
   UsersRound,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell, money } from "@/components/AppShell";
+import { OrganizationLocations } from "@/components/OrganizationLocations";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -146,7 +148,19 @@ export function ClientWorkspace({ id }: { id: string }) {
     email: "",
     phone: "",
     job_title: "",
+    location: "",
+    location_source_url: "",
   });
+  const [editingContact, setEditingContact] = useState<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    job_title: string;
+    location: string;
+    location_source_url: string;
+  } | null>(null);
   const { data: client, isLoading: clientLoading } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
@@ -360,23 +374,63 @@ export function ClientWorkspace({ id }: { id: string }) {
   });
   const addContact = useMutation({
     mutationFn: async () => {
-      if (![contact.first_name, contact.last_name, contact.email].some((value) => value.trim()))
+      if (!contact.first_name.trim() && !contact.last_name.trim() && !contact.email.trim()) {
         throw new Error("Add a contact name or email address.");
-      const result = await db.from("client_contacts").insert({
+      }
+      const normalizedPhone = normalizePhone(contact.phone);
+      const { error } = await db.from("client_contacts").insert({
         client_id: id,
         first_name: contact.first_name.trim() || null,
         last_name: contact.last_name.trim() || null,
         email: contact.email.trim().toLowerCase() || null,
-        phone: normalizePhone(contact.phone) || null,
+        phone: normalizedPhone || null,
         raw_phone: contact.phone.trim() || null,
         job_title: contact.job_title.trim() || null,
+        location: contact.location.trim() || null,
+        location_source_url: contact.location_source_url.trim() || null,
+        location_is_inferred: false,
         is_primary: data.contacts.length === 0,
       });
-      if (result.error) throw result.error;
+      if (error) throw error;
     },
     onSuccess: () => {
-      setContact({ first_name: "", last_name: "", email: "", phone: "", job_title: "" });
+      setContact({
+        first_name: "",
+        last_name: "",
+        email: "",
+        phone: "",
+        job_title: "",
+        location: "",
+        location_source_url: "",
+      });
       toast.success("Contact person added.");
+      void qc.invalidateQueries({ queryKey: ["client-workspace", id] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const updateContact = useMutation({
+    mutationFn: async () => {
+      if (!editingContact) return;
+      const { error } = await db
+        .from("client_contacts")
+        .update({
+          first_name: editingContact.first_name.trim() || null,
+          last_name: editingContact.last_name.trim() || null,
+          email: editingContact.email.trim().toLowerCase() || null,
+          phone: normalizePhone(editingContact.phone) || null,
+          raw_phone: editingContact.phone.trim() || null,
+          job_title: editingContact.job_title.trim() || null,
+          location: editingContact.location.trim() || null,
+          location_source_url: editingContact.location_source_url.trim() || null,
+          location_is_inferred: false,
+        })
+        .eq("id", editingContact.id)
+        .eq("client_id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingContact(null);
+      toast.success("Contact details updated.");
       void qc.invalidateQueries({ queryKey: ["client-workspace", id] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -477,6 +531,9 @@ export function ClientWorkspace({ id }: { id: string }) {
                     {client.address}
                   </span>
                 ) : null}
+              </div>
+              <div className="mt-5 border-t pt-5">
+                <OrganizationLocations entityType="client" entityId={id} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:min-w-80">
@@ -760,85 +817,10 @@ export function ClientWorkspace({ id }: { id: string }) {
           >
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Contact people</CardTitle>
+                <CardTitle>Contact people</CardTitle>
               </CardHeader>
-              <CardContent>
-                {data.contacts.length ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {data.contacts.map((person) => {
-                      const name =
-                        [person.first_name, person.last_name].filter(Boolean).join(" ") ||
-                        person.email ||
-                        "Unnamed contact";
-                      return (
-                        <div
-                          key={person.id}
-                          className="flex items-start gap-3 rounded-xl border p-4"
-                        >
-                          <Avatar>
-                            <AvatarImage src={person.avatar_url || undefined} />
-                            <AvatarFallback>{initials(name)}</AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate font-medium">{name}</p>
-                              {person.is_primary ? (
-                                <Badge variant="secondary">Primary</Badge>
-                              ) : null}
-                            </div>
-                            <p className="mt-1 truncate text-xs text-muted-foreground">
-                              {person.job_title || "No job title"}
-                            </p>
-                            <div className="mt-3 space-y-1 text-xs">
-                              {person.email ? (
-                                <a
-                                  className="flex items-center gap-2 hover:text-primary"
-                                  href={`mailto:${person.email}`}
-                                >
-                                  <Mail className="size-3" />
-                                  {person.email}
-                                </a>
-                              ) : null}
-                              {person.phone || person.raw_phone ? (
-                                <a
-                                  className="flex items-center gap-2 hover:text-primary"
-                                  href={`tel:${person.phone || person.raw_phone}`}
-                                >
-                                  <Phone className="size-3" />
-                                  {person.phone || person.raw_phone}
-                                </a>
-                              ) : null}
-                            </div>
-                          </div>
-                          <ConfirmAction
-                            title="Delete contact person?"
-                            description="This removes the contact from this client."
-                            onConfirm={() => removeContact(person.id)}
-                            trigger={
-                              <Button size="sm" variant="ghost">
-                                Delete
-                              </Button>
-                            }
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-                    No contact people have been added.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <UserRoundPlus className="size-4" /> Add contact
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+              <CardContent className="space-y-4">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <Input
                     placeholder="First name"
                     value={contact.first_name}
@@ -853,32 +835,158 @@ export function ClientWorkspace({ id }: { id: string }) {
                       setContact((old) => ({ ...old, last_name: event.target.value }))
                     }
                   />
+                  <Input
+                    type="email"
+                    placeholder="Email address"
+                    value={contact.email}
+                    onChange={(event) =>
+                      setContact((old) => ({ ...old, email: event.target.value }))
+                    }
+                  />
+                  <Input
+                    placeholder="Phone number"
+                    value={contact.phone}
+                    onChange={(event) =>
+                      setContact((old) => ({ ...old, phone: event.target.value }))
+                    }
+                  />
+                  <Input
+                    className="sm:col-span-2"
+                    placeholder="Job title"
+                    value={contact.job_title}
+                    onChange={(event) =>
+                      setContact((old) => ({ ...old, job_title: event.target.value }))
+                    }
+                  />
+                  <Input
+                    className="sm:col-span-2"
+                    placeholder="Contact person's professional location"
+                    value={contact.location}
+                    onChange={(event) =>
+                      setContact((old) => ({ ...old, location: event.target.value }))
+                    }
+                  />
+                  <Input
+                    className="sm:col-span-2"
+                    type="url"
+                    placeholder="Location verification source URL (optional)"
+                    value={contact.location_source_url}
+                    onChange={(event) =>
+                      setContact((old) => ({ ...old, location_source_url: event.target.value }))
+                    }
+                  />
                 </div>
-                <Input
-                  type="email"
-                  placeholder="Email address"
-                  value={contact.email}
-                  onChange={(event) => setContact((old) => ({ ...old, email: event.target.value }))}
-                />
-                <Input
-                  placeholder="Phone number"
-                  value={contact.phone}
-                  onChange={(event) => setContact((old) => ({ ...old, phone: event.target.value }))}
-                />
-                <Input
-                  placeholder="Job title"
-                  value={contact.job_title}
-                  onChange={(event) =>
-                    setContact((old) => ({ ...old, job_title: event.target.value }))
-                  }
-                />
                 <Button
-                  className="w-full"
+                  variant="outline"
                   onClick={() => addContact.mutate()}
                   disabled={addContact.isPending}
                 >
-                  {addContact.isPending ? "Adding…" : "Add contact person"}
+                  Add contact person
                 </Button>
+                <div className="space-y-2">
+                  {data.contacts.map((person) =>
+                    editingContact?.id === person.id ? (
+                      <div key={person.id} className="rounded-xl border p-3">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {(
+                            [
+                              "first_name",
+                              "last_name",
+                              "email",
+                              "phone",
+                              "job_title",
+                              "location",
+                              "location_source_url",
+                            ] as const
+                          ).map((key) => (
+                            <Input
+                              key={key}
+                              className={
+                                key === "location_source_url" ? "sm:col-span-2" : undefined
+                              }
+                              placeholder={key.replaceAll("_", " ")}
+                              value={editingContact[key]}
+                              onChange={(event) =>
+                                setEditingContact((current) =>
+                                  current ? { ...current, [key]: event.target.value } : current,
+                                )
+                              }
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={updateContact.isPending}
+                            onClick={() => updateContact.mutate()}
+                          >
+                            {updateContact.isPending ? "Saving…" : "Save contact"}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingContact(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        key={person.id}
+                        className="flex items-start justify-between gap-3 rounded-xl border p-3 text-sm"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium">
+                            {[person.first_name, person.last_name].filter(Boolean).join(" ") ||
+                              person.email ||
+                              "Unnamed contact"}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {[person.job_title, person.email, person.phone || person.raw_phone]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                          <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                            <MapPin className="size-3 shrink-0" />
+                            {person.location || "Location not supplied"}
+                            {person.location_is_inferred ? " · based on company location" : ""}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label="Edit contact"
+                            onClick={() =>
+                              setEditingContact({
+                                id: person.id,
+                                first_name: person.first_name || "",
+                                last_name: person.last_name || "",
+                                email: person.email || "",
+                                phone: person.phone || person.raw_phone || "",
+                                job_title: person.job_title || "",
+                                location: person.location || "",
+                                location_source_url: person.location_source_url || "",
+                              })
+                            }
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <ConfirmAction
+                            title="Delete contact person?"
+                            description="This removes the contact from this client."
+                            onConfirm={() => removeContact(person.id)}
+                            trigger={
+                              <Button size="icon" variant="ghost" aria-label="Delete contact">
+                                <Trash2 className="size-4" />
+                              </Button>
+                            }
+                          />
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  {!data.contacts.length ? (
+                    <p className="text-sm text-muted-foreground">No contact people yet.</p>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import mysql, { type Pool } from "mysql2/promise";
 import { createDb, type DbInput, type DbResult } from "./db-query";
 import type { TableName } from "./db.types";
+import { withDatabaseReadRetry } from "./database-resilience";
 
 const fields: Record<TableName, string[]> = {
   prospects: [
@@ -292,6 +293,7 @@ const fields: Record<TableName, string[]> = {
     "status",
     "currency",
     "notes",
+    "column_rules",
     "created_at",
     "updated_at",
   ],
@@ -303,6 +305,20 @@ const fields: Record<TableName, string[]> = {
     "quantity",
     "unit_cost",
     "markup_percent",
+    "custom_values",
+    "attachments",
+    "created_at",
+    "updated_at",
+  ],
+  cost_sheet_columns: [
+    "id",
+    "cost_sheet_id",
+    "name",
+    "column_key",
+    "data_type",
+    "default_value",
+    "formula_expression",
+    "display_order",
     "created_at",
     "updated_at",
   ],
@@ -345,6 +361,25 @@ const fields: Record<TableName, string[]> = {
     "created_at",
     "updated_at",
   ],
+  supplier_quotes: [
+    "id",
+    "supplier_id",
+    "source_name",
+    "quote_reference",
+    "quote_date",
+    "valid_until",
+    "currency",
+    "amount",
+    "notes",
+    "attachment_path",
+    "attachment_name",
+    "attachment_type",
+    "attachment_size",
+    "created_by",
+    "created_at",
+    "updated_at",
+  ],
+  cost_sheet_supplier_quotes: ["cost_sheet_id", "supplier_quote_id", "created_by", "created_at"],
   purchase_orders: [
     "id",
     "po_number",
@@ -371,12 +406,27 @@ const fields: Record<TableName, string[]> = {
   prequalifications: [
     "id",
     "reference",
+    "title",
     "buyer",
+    "client_id",
     "category",
     "submission_type",
     "status",
     "submitted_date",
     "valid_until",
+    "due_date",
+    "value",
+    "currency",
+    "response_channel",
+    "submission_email",
+    "submission_cc",
+    "delivery_location",
+    "portal_url",
+    "portal_username",
+    "submission_instructions",
+    "submission_time",
+    "cost_sheet_id",
+    "submitted_at",
     "outcome",
     "notes",
     "created_at",
@@ -594,6 +644,9 @@ const fields: Record<TableName, string[]> = {
     "gender",
     "job_title",
     "avatar_url",
+    "location",
+    "location_source_url",
+    "location_is_inferred",
     "is_primary",
     "created_at",
     "updated_at",
@@ -609,6 +662,9 @@ const fields: Record<TableName, string[]> = {
     "gender",
     "job_title",
     "avatar_url",
+    "location",
+    "location_source_url",
+    "location_is_inferred",
     "is_primary",
     "created_at",
     "updated_at",
@@ -677,6 +733,8 @@ const jsonFields: Record<string, string[]> = {
   ai_prospect_searches: ["results_json"],
   replies: ["attachments"],
   prospect_interactions: ["attachments"],
+  cost_sheets: ["column_rules"],
+  cost_sheet_items: ["custom_values", "attachments"],
 };
 const booleanFields: Record<string, string[]> = {
   mailboxes: ["smtp_secure", "is_default"],
@@ -691,8 +749,8 @@ const booleanFields: Record<string, string[]> = {
   agreements: ["auto_renew"],
   email_templates: ["is_active"],
   roles: ["is_system"],
-  prospect_contacts: ["is_primary"],
-  client_contacts: ["is_primary"],
+  prospect_contacts: ["is_primary", "location_is_inferred"],
+  client_contacts: ["is_primary", "location_is_inferred"],
   notification_preferences: ["in_app_enabled", "email_enabled"],
   page_notes: ["is_pinned", "is_open"],
 };
@@ -716,6 +774,7 @@ const publicTables = new Set<TableName>([
   "bids",
   "cost_sheets",
   "cost_sheet_items",
+  "cost_sheet_columns",
   "jobs",
   "tasks",
   "suppliers",
@@ -749,6 +808,15 @@ const publicTables = new Set<TableName>([
 ]);
 let pool: Pool | undefined;
 
+const connectTimeoutMs = Math.max(
+  1_000,
+  Math.min(Number(process.env["DB_CONNECT_TIMEOUT_MS"] || 5_000), 15_000),
+);
+const queryTimeoutMs = Math.max(
+  1_000,
+  Math.min(Number(process.env["DB_QUERY_TIMEOUT_MS"] || 5_000), 15_000),
+);
+
 export function getPool() {
   if (!pool) {
     const database = process.env["DB_NAME"] || "gwero_crm";
@@ -766,11 +834,24 @@ export function getPool() {
           }),
       waitForConnections: true,
       connectionLimit: 10,
+      maxIdle: 10,
+      idleTimeout: 60_000,
+      queueLimit: 100,
+      connectTimeout: connectTimeoutMs,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 0,
       dateStrings: true,
       decimalNumbers: true,
     });
   }
   return pool;
+}
+
+export async function executeRead(sql: string, values: unknown[] = []) {
+  return withDatabaseReadRetry(
+    () => getPool().execute({ sql, timeout: queryTimeoutMs }, values as never[]),
+    { attempts: 2, delayMs: 100 },
+  );
 }
 
 function assertColumn(table: TableName, column: string) {
@@ -816,10 +897,7 @@ function where(input: DbInput) {
   return { sql: clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "", params };
 }
 async function rows(table: TableName, clause: string, params: unknown[] = []) {
-  const [result] = await getPool().execute(
-    `SELECT * FROM \`${table}\`${clause}`,
-    params as never[],
-  );
+  const [result] = await executeRead(`SELECT * FROM \`${table}\`${clause}`, params);
   return (result as Array<Record<string, unknown>>).map((row) => decode(table, row));
 }
 async function enrich(table: TableName, input: DbInput, selected: Array<Record<string, unknown>>) {

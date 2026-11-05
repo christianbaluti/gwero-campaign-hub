@@ -16,7 +16,9 @@ export const Route = createFileRoute("/api/attachments/$ownerId/$fileId")({
             attachment.content.byteOffset,
             attachment.content.byteOffset + attachment.content.byteLength,
           ) as ArrayBuffer;
-          return new Response(body, { headers: attachmentHeaders(attachment.name, attachment.size) });
+          return new Response(body, {
+            headers: attachmentHeaders(attachment.name, attachment.size),
+          });
         } catch {
           return new Response("Attachment not found", { status: 404 });
         }

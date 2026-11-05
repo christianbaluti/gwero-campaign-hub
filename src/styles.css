@@ -73,8 +73,13 @@
   scrollbar-width: thin;
   scrollbar-color: #c4b5fd transparent;
 }
-.gwero-scrollbar::-webkit-scrollbar { width: 7px; }
-.gwero-scrollbar::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 999px; }
+.gwero-scrollbar::-webkit-scrollbar {
+  width: 7px;
+}
+.gwero-scrollbar::-webkit-scrollbar-thumb {
+  background: #c4b5fd;
+  border-radius: 999px;
+}
 
 :root {
   --radius: 0.75rem;
