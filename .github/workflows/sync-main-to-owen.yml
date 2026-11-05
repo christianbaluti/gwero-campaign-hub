@@ -1,0 +1,85 @@
+name: Sync Christian main to Owen
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-christian-main-to-owen
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'christianbaluti/gwero-campaign-hub'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.OWEN_REPO_TOKEN }}
+      OWEN_REPOSITORY: owenk-bonhoga/gwero-campaign-hub
+      SYNC_BRANCH: sync/christian-main
+
+    steps:
+      - name: Check out Christian main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require Owen repository access token
+        shell: bash
+        run: |
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "OWEN_REPO_TOKEN is not configured." >&2
+            exit 1
+          fi
+
+      - name: Update the Owen synchronization branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${OWEN_REPOSITORY}.git" \
+            "HEAD:refs/heads/${SYNC_BRANCH}"
+
+      - name: Open a pull request when needed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing_pr="$(
+            gh pr list \
+              --repo "${OWEN_REPOSITORY}" \
+              --base main \
+              --head "${SYNC_BRANCH}" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+
+          if [[ -n "${existing_pr}" ]]; then
+            echo "Updated existing pull request #${existing_pr}."
+            exit 0
+          fi
+
+          ahead_by="$(
+            gh api \
+              "repos/${OWEN_REPOSITORY}/compare/main...${SYNC_BRANCH}" \
+              --jq '.ahead_by'
+          )"
+
+          if [[ "${ahead_by}" == "0" ]]; then
+            echo "No changes need to be synchronized."
+            exit 0
+          fi
+
+          gh pr create \
+            --repo "${OWEN_REPOSITORY}" \
+            --base main \
+            --head "${SYNC_BRANCH}" \
+            --title "Sync Christian main into Owen main" \
+            --body "Automated synchronization from christianbaluti/gwero-campaign-hub main. Required checks must pass before Owen's protected main branch is updated."
