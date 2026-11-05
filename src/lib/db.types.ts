@@ -297,6 +297,7 @@ export interface CostSheet {
   status: string;
   currency: string;
   notes: string | null;
+  column_rules: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

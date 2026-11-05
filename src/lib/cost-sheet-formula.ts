@@ -1,5 +1,99 @@
 export type FormulaContext = Record<string, number>;
 
+export const costSheetSystemColumnKeys = [
+  "quantity",
+  "unit_cost",
+  "markup_percent",
+  "line_cost",
+  "sell_price",
+  "gross_profit",
+] as const;
+
+export type CostSheetSystemColumnKey = (typeof costSheetSystemColumnKeys)[number];
+export type CostSheetSystemColumnRule = {
+  label: string;
+  defaultValue?: number;
+  formulaExpression?: string;
+};
+export type CostSheetSystemColumnRules = Record<
+  CostSheetSystemColumnKey,
+  CostSheetSystemColumnRule
+>;
+
+export const defaultCostSheetColumnRules: CostSheetSystemColumnRules = {
+  quantity: { label: "Qty", defaultValue: 1 },
+  unit_cost: { label: "Unit cost", defaultValue: 0 },
+  markup_percent: { label: "Markup", defaultValue: 0 },
+  line_cost: { label: "Line cost", formulaExpression: "quantity * unit_cost" },
+  sell_price: {
+    label: "Sell price",
+    formulaExpression: "line_cost * (1 + markup_percent / 100)",
+  },
+  gross_profit: { label: "Gross profit", formulaExpression: "sell_price - line_cost" },
+};
+
+export function normalizeCostSheetColumnRules(value: unknown): CostSheetSystemColumnRules {
+  let source: Record<string, unknown> = {};
+  if (typeof value === "string" && value.trim()) {
+    try {
+      source = JSON.parse(value) as Record<string, unknown>;
+    } catch {
+      source = {};
+    }
+  } else if (value && typeof value === "object") source = value as Record<string, unknown>;
+
+  return Object.fromEntries(
+    costSheetSystemColumnKeys.map((key) => {
+      const fallback = defaultCostSheetColumnRules[key];
+      const candidate =
+        source[key] && typeof source[key] === "object"
+          ? (source[key] as Record<string, unknown>)
+          : {};
+      const label =
+        typeof candidate["label"] === "string" && candidate["label"].trim()
+          ? candidate["label"].trim()
+          : fallback.label;
+      if ("defaultValue" in fallback) {
+        const defaultValue = Number(candidate["defaultValue"] ?? fallback.defaultValue);
+        return [
+          key,
+          {
+            label,
+            defaultValue: Number.isFinite(defaultValue) ? defaultValue : fallback.defaultValue,
+          },
+        ];
+      }
+      const formulaExpression =
+        typeof candidate["formulaExpression"] === "string" && candidate["formulaExpression"].trim()
+          ? candidate["formulaExpression"].trim().toLowerCase()
+          : fallback.formulaExpression;
+      return [key, { label, formulaExpression }];
+    }),
+  ) as CostSheetSystemColumnRules;
+}
+
+type CalculableColumn = {
+  column_key: string;
+  data_type: "text" | "number" | "formula";
+  default_value: string | null;
+  formula_expression: string | null;
+};
+
+type CalculableItem = {
+  quantity: number;
+  unit_cost: number;
+  markup_percent: number;
+  custom_values: Record<string, string | number>;
+};
+
+export type CostSheetRowCalculation = {
+  lineCost: number;
+  sellPrice: number;
+  grossProfit: number;
+  custom: Record<string, string | number>;
+  errors: Record<string, string>;
+};
+
 type Token =
   | { type: "number"; value: number }
   | { type: "identifier"; value: string }
@@ -148,4 +242,74 @@ export function columnKey(value: string) {
     .replace(/^_+|_+$/g, "")
     .slice(0, 80);
   return /^[a-z_]/.test(result) ? result : result ? `column_${result}` : "";
+}
+
+export function calculateCostSheetRow(
+  item: CalculableItem,
+  columns: CalculableColumn[],
+  rulesInput: unknown,
+): CostSheetRowCalculation {
+  const rules = normalizeCostSheetColumnRules(rulesInput);
+  const context: FormulaContext = {
+    quantity: Number(item.quantity || 0),
+    unit_cost: Number(item.unit_cost || 0),
+    markup_percent: Number(item.markup_percent || 0),
+  };
+  const custom: Record<string, string | number> = {};
+  const errors: Record<string, string> = {};
+  for (const column of columns) {
+    const stored = item.custom_values?.[column.column_key];
+    const value = stored === undefined || stored === "" ? column.default_value || "" : stored;
+    if (column.data_type === "text") custom[column.column_key] = String(value);
+    if (column.data_type === "number") {
+      const number = Number(value || 0);
+      custom[column.column_key] = Number.isFinite(number) ? number : 0;
+      context[column.column_key] = Number.isFinite(number) ? number : 0;
+    }
+  }
+
+  const formulas = new Map<string, string>([
+    ["line_cost", rules.line_cost.formulaExpression || ""],
+    ["sell_price", rules.sell_price.formulaExpression || ""],
+    ["gross_profit", rules.gross_profit.formulaExpression || ""],
+    ...columns
+      .filter((column) => column.data_type === "formula")
+      .map((column): [string, string] => [column.column_key, column.formula_expression || ""]),
+  ]);
+  const evaluating = new Set<string>();
+  const evaluate = (key: string): number => {
+    if (key in context) return context[key]!;
+    if (evaluating.has(key)) throw new Error("Circular formula reference.");
+    const expression = formulas.get(key);
+    if (expression === undefined) throw new Error(`Unknown column "${key}".`);
+    evaluating.add(key);
+    try {
+      for (const identifier of formulaIdentifiers(expression))
+        if (formulas.has(identifier) && !(identifier in context))
+          context[identifier] = evaluate(identifier);
+      const result = evaluateCostSheetFormula(expression, context);
+      context[key] = result;
+      return result;
+    } finally {
+      evaluating.delete(key);
+    }
+  };
+
+  for (const key of formulas.keys()) {
+    try {
+      const value = evaluate(key);
+      if (!costSheetSystemColumnKeys.includes(key as CostSheetSystemColumnKey)) custom[key] = value;
+    } catch (error) {
+      errors[key] = error instanceof Error ? error.message : "Formula error";
+      if (!costSheetSystemColumnKeys.includes(key as CostSheetSystemColumnKey))
+        custom[key] = "#ERROR";
+    }
+  }
+  return {
+    lineCost: context["line_cost"] ?? 0,
+    sellPrice: context["sell_price"] ?? 0,
+    grossProfit: context["gross_profit"] ?? 0,
+    custom,
+    errors,
+  };
 }

@@ -209,6 +209,8 @@ CREATE TABLE IF NOT EXISTS cost_sheets (
   CONSTRAINT cost_sheets_client_fk FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE cost_sheets ADD COLUMN IF NOT EXISTS column_rules LONGTEXT NULL;
+
 CREATE TABLE IF NOT EXISTS cost_sheet_items (
   id CHAR(36) PRIMARY KEY, cost_sheet_id CHAR(36) NOT NULL, category VARCHAR(60) NOT NULL DEFAULT 'labour',
   description TEXT NOT NULL, quantity DECIMAL(12,2) NOT NULL DEFAULT 1,

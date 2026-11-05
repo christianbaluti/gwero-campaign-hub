@@ -293,6 +293,7 @@ const fields: Record<TableName, string[]> = {
     "status",
     "currency",
     "notes",
+    "column_rules",
     "created_at",
     "updated_at",
   ],
@@ -732,6 +733,7 @@ const jsonFields: Record<string, string[]> = {
   ai_prospect_searches: ["results_json"],
   replies: ["attachments"],
   prospect_interactions: ["attachments"],
+  cost_sheets: ["column_rules"],
   cost_sheet_items: ["custom_values", "attachments"],
 };
 const booleanFields: Record<string, string[]> = {

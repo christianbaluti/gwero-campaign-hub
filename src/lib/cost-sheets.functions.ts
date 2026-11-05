@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { permissionMiddleware } from "./auth.middleware";
-import { columnKey, formulaIdentifiers } from "./cost-sheet-formula";
+import {
+  columnKey,
+  costSheetSystemColumnKeys,
+  evaluateCostSheetFormula,
+  formulaIdentifiers,
+  normalizeCostSheetColumnRules,
+  type CostSheetSystemColumnRules,
+} from "./cost-sheet-formula";
 
 export type CostSheetAttachment = {
   path: string;
@@ -45,6 +52,7 @@ export type CostSheetRecord = {
   status: string;
   currency: string;
   notes: string | null;
+  column_rules: CostSheetSystemColumnRules;
   client_name: string | null;
   client_logo: string | null;
   created_at: string;
@@ -88,14 +96,7 @@ type ItemInput = {
   attachments: CostSheetAttachment[];
 };
 
-const builtInFormulaKeys = new Set([
-  "quantity",
-  "unit_cost",
-  "markup_percent",
-  "line_cost",
-  "sell_price",
-  "gross_profit",
-]);
+const builtInFormulaKeys = new Set<string>(costSheetSystemColumnKeys);
 
 function parseJson<T>(value: unknown, fallback: T): T {
   if (value && typeof value === "object") return value as T;
@@ -124,22 +125,34 @@ function validateAttachments(attachments: CostSheetAttachment[]) {
   }
 }
 
-function validateFormulaGraph(columns: CostSheetColumn[]) {
-  const available = new Set([...builtInFormulaKeys, ...columns.map((column) => column.column_key)]);
+function validateFormulaGraph(columns: CostSheetColumn[], rulesInput: unknown) {
+  const rules = normalizeCostSheetColumnRules(rulesInput);
+  const calculableColumns = columns.filter((column) => column.data_type !== "text");
+  const available = new Set([
+    ...builtInFormulaKeys,
+    ...calculableColumns.map((column) => column.column_key),
+  ]);
   const formulaDependencies = new Map<string, string[]>();
-  for (const column of columns) {
-    if (column.data_type !== "formula") continue;
-    const expression = column.formula_expression?.trim() || "";
+  const formulas = [
+    ...(["line_cost", "sell_price", "gross_profit"] as const).map((key) => ({
+      key,
+      expression: rules[key].formulaExpression || "",
+    })),
+    ...columns
+      .filter((column) => column.data_type === "formula")
+      .map((column) => ({ key: column.column_key, expression: column.formula_expression || "" })),
+  ];
+  const formulaKeys = new Set(formulas.map((formula) => formula.key));
+  const validationContext = Object.fromEntries([...available].map((key) => [key, 1]));
+  for (const formula of formulas) {
+    const expression = formula.expression.trim();
     const identifiers = formulaIdentifiers(expression);
     for (const identifier of identifiers)
       if (!available.has(identifier)) throw new Error(`Unknown formula column "${identifier}".`);
+    evaluateCostSheetFormula(expression, validationContext);
     formulaDependencies.set(
-      column.column_key,
-      identifiers.filter((identifier) =>
-        columns.some(
-          (candidate) => candidate.column_key === identifier && candidate.data_type === "formula",
-        ),
-      ),
+      formula.key,
+      identifiers.filter((identifier) => formulaKeys.has(identifier)),
     );
   }
   const visiting = new Set<string>();
@@ -193,6 +206,7 @@ export const getCostSheetWorkspace = createServerFn({ method: "GET" })
     ]);
     const sheet = (sheetRows as unknown as CostSheetRecord[])[0];
     if (!sheet) throw new Error("Cost sheet not found.");
+    sheet.column_rules = normalizeCostSheetColumnRules(sheet.column_rules);
     const items = (itemRows as Array<Record<string, unknown>>).map((row) => ({
       ...row,
       custom_values: parseJson<Record<string, string | number>>(row["custom_values"], {}),
@@ -334,11 +348,16 @@ export const saveCostSheetColumn = createServerFn({ method: "POST" })
 
     const { getPool } = await import("./db.server");
     const db = getPool();
-    const [rows] = await db.execute(
-      "SELECT * FROM cost_sheet_columns WHERE cost_sheet_id = ? ORDER BY display_order ASC",
-      [data.costSheetId],
-    );
+    const [[rows], [sheetRows]] = await Promise.all([
+      db.execute(
+        "SELECT * FROM cost_sheet_columns WHERE cost_sheet_id = ? ORDER BY display_order ASC",
+        [data.costSheetId],
+      ),
+      db.execute("SELECT column_rules FROM cost_sheets WHERE id = ? LIMIT 1", [data.costSheetId]),
+    ]);
     const existing = rows as CostSheetColumn[];
+    const sheet = (sheetRows as Array<{ column_rules: unknown }>)[0];
+    if (!sheet) throw new Error("Cost sheet not found.");
     const current = data.columnId ? existing.find((column) => column.id === data.columnId) : null;
     if (data.columnId && !current) throw new Error("Custom column not found.");
     if (existing.some((column) => column.column_key === key && column.id !== data.columnId))
@@ -354,7 +373,10 @@ export const saveCostSheetColumn = createServerFn({ method: "POST" })
         data.dataType === "formula" ? data.formulaExpression.trim().toLowerCase() : null,
       display_order: current?.display_order ?? existing.length,
     };
-    validateFormulaGraph([...existing.filter((column) => column.id !== candidate.id), candidate]);
+    validateFormulaGraph(
+      [...existing.filter((column) => column.id !== candidate.id), candidate],
+      sheet.column_rules,
+    );
 
     if (data.columnId) {
       await db.execute(
@@ -390,6 +412,41 @@ export const saveCostSheetColumn = createServerFn({ method: "POST" })
     return { id: candidate.id, key: candidate.column_key };
   });
 
+export const saveCostSheetColumnRules = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("opportunities.manage")])
+  .validator((data: { costSheetId: string; rules: CostSheetSystemColumnRules }) => data)
+  .handler(async ({ data }) => {
+    for (const key of costSheetSystemColumnKeys)
+      if (!data.rules[key]?.label?.trim()) throw new Error(`Add a label for ${key}.`);
+    for (const key of ["line_cost", "sell_price", "gross_profit"] as const)
+      if (!data.rules[key]?.formulaExpression?.trim())
+        throw new Error(`Add a formula for ${data.rules[key]?.label || key}.`);
+    const rules = normalizeCostSheetColumnRules(data.rules);
+    for (const key of ["quantity", "unit_cost", "markup_percent"] as const) {
+      const value = rules[key].defaultValue;
+      if (!Number.isFinite(value)) throw new Error(`${rules[key].label} needs a valid default.`);
+      if (value! < 0) throw new Error(`${rules[key].label} default cannot be negative.`);
+    }
+    for (const key of ["line_cost", "sell_price", "gross_profit"] as const)
+      if (!rules[key].formulaExpression?.trim())
+        throw new Error(`Add a formula for ${rules[key].label}.`);
+
+    const { getPool } = await import("./db.server");
+    const db = getPool();
+    const [columns] = await db.execute(
+      "SELECT * FROM cost_sheet_columns WHERE cost_sheet_id = ? ORDER BY display_order ASC",
+      [data.costSheetId],
+    );
+    validateFormulaGraph(columns as CostSheetColumn[], rules);
+    const [result] = await db.execute("UPDATE cost_sheets SET column_rules = ? WHERE id = ?", [
+      JSON.stringify(rules),
+      data.costSheetId,
+    ]);
+    if (!(result as { affectedRows: number }).affectedRows)
+      throw new Error("Cost sheet not found.");
+    return { updated: true };
+  });
+
 export const deleteCostSheetColumn = createServerFn({ method: "POST" })
   .middleware([permissionMiddleware("opportunities.manage")])
   .validator((data: { costSheetId: string; columnId: string }) => data)
@@ -405,6 +462,16 @@ export const deleteCostSheetColumn = createServerFn({ method: "POST" })
       );
       const column = (columnRows as Array<{ column_key: string }>)[0];
       if (!column) throw new Error("Custom column not found.");
+      const [sheetRows] = await connection.execute(
+        "SELECT column_rules FROM cost_sheets WHERE id = ? LIMIT 1",
+        [data.costSheetId],
+      );
+      const rules = normalizeCostSheetColumnRules(
+        (sheetRows as Array<{ column_rules: unknown }>)[0]?.column_rules,
+      );
+      for (const key of ["line_cost", "sell_price", "gross_profit"] as const)
+        if (formulaIdentifiers(rules[key].formulaExpression || "").includes(column.column_key))
+          throw new Error(`Remove the reference from ${rules[key].label} first.`);
       const [dependentRows] = await connection.execute(
         `SELECT name, formula_expression FROM cost_sheet_columns
           WHERE cost_sheet_id = ? AND data_type = 'formula' AND id <> ?`,
