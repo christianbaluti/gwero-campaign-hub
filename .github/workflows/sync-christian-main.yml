@@ -79,7 +79,13 @@ jobs:
             updated=false
             echo "The existing synchronization branch already contains both main branches."
           else
-            git switch --create "${SYNC_BRANCH}" origin/main
+            if [[ "${branch_exists}" == "true" ]]; then
+              git switch --create "${SYNC_BRANCH}" "origin/${SYNC_BRANCH}"
+              git merge --no-ff --no-edit origin/main
+            else
+              git switch --create "${SYNC_BRANCH}" origin/main
+            fi
+
             git merge --no-ff --no-edit christian/main
             git push origin "HEAD:refs/heads/${SYNC_BRANCH}"
             head_sha="$(git rev-parse HEAD)"
