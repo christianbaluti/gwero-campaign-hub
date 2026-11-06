@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, FileText, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -91,6 +91,10 @@ function VendorsPage() {
   const [quoteForm, setQuoteForm] = useState(emptyQuote);
   const [quoteOwnerId, setQuoteOwnerId] = useState<string>(() => crypto.randomUUID());
   const [uploading, setUploading] = useState(false);
+  useEffect(() => {
+    const linkedSearch = new URLSearchParams(window.location.search).get("search");
+    if (linkedSearch) setSearch(linkedSearch);
+  }, []);
   const { data, isLoading } = useQuery({
     queryKey: ["vendor-workspace"],
     queryFn: () => getVendorWorkspace() as Promise<Workspace>,

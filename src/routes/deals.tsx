@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppShell, money } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ function DealsPage() {
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
   const [value, setValue] = useState("");
+  const [search, setSearch] = useState("");
   const { data: deals = [] } = useQuery({
     queryKey: ["deals"],
     queryFn: async () => {
@@ -55,10 +56,32 @@ function DealsPage() {
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["deals"] }),
   });
+  useEffect(() => {
+    const linkedSearch = new URLSearchParams(window.location.search).get("search");
+    if (linkedSearch) setSearch(linkedSearch);
+  }, []);
+  const filteredDeals = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    if (!needle) return deals;
+    return deals.filter((deal) =>
+      [deal.title, deal.stage, deal.owner, (deal.clients as { name?: string } | null)?.name].some(
+        (field) =>
+          String(field || "")
+            .toLowerCase()
+            .includes(needle),
+      ),
+    );
+  }, [deals, search]);
   return (
     <AppShell title="Deals" description="Move opportunities through your sales pipeline.">
       <Card className="mb-6">
         <CardContent className="flex flex-wrap gap-3 pt-6">
+          <Input
+            className="max-w-xs"
+            placeholder="Search deals"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
           <Input
             className="max-w-xs"
             placeholder="New deal"
@@ -81,11 +104,11 @@ function DealsPage() {
             <div className="mb-3 flex justify-between">
               <h2 className="text-sm font-semibold capitalize">{stage}</h2>
               <span className="text-xs text-muted-foreground">
-                {deals.filter((d) => d.stage === stage).length}
+                {filteredDeals.filter((d) => d.stage === stage).length}
               </span>
             </div>
             <div className="space-y-3">
-              {deals
+              {filteredDeals
                 .filter((d) => d.stage === stage)
                 .map((d) => (
                   <Card key={d.id}>
