@@ -371,6 +371,47 @@ ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
 
+CREATE TABLE IF NOT EXISTS bidaf_sync_state (
+  id VARCHAR(80) PRIMARY KEY,
+  status VARCHAR(30) NOT NULL DEFAULT 'idle',
+  last_started_at DATETIME(3) NULL,
+  last_completed_at DATETIME(3) NULL,
+  lease_until DATETIME(3) NULL,
+  last_error TEXT NULL,
+  records_seen INT NOT NULL DEFAULT 0,
+  records_created INT NOT NULL DEFAULT 0,
+  records_updated INT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS bidaf_buyer_links (
+  external_buyer_id VARCHAR(120) PRIMARY KEY,
+  client_id CHAR(36) NOT NULL,
+  buyer_name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY bidaf_buyer_links_client_idx (client_id),
+  CONSTRAINT bidaf_buyer_links_client_fk FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS bidaf_opportunity_links (
+  external_opportunity_id VARCHAR(120) PRIMARY KEY,
+  local_kind VARCHAR(20) NOT NULL,
+  local_opportunity_id CHAR(36) NOT NULL,
+  external_version VARCHAR(128) NULL,
+  lifecycle VARCHAR(40) NULL,
+  source_url VARCHAR(1000) NULL,
+  source_payload LONGTEXT NULL,
+  first_seen_at DATETIME(3) NULL,
+  last_seen_at DATETIME(3) NULL,
+  last_synced_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY bidaf_opportunity_links_local_key (local_kind, local_opportunity_id),
+  KEY bidaf_opportunity_links_synced_idx (last_synced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS currencies (
   id CHAR(36) PRIMARY KEY, code VARCHAR(10) NOT NULL, name VARCHAR(120) NOT NULL,
   symbol VARCHAR(12) NOT NULL, is_default BOOLEAN NOT NULL DEFAULT FALSE,

@@ -35,6 +35,7 @@ import {
   saveProviderSecrets,
   saveSystemSettings,
 } from "@/lib/settings.functions";
+import { syncBidafOpportunities } from "@/lib/bidaf.functions";
 import {
   createRole,
   deleteSystemUser,
@@ -95,6 +96,7 @@ function SettingsPage() {
     google_oauth_client_secret: "Google OAuth client secret",
     microsoft_oauth_client_id: "Microsoft OAuth client ID",
     microsoft_oauth_client_secret: "Microsoft OAuth client secret",
+    bidaf_api_token: "BidAF API token",
   };
   return (
     <AppShell
@@ -122,6 +124,7 @@ function SettingsPage() {
           <TabsTrigger value="templates">Email templates</TabsTrigger>
           <TabsTrigger value="currencies">Currencies</TabsTrigger>
           <TabsTrigger value="ai">AI & Prospecting</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="access">Users & access</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
@@ -155,6 +158,13 @@ function SettingsPage() {
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
+        <TabsContent value="integrations">
+          <IntegrationsTab
+            initial={values}
+            configured={data.configured.bidaf}
+            refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
+          />
+        </TabsContent>
         <TabsContent value="access">
           <AccessTab
             data={data}
@@ -163,6 +173,109 @@ function SettingsPage() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+function IntegrationsTab({
+  initial,
+  configured,
+  refresh,
+}: {
+  initial: Record<string, string>;
+  configured: boolean;
+  refresh: () => void;
+}) {
+  const [form, setForm] = useState({
+    origin: initial["bidaf_origin"] || "https://bidaf.africa",
+    organisationId: initial["bidaf_organisation_id"] || "",
+    country: initial["bidaf_country"] || "MW",
+    token: "",
+  });
+  const save = useMutation({
+    mutationFn: async () => {
+      await saveSystemSettings({
+        data: {
+          group: "integrations",
+          values: {
+            bidaf_origin: form.origin,
+            bidaf_organisation_id: form.organisationId,
+            bidaf_country: form.country.toUpperCase(),
+          },
+        },
+      });
+      await saveProviderSecrets({ data: { bidaf_api_token: form.token } });
+      return syncBidafOpportunities();
+    },
+    onSuccess: (result) => {
+      refresh();
+      setForm((current) => ({ ...current, token: "" }));
+      if (result.status === "completed") {
+        toast.success(
+          `BidAF connected: ${result.created} added, ${result.updated} updated, ${result.seen} checked.`,
+        );
+      } else {
+        toast.success("BidAF settings saved. The hourly sync is already up to date.");
+      }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const set = (key: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>BidAF opportunity discovery</CardTitle>
+            <CardDescription>
+              Import active opportunities hourly and route them into Bids, EOI, RFPs and RFQs.
+            </CardDescription>
+          </div>
+          <Badge variant={configured ? "default" : "secondary"}>
+            {configured ? "Token configured" : "Token required"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-5 md:grid-cols-2">
+        <Field
+          label="BidAF origin"
+          value={form.origin}
+          placeholder="https://bidaf.africa"
+          onChange={(value) => set("origin", value)}
+        />
+        <Field
+          label="Organisation ID"
+          value={form.organisationId}
+          onChange={(value) => set("organisationId", value)}
+        />
+        <Field
+          label="Country code"
+          value={form.country}
+          placeholder="MW"
+          onChange={(value) => set("country", value.slice(0, 2).toUpperCase())}
+        />
+        <Field
+          label={configured ? "Replace API token" : "API token"}
+          type="password"
+          value={form.token}
+          placeholder={configured ? "Leave blank to keep the current token" : "baf_test_…"}
+          onChange={(value) => set("token", value)}
+        />
+        <p className="text-sm text-muted-foreground md:col-span-2">
+          The token is encrypted at rest and used only by the server. Saving also performs a safe,
+          idempotent sync; later runs are limited to once per hour.
+        </p>
+        <Button
+          className="md:w-fit"
+          disabled={
+            save.isPending || !form.origin || !form.organisationId || (!configured && !form.token)
+          }
+          onClick={() => save.mutate()}
+        >
+          {save.isPending ? "Connecting…" : "Save and sync BidAF"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 

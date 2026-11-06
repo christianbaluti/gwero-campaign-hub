@@ -29,6 +29,12 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://os.gwerosolutions.c
 
 The campaign-only endpoint is `/api/cron/campaigns`. Both endpoints are idempotent and use recipient-level claims, retry limits and daily campaign limits.
 
+## BidAF opportunity discovery
+
+Set `BIDAF_ORIGIN`, `BIDAF_ORGANISATION_ID` and `BIDAF_API_TOKEN` in the server secret store. Gwero OS checks BidAF in the background when an authenticated user opens the application, and the existing notifications cron endpoint also checks it. A database lease limits discovery to one successful run per hour across all application instances.
+
+Active Malawi records are imported idempotently and routed by procurement type: RFQs to RFQs, RFPs to RFPs, expressions of interest and prequalifications to EOI / Prequalification, and other tender or request-for-bid types to Bids. BidAF IDs and versions are retained in dedicated link tables, so later scans update the linked opportunity rather than creating duplicates.
+
 ## Production
 
 ```sh

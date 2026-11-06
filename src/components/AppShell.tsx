@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { getAuthStatus, logout } from "@/lib/auth.functions";
+import { syncBidafOpportunities } from "@/lib/bidaf.functions";
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -156,7 +157,14 @@ export function AppShell({
   }, [brand["icon_url"]]);
   useEffect(() => {
     void processNotificationEmails().catch(() => undefined);
-  }, []);
+    void syncBidafOpportunities()
+      .then((result) => {
+        if (result.status !== "completed" || (!result.created && !result.updated)) return;
+        for (const kind of ["bid", "eoi", "rfp", "rfq"])
+          void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
+      })
+      .catch(() => undefined);
+  }, [qc]);
   return (
     <div
       className="flex min-h-screen max-w-full overflow-x-clip bg-background"
