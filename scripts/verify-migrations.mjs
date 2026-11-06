@@ -17,6 +17,9 @@ const connection = await mysql.createConnection({
 
 const requiredTables = [
   "attachment_files",
+  "document_categories",
+  "document_versions",
+  "document_access",
   "bidaf_buyer_links",
   "bidaf_opportunity_links",
   "bidaf_sync_state",
@@ -31,6 +34,9 @@ const requiredTables = [
 
 const requiredColumns = [
   ["attachment_files", "uploaded_by"],
+  ["documents", "category_id"],
+  ["documents", "owner_id"],
+  ["documents", "status"],
   ["cost_sheets", "column_rules"],
   ["cost_sheet_items", "attachments"],
   ["cost_sheet_items", "custom_values"],

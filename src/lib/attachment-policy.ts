@@ -52,3 +52,27 @@ export function attachmentHeaders(name: string, size: number) {
     "cache-control": "private, no-store",
   };
 }
+
+export function attachmentPreviewHeaders(name: string, type: string, size: number) {
+  const safeName = Array.from(name, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code > 126 || code === 34 || code === 92 ? "_" : character;
+  }).join("");
+  const inlineTypes = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "text/plain",
+    "text/csv",
+  ]);
+  return {
+    "content-type": inlineTypes.has(type) ? type : "application/octet-stream",
+    "content-length": String(size),
+    "content-disposition": `inline; filename="${safeName || "document"}"`,
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "sandbox; default-src 'none'; frame-ancestors 'self'",
+    "cache-control": "private, no-store",
+  };
+}

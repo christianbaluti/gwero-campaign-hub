@@ -619,6 +619,46 @@ CREATE TABLE IF NOT EXISTS system_users (
 
 ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password_hash TEXT NULL;
 
+CREATE TABLE IF NOT EXISTS document_categories (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, description TEXT,
+  color VARCHAR(30) NOT NULL DEFAULT 'violet', created_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY document_categories_name (name),
+  CONSTRAINT document_categories_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS category_id CHAR(36) NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS owner_id CHAR(36) NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'active';
+ALTER TABLE documents ADD INDEX IF NOT EXISTS documents_category_idx (category_id);
+ALTER TABLE documents ADD INDEX IF NOT EXISTS documents_owner_idx (owner_id);
+
+CREATE TABLE IF NOT EXISTS document_versions (
+  id CHAR(36) PRIMARY KEY, document_id CHAR(36) NOT NULL, version_number INT UNSIGNED NOT NULL,
+  attachment_path VARCHAR(1000) NOT NULL, file_name VARCHAR(500) NOT NULL,
+  content_type VARCHAR(255) NOT NULL, file_size INT UNSIGNED NOT NULL,
+  notes TEXT, created_by CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY document_versions_number (document_id, version_number),
+  KEY document_versions_document_created (document_id, created_at),
+  CONSTRAINT document_versions_document_fk FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT document_versions_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_access (
+  document_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  access_level VARCHAR(20) NOT NULL DEFAULT 'view', granted_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (document_id, user_id), KEY document_access_user (user_id, access_level),
+  CONSTRAINT document_access_document_fk FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT document_access_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE,
+  CONSTRAINT document_access_granter_fk FOREIGN KEY (granted_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO document_categories (id, name, description, color)
+VALUES (UUID(), 'General', 'General business documents', 'slate');
+
 CREATE TABLE IF NOT EXISTS auth_sessions (
   id CHAR(36) PRIMARY KEY, user_id CHAR(36) NOT NULL, token_hash CHAR(64) NOT NULL,
   expires_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -789,6 +829,14 @@ CREATE TABLE IF NOT EXISTS attachment_files (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   KEY attachment_files_owner (owner_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO document_versions
+  (id, document_id, version_number, attachment_path, file_name, content_type, file_size, created_at)
+SELECT UUID(), d.id, 1, CONCAT(af.owner_id, '/', af.id), af.file_name, af.content_type, af.file_size, af.created_at
+  FROM documents d
+  JOIN attachment_files af
+    ON d.file_url = CONCAT('/api/attachments/', af.owner_id, '/', af.id)
+ WHERE NOT EXISTS (SELECT 1 FROM document_versions v WHERE v.document_id = d.id);
 
 CREATE TABLE IF NOT EXISTS ai_prospect_searches (
   id CHAR(36) PRIMARY KEY, prompt LONGTEXT NOT NULL, search_context LONGTEXT,

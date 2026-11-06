@@ -1,10 +1,10 @@
-import { attachmentHeaders } from "@/lib/attachment-policy";
+import { attachmentHeaders, attachmentPreviewHeaders } from "@/lib/attachment-policy";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/attachments/$ownerId/$fileId")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ params, request }) => {
         const { currentUser } = await import("@/lib/auth.server");
         if (!(await currentUser())) return new Response("Authentication required", { status: 401 });
         try {
@@ -12,12 +12,22 @@ export const Route = createFileRoute("/api/attachments/$ownerId/$fileId")({
           await requireAttachmentAccess(params.ownerId);
           const { readAttachmentRecord } = await import("@/lib/attachments.server");
           const attachment = await readAttachmentRecord(`${params.ownerId}/${params.fileId}`);
+          const url = new URL(request.url);
+          if (url.searchParams.get("metadata") === "1")
+            return Response.json({
+              name: attachment.name,
+              type: attachment.type,
+              size: attachment.size,
+            });
           const body = attachment.content.buffer.slice(
             attachment.content.byteOffset,
             attachment.content.byteOffset + attachment.content.byteLength,
           ) as ArrayBuffer;
           return new Response(body, {
-            headers: attachmentHeaders(attachment.name, attachment.size),
+            headers:
+              url.searchParams.get("inline") === "1"
+                ? attachmentPreviewHeaders(attachment.name, attachment.type, attachment.size)
+                : attachmentHeaders(attachment.name, attachment.size),
           });
         } catch {
           return new Response("Attachment not found", { status: 404 });

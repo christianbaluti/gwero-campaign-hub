@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { StickyNotes } from "@/components/StickyNotes";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { GlobalDocumentViewer } from "@/components/DocumentViewer";
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
@@ -383,6 +384,7 @@ export function AppShell({
           </div>
         </main>
       </div>
+      <GlobalDocumentViewer />
     </div>
   );
 }
