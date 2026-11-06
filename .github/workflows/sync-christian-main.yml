@@ -9,6 +9,7 @@ permissions:
   actions: write
   contents: write
   pull-requests: write
+  statuses: write
 
 concurrency:
   group: sync-christian-main
@@ -18,7 +19,7 @@ jobs:
   sync:
     if: github.repository == 'owenk-bonhoga/gwero-campaign-hub'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     env:
       CHRISTIAN_REPOSITORY: christianbaluti/gwero-campaign-hub
       SYNC_BRANCH: sync/christian-main
@@ -78,7 +79,13 @@ jobs:
             updated=false
             echo "The existing synchronization branch already contains both main branches."
           else
-            git switch --create "${SYNC_BRANCH}" origin/main
+            if [[ "${branch_exists}" == "true" ]]; then
+              git switch --create "${SYNC_BRANCH}" "origin/${SYNC_BRANCH}"
+              git merge --no-ff --no-edit origin/main
+            else
+              git switch --create "${SYNC_BRANCH}" origin/main
+            fi
+
             git merge --no-ff --no-edit christian/main
             git push origin "HEAD:refs/heads/${SYNC_BRANCH}"
             head_sha="$(git rev-parse HEAD)"
@@ -115,7 +122,7 @@ jobs:
               --body "Automated synchronization from christianbaluti/gwero-campaign-hub main. Required checks must pass before Owen's protected main branch is updated."
           fi
 
-      - name: Dispatch verification for the exact synchronization commit
+      - name: Verify and merge the exact synchronization commit
         if: steps.compare.outputs.ahead_by != '0'
         env:
           HEAD_SHA: ${{ steps.prepare.outputs.head_sha }}
@@ -123,17 +130,90 @@ jobs:
         run: |
           set -euo pipefail
 
-          matching_runs="$(
+          find_run() {
             gh api \
               "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${SYNC_BRANCH}&event=workflow_dispatch&per_page=20" \
-              --jq "[.workflow_runs[] | select(.head_sha == \"${HEAD_SHA}\")] | length"
-          )"
+              --jq "[.workflow_runs[] | select(.head_sha == \"${HEAD_SHA}\")] | sort_by(.created_at) | reverse | .[0] // empty"
+          }
 
-          if [[ "${matching_runs}" != "0" ]]; then
-            echo "Verification has already been dispatched for ${HEAD_SHA}."
-            exit 0
+          run_json="$(find_run)"
+          if [[ -z "${run_json}" ]]; then
+            gh workflow run ci.yml \
+              --repo "${GITHUB_REPOSITORY}" \
+              --ref "${SYNC_BRANCH}"
+
+            for _ in {1..60}; do
+              run_json="$(find_run)"
+              [[ -n "${run_json}" ]] && break
+              sleep 5
+            done
           fi
 
+          [[ -n "${run_json}" ]] || {
+            echo "The verification workflow did not start." >&2
+            exit 1
+          }
+
+          run_id="$(jq -r '.id' <<<"${run_json}")"
+          run_url="$(jq -r '.html_url' <<<"${run_json}")"
+
+          for _ in {1..240}; do
+            run_json="$(gh api "/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}")"
+            status="$(jq -r '.status' <<<"${run_json}")"
+            [[ "${status}" == "completed" ]] && break
+            sleep 5
+          done
+
+          conclusion="$(jq -r '.conclusion // empty' <<<"${run_json}")"
+          [[ "${status}" == "completed" && "${conclusion}" == "success" ]] || {
+            echo "Verification did not complete successfully: ${run_url}" >&2
+            exit 1
+          }
+
+          # A workflow_dispatch check is not associated with the pull request in
+          # GitHub's UI. Record the successful, exact-SHA verification as the
+          # protected branch status before asking GitHub to merge.
+          gh api \
+            --method POST \
+            "/repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state=success \
+            -f context=verify \
+            -f description='CI passed for the exact synchronization commit' \
+            -f target_url="${run_url}" \
+            >/dev/null
+
+          pr_json="$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/pulls?state=open&base=main&head=owenk-bonhoga%3A${SYNC_BRANCH}" \
+              --jq 'if length == 1 then .[0] else empty end'
+          )"
+          [[ -n "${pr_json}" ]] || {
+            echo "Expected exactly one open synchronization pull request." >&2
+            exit 1
+          }
+
+          pr_number="$(jq -r '.number' <<<"${pr_json}")"
+          pr_sha="$(jq -r '.head.sha' <<<"${pr_json}")"
+          [[ "${pr_sha}" == "${HEAD_SHA}" ]] || {
+            echo "The pull request changed after verification." >&2
+            exit 1
+          }
+
+          merged="$(
+            gh api \
+              --method PUT \
+              "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/merge" \
+              -f merge_method=merge \
+              -f sha="${HEAD_SHA}" \
+              --jq '.merged'
+          )"
+          [[ "${merged}" == "true" ]] || {
+            echo "GitHub did not merge the verified synchronization pull request." >&2
+            exit 1
+          }
+
+          # GITHUB_TOKEN merges do not emit another push workflow. Verify main
+          # explicitly so production deployment remains gated by CI.
           gh workflow run ci.yml \
             --repo "${GITHUB_REPOSITORY}" \
-            --ref "${SYNC_BRANCH}"
+            --ref main
