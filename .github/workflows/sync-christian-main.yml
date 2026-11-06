@@ -6,6 +6,7 @@ on:
     - cron: "*/5 * * * *"
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -50,12 +51,42 @@ jobs:
             echo "Christian main has ${ahead_by} commit(s) to synchronize."
           fi
 
-      - name: Update the synchronization branch
+      - name: Prepare an up-to-date synchronization branch
+        id: prepare
         if: steps.compare.outputs.ahead_by != '0'
         shell: bash
         run: |
           set -euo pipefail
-          git push origin "christian/main:refs/heads/${SYNC_BRANCH}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          branch_exists=false
+          if git fetch --no-tags origin "${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}"; then
+            branch_exists=true
+          fi
+
+          branch_is_current=false
+          if [[ "${branch_exists}" == "true" ]] && \
+             git merge-base --is-ancestor origin/main "origin/${SYNC_BRANCH}" && \
+             git merge-base --is-ancestor christian/main "origin/${SYNC_BRANCH}"; then
+            branch_is_current=true
+          fi
+
+          if [[ "${branch_is_current}" == "true" ]]; then
+            head_sha="$(git rev-parse "origin/${SYNC_BRANCH}")"
+            updated=false
+            echo "The existing synchronization branch already contains both main branches."
+          else
+            git switch --create "${SYNC_BRANCH}" origin/main
+            git merge --no-ff --no-edit christian/main
+            git push origin "HEAD:refs/heads/${SYNC_BRANCH}"
+            head_sha="$(git rev-parse HEAD)"
+            updated=true
+          fi
+
+          echo "head_sha=${head_sha}" >> "${GITHUB_OUTPUT}"
+          echo "updated=${updated}" >> "${GITHUB_OUTPUT}"
 
       - name: Open a pull request when needed
         if: steps.compare.outputs.ahead_by != '0'
@@ -75,12 +106,34 @@ jobs:
 
           if [[ -n "${existing_pr}" ]]; then
             echo "Updated existing pull request #${existing_pr}."
+          else
+            gh pr create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --base main \
+              --head "${SYNC_BRANCH}" \
+              --title "Sync Christian main into Owen main" \
+              --body "Automated synchronization from christianbaluti/gwero-campaign-hub main. Required checks must pass before Owen's protected main branch is updated."
+          fi
+
+      - name: Dispatch verification for the exact synchronization commit
+        if: steps.compare.outputs.ahead_by != '0'
+        env:
+          HEAD_SHA: ${{ steps.prepare.outputs.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          matching_runs="$(
+            gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?branch=${SYNC_BRANCH}&event=workflow_dispatch&per_page=20" \
+              --jq "[.workflow_runs[] | select(.head_sha == \"${HEAD_SHA}\")] | length"
+          )"
+
+          if [[ "${matching_runs}" != "0" ]]; then
+            echo "Verification has already been dispatched for ${HEAD_SHA}."
             exit 0
           fi
 
-          gh pr create \
+          gh workflow run ci.yml \
             --repo "${GITHUB_REPOSITORY}" \
-            --base main \
-            --head "${SYNC_BRANCH}" \
-            --title "Sync Christian main into Owen main" \
-            --body "Automated synchronization from christianbaluti/gwero-campaign-hub main. Required checks must pass before Owen's protected main branch is updated."
+            --ref "${SYNC_BRANCH}"
