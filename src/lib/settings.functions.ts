@@ -33,6 +33,7 @@ export const getSettingsOverview = createServerFn({ method: "GET" })
       "google_oauth_client_secret",
       "microsoft_oauth_client_id",
       "microsoft_oauth_client_secret",
+      "bidaf_api_token",
     ] as const;
     const [settings, templates, roles, permissions, rolePermissions, users, secretStatuses] =
       await Promise.all([
@@ -62,6 +63,7 @@ export const getSettingsOverview = createServerFn({ method: "GET" })
           googleSecret: secretStatus["google_oauth_client_secret"] === "configured",
           microsoftId: secretStatus["microsoft_oauth_client_id"] === "configured",
           microsoftSecret: secretStatus["microsoft_oauth_client_secret"] === "configured",
+          bidaf: secretStatus["bidaf_api_token"] === "configured",
         },
         unreadableSecrets: secretKeys.filter((key) => secretStatus[key] === "unreadable"),
       }),

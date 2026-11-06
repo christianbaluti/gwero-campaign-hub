@@ -17,6 +17,9 @@ const connection = await mysql.createConnection({
 
 const requiredTables = [
   "attachment_files",
+  "bidaf_buyer_links",
+  "bidaf_opportunity_links",
+  "bidaf_sync_state",
   "cost_sheet_columns",
   "cost_sheet_supplier_quotes",
   "organization_locations",
