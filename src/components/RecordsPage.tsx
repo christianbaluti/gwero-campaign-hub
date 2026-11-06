@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -192,6 +192,11 @@ export function RecordsTable({
   const [form, setForm] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? ""])),
   );
+
+  useEffect(() => {
+    const linkedSearch = new URLSearchParams(window.location.search).get("search");
+    if (linkedSearch) setSearch(linkedSearch);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

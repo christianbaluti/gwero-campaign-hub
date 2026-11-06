@@ -27,7 +27,6 @@ import {
   IdCard,
   Wallet,
   Receipt,
-  Search,
   Bell,
   CircleHelp,
   Settings,
@@ -52,6 +51,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { StickyNotes } from "@/components/StickyNotes";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
@@ -232,13 +232,7 @@ export function AppShell({
 
       <div className="flex w-full min-w-0 flex-1 flex-col md:pl-64">
         <header className="fixed left-0 right-0 top-0 z-30 flex min-h-20 items-center gap-4 border-b border-violet-100 bg-white/95 px-5 backdrop-blur md:left-64 md:px-8">
-          <div className="relative hidden max-w-xl flex-1 lg:block">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-50"
-              placeholder="Search across Gwero OS…"
-            />
-          </div>
+          <GlobalSearch />
           <div className="ml-auto flex items-center gap-2">
             <StickyNotes />
             <button aria-label="Help" className="rounded-xl p-2 text-slate-500 hover:bg-accent">
