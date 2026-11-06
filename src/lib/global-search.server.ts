@@ -1,5 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import type { GlobalSearchGroup, GlobalSearchResult } from "./global-search.types";
+import type { AuthUser } from "./auth.server";
 
 type CandidateRow = RowDataPacket & {
   id: string;
@@ -362,13 +363,25 @@ export function rankSearchCandidate(
   return score;
 }
 
-async function rowsForSpec(spec: SearchSpec, terms: string[]) {
+async function rowsForSpec(spec: SearchSpec, terms: string[], user?: AuthUser) {
   const { getPool } = await import("./db.server");
   const normalizedSearch = `LOWER(${spec.search})`;
   const termWhere = terms.length
     ? `(${terms.map(() => `LOCATE(?, ${normalizedSearch}) > 0`).join(" OR ")})`
     : "1 = 1";
-  const where = [spec.extraWhere, termWhere].filter(Boolean).join(" AND ");
+  const documentWhere =
+    spec.kind === "document" && user
+      ? `(? = 1 OR owner_id = ? OR owner_id IS NULL OR EXISTS (
+          SELECT 1 FROM document_access da WHERE da.document_id = documents.id AND da.user_id = ?
+        ))`
+      : "";
+  const where = [spec.extraWhere, documentWhere, termWhere].filter(Boolean).join(" AND ");
+  const parameters = [
+    ...(documentWhere
+      ? [user?.roleName === "Administrator" ? 1 : 0, user?.id || "", user?.id || ""]
+      : []),
+    ...terms,
+  ];
   const [rows] = await getPool().execute(
     `SELECT id,
             ${spec.parentId || "NULL"} AS parent_id,
@@ -381,12 +394,15 @@ async function rowsForSpec(spec: SearchSpec, terms: string[]) {
       WHERE ${where}
       ORDER BY ${spec.updatedAt || "updated_at"} DESC
       LIMIT 12`,
-    terms,
+    parameters,
   );
   return rows as CandidateRow[];
 }
 
-export async function searchEverywhereServer(query: string): Promise<GlobalSearchResult[]> {
+export async function searchEverywhereServer(
+  query: string,
+  user?: AuthUser,
+): Promise<GlobalSearchResult[]> {
   const cleanQuery = query.trim().slice(0, 120);
   if (normalizeSearchText(cleanQuery).length < 2) return [];
   const parsed = parseSearchQuery(cleanQuery);
@@ -395,7 +411,7 @@ export async function searchEverywhereServer(query: string): Promise<GlobalSearc
     : SPECS;
   const terms = parsed.terms;
   const batches = await Promise.all(
-    selectedSpecs.map(async (spec) => ({ spec, rows: await rowsForSpec(spec, terms) })),
+    selectedSpecs.map(async (spec) => ({ spec, rows: await rowsForSpec(spec, terms, user) })),
   );
   return batches
     .flatMap(({ spec, rows }) =>

@@ -132,7 +132,7 @@ function safeFilename(value: string) {
 
 export const listOpportunityDependencies = createServerFn({ method: "GET" })
   .middleware([permissionMiddleware("opportunities.manage")])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     const db = await pool();
     const [clients, currencies, documents, users, mailboxes, costSheets] = await Promise.all([
       db.query(
@@ -142,7 +142,12 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
         "SELECT * FROM currencies WHERE is_active = TRUE ORDER BY is_default DESC, sort_order, code",
       ),
       db.query(
-        "SELECT id, title, category, owner, version, file_url FROM documents ORDER BY updated_at DESC",
+        `SELECT d.id, d.title, d.category, d.owner, d.version, d.file_url
+           FROM documents d
+           LEFT JOIN document_access da ON da.document_id = d.id AND da.user_id = ?
+          WHERE ? = 1 OR d.owner_id = ? OR d.owner_id IS NULL OR da.user_id IS NOT NULL
+          ORDER BY d.updated_at DESC`,
+        [context.user.id, context.user.roleName === "Administrator" ? 1 : 0, context.user.id],
       ),
       db.query(
         "SELECT id, full_name, email FROM system_users WHERE status = 'active' ORDER BY full_name",
@@ -598,6 +603,8 @@ export const addOpportunityDocument = createServerFn({ method: "POST" })
     const db = await pool();
     let attachment = data.attachment;
     if (!attachment && data.documentId) {
+      const { requireAttachmentAccess } = await import("./attachment-access.server");
+      await requireAttachmentAccess(data.documentId);
       const document = rows<{ title: string; file_url: string | null }>(
         await db.query("SELECT title, file_url FROM documents WHERE id = ? LIMIT 1", [
           data.documentId,
