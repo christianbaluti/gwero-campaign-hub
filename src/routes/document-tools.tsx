@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -385,8 +386,8 @@ function DocumentToolsPage() {
               <span className="grid size-9 place-items-center rounded-lg bg-violet-50 text-violet-700">
                 <item.icon className="size-4" />
               </span>
-              <div>
-                <p className="text-xl font-bold leading-none">{item.value}</p>
+              <div className="min-w-0 flex-1">
+                <MetricValue value={item.value} maxSize={1.25} />
                 <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
               </div>
             </CardContent>
@@ -497,7 +498,7 @@ function DocumentToolsPage() {
                 </div>
               ))}
               {!data?.documents.length ? (
-                <p className="p-8 text-center text-sm text-muted-foreground">
+                <p className="p-6 text-center text-sm text-muted-foreground">
                   No managed PDF documents are available yet.
                 </p>
               ) : null}
@@ -530,7 +531,7 @@ function DocumentToolsPage() {
                 </div>
               ))}
               {!data?.applications.length ? (
-                <p className="p-8 text-center text-sm text-muted-foreground">
+                <p className="p-6 text-center text-sm text-muted-foreground">
                   Stamping and signing activity will appear here.
                 </p>
               ) : null}

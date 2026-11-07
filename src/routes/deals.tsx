@@ -6,6 +6,7 @@ import { AppShell, money } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -74,8 +75,8 @@ function DealsPage() {
   }, [deals, search]);
   return (
     <AppShell title="Deals" description="Move opportunities through your sales pipeline.">
-      <Card className="mb-6">
-        <CardContent className="flex flex-wrap gap-3 pt-6">
+      <Card className="mb-4">
+        <CardContent className="flex flex-wrap gap-2 pt-4">
           <Input
             className="max-w-xs"
             placeholder="Search deals"
@@ -98,7 +99,7 @@ function DealsPage() {
           <Button onClick={() => create.mutate()}>Add deal</Button>
         </CardContent>
       </Card>
-      <div className="grid gap-4 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid gap-3 xl:grid-cols-3 2xl:grid-cols-6">
         {stages.map((stage) => (
           <section key={stage} className="rounded-xl bg-muted/60 p-3">
             <div className="mb-3 flex justify-between">
@@ -117,7 +118,11 @@ function DealsPage() {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {(d.clients as { name?: string } | null)?.name || "Unassigned"}
                       </p>
-                      <p className="my-3 font-semibold">{money(d.value, d.currency)}</p>
+                      <MetricValue
+                        className="my-3"
+                        value={money(d.value, d.currency)}
+                        maxSize={1}
+                      />
                       <Select
                         value={d.stage}
                         onValueChange={(next) => move.mutate({ id: d.id, stage: next })}

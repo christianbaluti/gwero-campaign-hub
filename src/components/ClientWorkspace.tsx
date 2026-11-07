@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MetricValue } from "@/components/ui/metric-value";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizePhone } from "@/lib/contact-normalization";
@@ -469,10 +470,10 @@ export function ClientWorkspace({ id }: { id: string }) {
         </Button>
       }
     >
-      <Card className="mb-6 overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-primary/5">
-        <CardContent className="p-5 sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-            <Avatar className="size-24 rounded-3xl border bg-white shadow-sm">
+      <Card className="mb-4 overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-primary/5">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+            <Avatar className="size-20 rounded-2xl border bg-white shadow-sm">
               <AvatarImage
                 src={client.logo_path || undefined}
                 alt={`${displayName} logo`}
@@ -484,7 +485,7 @@ export function ClientWorkspace({ id }: { id: string }) {
             </Avatar>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-display text-2xl font-semibold">{displayName}</h2>
+                <h2 className="font-display text-xl font-semibold">{displayName}</h2>
                 <Badge
                   variant={client.status === "active" ? "default" : "secondary"}
                   className="capitalize"
@@ -1060,7 +1061,7 @@ function Count({ value }: { value: number }) {
 function Metric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border bg-background/70 p-3 text-center">
-      <p className="font-display text-xl font-semibold">{value}</p>
+      <MetricValue value={value} maxSize={1.25} />
       <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
     </div>
   );

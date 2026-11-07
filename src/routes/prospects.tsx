@@ -921,7 +921,7 @@ function ProspectsPage() {
         </div>
       ) : null}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4">
           <div className="mb-4 grid min-w-0 gap-3 md:grid-cols-[minmax(220px,1fr)_minmax(190px,280px)_minmax(180px,230px)]">
             <Input
               placeholder="Search by name, email or company"

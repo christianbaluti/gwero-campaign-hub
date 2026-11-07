@@ -43,9 +43,9 @@ function QuotationDetail() {
         (quote?.clients as { name?: string } | null)?.name ?? "No client"
       }`}
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         <Card>
-          <CardContent className="grid gap-4 pt-6 sm:grid-cols-4">
+          <CardContent className="grid gap-3 pt-4 sm:grid-cols-4">
             <Info label="Status" value={quote?.status ?? "—"} />
             <Info label="Issue date" value={quote?.issue_date ?? "—"} />
             <Info label="Valid until" value={quote?.valid_until ?? "—"} />

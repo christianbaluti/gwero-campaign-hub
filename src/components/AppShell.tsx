@@ -205,7 +205,7 @@ export function AppShell({
             <p className="text-[11px] font-medium text-violet-500">Operations system</p>
           </div>
         </div>
-        <nav className="gwero-scrollbar flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-3">
+        <nav className="gwero-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2">
           {navGroups.map((group) => (
             <div key={group.label} className="space-y-1">
               <p className="px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -216,10 +216,10 @@ export function AppShell({
                   key={item.to}
                   to={item.to as never}
                   activeOptions={{ exact: item.to === "/" }}
-                  className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-accent hover:text-accent-foreground"
+                  className="flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-accent hover:text-accent-foreground"
                   activeProps={{
                     className:
-                      "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold bg-accent text-accent-foreground",
+                      "flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-semibold bg-accent text-accent-foreground",
                   }}
                 >
                   <item.icon className="h-4 w-4" />
@@ -229,7 +229,7 @@ export function AppShell({
             </div>
           ))}
         </nav>
-        <div className="m-4 rounded-2xl bg-gradient-to-br from-[#f5efff] to-[#ede4ff] p-4">
+        <div className="m-3 rounded-xl bg-gradient-to-br from-[#f5efff] to-[#ede4ff] p-3">
           <p className="font-semibold text-[#321568]">Build better business.</p>
           <p className="mt-1 text-xs leading-5 text-violet-600">One connected operating system.</p>
         </div>
@@ -371,15 +371,15 @@ export function AppShell({
             </Link>
           ))}
         </div>
-        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:px-7 md:pb-7 md:pt-28">
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:px-6 md:pb-6 md:pt-24">
           <div className="mx-auto min-w-0 max-w-[1500px]">
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
-                <h1 className="break-words font-display text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
+                <h1 className="break-words font-display text-2xl font-bold tracking-tight text-[#21143f]">
                   {title}
                 </h1>
                 {description ? (
-                  <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
                 ) : null}
               </div>
               {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}

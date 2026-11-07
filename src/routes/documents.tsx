@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -138,8 +139,8 @@ function StatCard({
           <Icon className="size-4" />
         </span>
         <div className="min-w-0">
-          <div className="flex items-baseline gap-2">
-            <p className="text-lg font-bold leading-none text-slate-900">{value}</p>
+          <div className="flex min-w-0 items-baseline gap-2">
+            <MetricValue className="max-w-20 text-slate-900" value={value} maxSize={1.125} />
             <p className="truncate text-xs font-semibold text-slate-700">{label}</p>
           </div>
           <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
@@ -324,7 +325,7 @@ function DocumentsPage() {
               })}
             </div>
           ) : (
-            <div className="px-6 py-12 text-center">
+            <div className="px-5 py-8 text-center">
               <FileText className="mx-auto size-8 text-slate-200" />
               <p className="mt-3 text-sm font-semibold text-slate-800">
                 No documents match this view

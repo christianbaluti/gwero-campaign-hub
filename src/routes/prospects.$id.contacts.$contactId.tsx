@@ -259,11 +259,11 @@ function ProspectContactPage() {
         </Button>
       }
     >
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <Card className="self-start">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex flex-col items-center text-center">
-              <Avatar className="size-24">
+              <Avatar className="size-20">
                 <AvatarImage src={contact.avatar_url || undefined} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
@@ -272,7 +272,7 @@ function ProspectContactPage() {
                 {contact.job_title || "Position not set"}
               </p>
             </div>
-            <div className="mt-6 space-y-3 text-sm">
+            <div className="mt-4 space-y-3 text-sm">
               {contact.email ? (
                 <a
                   href={`mailto:${contact.email}`}
