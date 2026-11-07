@@ -519,6 +519,19 @@ export interface DocumentAccess {
   created_at: string;
   updated_at: string;
 }
+export interface PortalAccount {
+  id: string;
+  portal_name: string;
+  category: string;
+  portal_url: string | null;
+  website_url: string | null;
+  notes: string | null;
+  status: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 export interface Vacancy {
   id: string;
   title: string;
@@ -854,6 +867,7 @@ export interface Tables {
   document_categories: DocumentCategory;
   document_versions: DocumentVersion;
   document_access: DocumentAccess;
+  portal_accounts: PortalAccount;
   vacancies: Vacancy;
   applicants: Applicant;
   employees: Employee;

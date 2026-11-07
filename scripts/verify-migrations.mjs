@@ -20,6 +20,7 @@ const requiredTables = [
   "document_categories",
   "document_versions",
   "document_access",
+  "portal_accounts",
   "bidaf_buyer_links",
   "bidaf_opportunity_links",
   "bidaf_sync_state",
