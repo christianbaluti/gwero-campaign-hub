@@ -23,6 +23,7 @@ import {
   ShoppingCart,
   Truck,
   Files,
+  KeyRound,
   UserPlus,
   IdCard,
   Wallet,
@@ -106,6 +107,7 @@ const navGroups = [
     label: "Business",
     items: [
       nav("/documents", "Documents", Files),
+      nav("/accounts", "Portal accounts", KeyRound),
       nav("/finance", "Finance & Accounts", Receipt),
       nav("/agreements", "Agreements & SLAs", FileSignature),
       nav("/settings", "Settings", Settings),

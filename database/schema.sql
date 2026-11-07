@@ -619,6 +619,18 @@ CREATE TABLE IF NOT EXISTS system_users (
 
 ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password_hash TEXT NULL;
 
+CREATE TABLE IF NOT EXISTS portal_accounts (
+  id CHAR(36) PRIMARY KEY, portal_name VARCHAR(200) NOT NULL,
+  category VARCHAR(80) NOT NULL DEFAULT 'Other', portal_url VARCHAR(1000),
+  website_url VARCHAR(1000), notes TEXT, status VARCHAR(30) NOT NULL DEFAULT 'active',
+  created_by CHAR(36), updated_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY portal_accounts_name (portal_name), KEY portal_accounts_category (category, status),
+  CONSTRAINT portal_accounts_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL,
+  CONSTRAINT portal_accounts_updater_fk FOREIGN KEY (updated_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS document_categories (
   id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, description TEXT,
   color VARCHAR(30) NOT NULL DEFAULT 'violet', created_by CHAR(36),
@@ -851,6 +863,7 @@ INSERT IGNORE INTO roles (id, name, description, is_system) VALUES
 
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES
   (UUID(), 'settings.manage', 'Manage settings', 'Settings'),
+  (UUID(), 'accounts.manage', 'Manage portal accounts', 'Accounts'),
   (UUID(), 'users.manage', 'Manage users and roles', 'Settings'),
   (UUID(), 'prospects.view', 'View prospects', 'Prospects'),
   (UUID(), 'prospects.manage', 'Create and update prospects', 'Prospects'),

@@ -133,14 +133,16 @@ function StatCard({
 }) {
   return (
     <Card className="border-slate-200 shadow-sm">
-      <CardContent className="flex items-center gap-4 p-5">
-        <span className="grid size-11 place-items-center rounded-2xl bg-violet-50 text-violet-700">
-          <Icon className="size-5" />
+      <CardContent className="flex items-center gap-3 p-3">
+        <span className="grid size-8 place-items-center rounded-lg bg-violet-50 text-violet-700">
+          <Icon className="size-4" />
         </span>
-        <div>
-          <p className="text-2xl font-bold text-slate-900">{value}</p>
-          <p className="text-sm font-medium text-slate-700">{label}</p>
-          <p className="text-xs text-muted-foreground">{detail}</p>
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-2">
+            <p className="text-lg font-bold leading-none text-slate-900">{value}</p>
+            <p className="truncate text-xs font-semibold text-slate-700">{label}</p>
+          </div>
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">{detail}</p>
         </div>
       </CardContent>
     </Card>
@@ -192,16 +194,16 @@ function DocumentsPage() {
       description="A controlled library for files, versions, ownership and access."
       actions={
         <>
-          <Button variant="outline" onClick={() => setCategoryOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => setCategoryOpen(true)}>
             <FolderPlus className="mr-2 size-4" /> Categories
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
             <Upload className="mr-2 size-4" /> Upload document
           </Button>
         </>
       }
     >
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={FileText}
           label="Accessible documents"
@@ -231,20 +233,20 @@ function DocumentsPage() {
         />
       </div>
 
-      <Card className="mt-6 overflow-hidden border-slate-200 shadow-sm">
+      <Card className="mt-4 overflow-hidden border-slate-200 shadow-sm">
         <CardContent className="p-0">
-          <div className="flex flex-col gap-3 border-b bg-white p-4 md:flex-row md:items-center">
+          <div className="flex flex-col gap-2 border-b bg-white p-3 md:flex-row md:items-center">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search title, owner, category or filename"
-                className="h-10 pl-9"
+                className="h-9 pl-9"
               />
             </div>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-10 w-full md:w-64">
+              <SelectTrigger className="h-9 w-full md:w-56">
                 <SelectValue placeholder="All categories" />
               </SelectTrigger>
               <SelectContent>
@@ -275,17 +277,17 @@ function DocumentsPage() {
                     key={document.id}
                     type="button"
                     onClick={() => setSelectedId(document.id)}
-                    className="grid w-full gap-4 px-5 py-4 text-left transition hover:bg-slate-50 md:grid-cols-[minmax(0,2fr)_minmax(160px,1fr)_minmax(140px,.8fr)_120px_28px] md:items-center"
+                    className="grid w-full gap-3 px-4 py-2.5 text-left transition hover:bg-slate-50 md:grid-cols-[minmax(0,2fr)_minmax(140px,.8fr)_minmax(130px,.7fr)_110px_20px] md:items-center"
                   >
                     <span className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-slate-100 text-violet-700">
-                        <FileText className="size-5" />
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-violet-700">
+                        <FileText className="size-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate font-semibold text-slate-900">
                           {document.title}
                         </span>
-                        <span className="mt-1 block truncate text-xs text-muted-foreground">
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                           {latest?.fileName || "No managed version yet"}
                           {latest ? ` · ${formatBytes(latest.fileSize)}` : ""}
                         </span>
@@ -293,7 +295,7 @@ function DocumentsPage() {
                     </span>
                     <span>
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${colors[document.categoryColor] || colors["slate"]}`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${colors[document.categoryColor] || colors["slate"]}`}
                       >
                         {document.categoryName}
                       </span>
@@ -302,7 +304,7 @@ function DocumentsPage() {
                       <span className="block truncate text-sm font-medium text-slate-700">
                         {document.ownerName}
                       </span>
-                      <span className="mt-0.5 block text-xs capitalize text-muted-foreground">
+                      <span className="block text-[11px] capitalize text-muted-foreground">
                         {document.accessLevel} access
                       </span>
                     </span>
@@ -322,9 +324,11 @@ function DocumentsPage() {
               })}
             </div>
           ) : (
-            <div className="px-6 py-20 text-center">
-              <FileText className="mx-auto size-10 text-slate-200" />
-              <p className="mt-4 font-semibold text-slate-800">No documents match this view</p>
+            <div className="px-6 py-12 text-center">
+              <FileText className="mx-auto size-8 text-slate-200" />
+              <p className="mt-3 text-sm font-semibold text-slate-800">
+                No documents match this view
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Change the filters or upload the first document in this category.
               </p>
@@ -708,14 +712,14 @@ function DocumentDetail({
   const latest = document.versions[0];
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-3xl">
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader className="pr-8">
           <div className="flex items-start gap-3">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-50 text-violet-700">
-              <FileText className="size-5" />
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-700">
+              <FileText className="size-4" />
             </span>
             <div className="min-w-0">
-              <SheetTitle className="truncate text-xl">{document.title}</SheetTitle>
+              <SheetTitle className="truncate text-base">{document.title}</SheetTitle>
               <SheetDescription className="mt-1 flex flex-wrap items-center gap-2">
                 <span>{document.categoryName}</span>
                 <span>·</span>
@@ -729,7 +733,7 @@ function DocumentDetail({
         {latest ? (
           <a
             href={attachmentUrl(latest.attachmentPath)}
-            className="mt-5 flex items-center justify-between rounded-2xl border border-violet-100 bg-violet-50/60 p-4 transition hover:bg-violet-50"
+            className="mt-4 flex items-center justify-between rounded-xl border border-violet-100 bg-violet-50/60 p-3 transition hover:bg-violet-50"
           >
             <span className="flex min-w-0 items-center gap-3">
               <FileText className="size-5 shrink-0 text-violet-700" />
@@ -749,14 +753,14 @@ function DocumentDetail({
             This legacy record has no managed file version yet. Upload one from the Versions tab.
           </div>
         )}
-        <Tabs defaultValue="details" className="mt-6">
+        <Tabs defaultValue="details" className="mt-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="versions">Versions ({document.versions.length})</TabsTrigger>
             <TabsTrigger value="access">Access ({document.grants.length})</TabsTrigger>
           </TabsList>
-          <TabsContent value="details" className="space-y-4 pt-4">
-            <div className="grid gap-4 md:grid-cols-2">
+          <TabsContent value="details" className="space-y-3 pt-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <Label>Title</Label>
                 <Input
@@ -893,9 +897,9 @@ function DocumentDetail({
               </p>
             )}
           </TabsContent>
-          <TabsContent value="versions" className="space-y-4 pt-4">
+          <TabsContent value="versions" className="space-y-3 pt-3">
             {canEdit ? (
-              <div className="rounded-2xl border bg-slate-50 p-4">
+              <div className="rounded-xl border bg-slate-50 p-3">
                 <h3 className="text-sm font-semibold">Upload a new version</h3>
                 <div className="mt-3 grid gap-3">
                   <Input
@@ -928,7 +932,7 @@ function DocumentDetail({
                 <a
                   key={version.id}
                   href={attachmentUrl(version.attachmentPath)}
-                  className="flex items-start justify-between rounded-xl border p-4 transition hover:bg-slate-50"
+                  className="flex items-start justify-between rounded-xl border p-3 transition hover:bg-slate-50"
                 >
                   <span className="flex min-w-0 gap-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-700">
@@ -958,8 +962,8 @@ function DocumentDetail({
               ) : null}
             </div>
           </TabsContent>
-          <TabsContent value="access" className="space-y-4 pt-4">
-            <div className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-900">
+          <TabsContent value="access" className="space-y-3 pt-3">
+            <div className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">
               <ShieldCheck className="mr-2 inline size-4" /> <strong>{document.ownerName}</strong>{" "}
               is the owner and always has full control.
             </div>
@@ -1019,7 +1023,7 @@ function DocumentDetail({
             )}
           </TabsContent>
         </Tabs>
-        <div className="mt-6 flex flex-wrap gap-2 border-t pt-4 text-xs text-muted-foreground">
+        <div className="mt-4 flex flex-wrap gap-2 border-t pt-3 text-xs text-muted-foreground">
           <Badge variant="outline" className="capitalize">
             {document.status === "archived" ? (
               <Archive className="mr-1 size-3" />
