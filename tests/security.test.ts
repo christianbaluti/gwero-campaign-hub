@@ -10,6 +10,8 @@ test("sensitive modules and unknown tables fail closed", () => {
   assert.equal(requiredTablePermission("payroll_items", "select"), "finance.manage");
   assert.equal(requiredTablePermission("employees", "delete"), "hr.manage");
   assert.equal(requiredTablePermission("portal_accounts", "select"), "accounts.manage");
+  assert.equal(requiredTablePermission("document_marks", "insert"), "documents.manage");
+  assert.equal(requiredTablePermission("document_mark_applications", "select"), "documents.manage");
   assert.equal(requiredTablePermission("mailboxes", "update"), "settings.manage");
   assert.equal(requiredTablePermission("prospects", "select"), "prospects.view");
   assert.equal(requiredTablePermission("prospects", "insert"), "prospects.manage");

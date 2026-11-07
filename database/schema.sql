@@ -668,6 +668,31 @@ CREATE TABLE IF NOT EXISTS document_access (
   CONSTRAINT document_access_granter_fk FOREIGN KEY (granted_by) REFERENCES system_users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS document_marks (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL,
+  mark_type VARCHAR(20) NOT NULL, design_json LONGTEXT,
+  image_attachment_path VARCHAR(1000), status VARCHAR(30) NOT NULL DEFAULT 'active',
+  created_by CHAR(36), updated_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY document_marks_type_status (mark_type, status),
+  CONSTRAINT document_marks_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL,
+  CONSTRAINT document_marks_updater_fk FOREIGN KEY (updated_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_mark_applications (
+  id CHAR(36) PRIMARY KEY, source_attachment_path VARCHAR(1000) NOT NULL,
+  output_attachment_path VARCHAR(1000) NOT NULL, source_name VARCHAR(500) NOT NULL,
+  output_name VARCHAR(500) NOT NULL, mark_id CHAR(36) NOT NULL, mark_type VARCHAR(20) NOT NULL,
+  page_number INT UNSIGNED NOT NULL, x_ratio DECIMAL(8,6) NOT NULL,
+  y_ratio DECIMAL(8,6) NOT NULL, width_ratio DECIMAL(8,6) NOT NULL,
+  rotation DECIMAL(6,2) NOT NULL DEFAULT 0, applied_date DATE, applied_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY document_mark_applications_created (created_at),
+  CONSTRAINT document_mark_applications_mark_fk FOREIGN KEY (mark_id) REFERENCES document_marks(id),
+  CONSTRAINT document_mark_applications_user_fk FOREIGN KEY (applied_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 INSERT IGNORE INTO document_categories (id, name, description, color)
 VALUES (UUID(), 'General', 'General business documents', 'slate');
 

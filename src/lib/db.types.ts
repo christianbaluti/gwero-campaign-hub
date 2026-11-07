@@ -519,6 +519,35 @@ export interface DocumentAccess {
   created_at: string;
   updated_at: string;
 }
+export interface DocumentMark {
+  id: string;
+  name: string;
+  mark_type: "stamp" | "signature";
+  design_json: Json | null;
+  image_attachment_path: string | null;
+  status: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface DocumentMarkApplication {
+  id: string;
+  source_attachment_path: string;
+  output_attachment_path: string;
+  source_name: string;
+  output_name: string;
+  mark_id: string;
+  mark_type: "stamp" | "signature";
+  page_number: number;
+  x_ratio: number;
+  y_ratio: number;
+  width_ratio: number;
+  rotation: number;
+  applied_date: string | null;
+  applied_by: string | null;
+  created_at: string;
+}
 export interface PortalAccount {
   id: string;
   portal_name: string;
@@ -867,6 +896,8 @@ export interface Tables {
   document_categories: DocumentCategory;
   document_versions: DocumentVersion;
   document_access: DocumentAccess;
+  document_marks: DocumentMark;
+  document_mark_applications: DocumentMarkApplication;
   portal_accounts: PortalAccount;
   vacancies: Vacancy;
   applicants: Applicant;
