@@ -47,6 +47,8 @@ export const tablePermissions: Readonly<Record<string, string>> = {
   document_categories: "documents.manage",
   document_versions: "documents.manage",
   document_access: "documents.manage",
+  document_marks: "documents.manage",
+  document_mark_applications: "documents.manage",
   portal_accounts: "accounts.manage",
   page_notes: "notes.manage",
   page_note_mentions: "notes.manage",

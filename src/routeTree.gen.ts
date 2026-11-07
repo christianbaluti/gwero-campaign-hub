@@ -16,6 +16,7 @@ import { Route as BidsRouteImport } from './routes/bids'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CostSheetsRouteImport } from './routes/cost-sheets'
 import { Route as DealsRouteImport } from './routes/deals'
+import { Route as DocumentToolsRouteImport } from './routes/document-tools'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as HrRouteImport } from './routes/hr'
@@ -92,6 +93,11 @@ const CostSheetsRoute = CostSheetsRouteImport.update({
 const DealsRoute = DealsRouteImport.update({
   id: '/deals',
   path: '/deals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentToolsRoute = DocumentToolsRouteImport.update({
+  id: '/document-tools',
+  path: '/document-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -316,6 +322,7 @@ export interface FileRoutesByFullPath {
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -367,6 +374,7 @@ export interface FileRoutesByTo {
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -419,6 +427,7 @@ export interface FileRoutesById {
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -472,6 +481,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -574,6 +585,7 @@ export interface FileRouteTypes {
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -626,6 +638,7 @@ export interface RootRouteChildren {
   ClientsRoute: typeof ClientsRouteWithChildren
   CostSheetsRoute: typeof CostSheetsRouteWithChildren
   DealsRoute: typeof DealsRoute
+  DocumentToolsRoute: typeof DocumentToolsRoute
   DocumentsRoute: typeof DocumentsRoute
   FinanceRoute: typeof FinanceRoute
   HrRoute: typeof HrRoute
@@ -710,6 +723,13 @@ declare module '@tanstack/react-router' {
       path: '/deals'
       fullPath: '/deals'
       preLoaderRoute: typeof DealsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/document-tools': {
+      id: '/document-tools'
+      path: '/document-tools'
+      fullPath: '/document-tools'
+      preLoaderRoute: typeof DocumentToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -1117,6 +1137,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClientsRoute: ClientsRouteWithChildren,
   CostSheetsRoute: CostSheetsRouteWithChildren,
   DealsRoute: DealsRoute,
+  DocumentToolsRoute: DocumentToolsRoute,
   DocumentsRoute: DocumentsRoute,
   FinanceRoute: FinanceRoute,
   HrRoute: HrRoute,

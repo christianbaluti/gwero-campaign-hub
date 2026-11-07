@@ -1,0 +1,291 @@
+import { randomUUID } from "node:crypto";
+import type { RowDataPacket } from "mysql2/promise";
+import { createServerFn } from "@tanstack/react-start";
+import { permissionMiddleware } from "./auth.middleware";
+import type {
+  DocumentMark,
+  MarkApplication,
+  MarkingDocument,
+  StampDesign,
+} from "./document-marks.types";
+
+const permission = permissionMiddleware("documents.manage");
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function text(value: unknown, max: number) {
+  return String(value ?? "")
+    .trim()
+    .slice(0, max);
+}
+
+function bounded(value: unknown, fallback: number, min: number, max: number) {
+  const parsed = Number(value);
+  return Math.max(min, Math.min(max, Number.isFinite(parsed) ? parsed : fallback));
+}
+
+function design(value: unknown): StampDesign {
+  const source = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const shape = ["oval", "rectangle", "circle"].includes(String(source["shape"]))
+    ? (String(source["shape"]) as StampDesign["shape"])
+    : "oval";
+  const color = /^#[0-9a-f]{6}$/i.test(String(source["color"]))
+    ? String(source["color"])
+    : "#1d4ed8";
+  return {
+    primaryText: text(source["primaryText"], 80) || "RECEIVED",
+    secondaryText: text(source["secondaryText"], 100),
+    includeDate: source["includeDate"] !== false,
+    datePrefix: text(source["datePrefix"], 30) || "DATE",
+    color,
+    shape,
+    distressed: bounded(source["distressed"], 0, 0, 100),
+    rotation: bounded(source["rotation"], 0, -15, 15),
+  };
+}
+
+function savedDesign(value: unknown) {
+  try {
+    return design(JSON.parse(String(value || "{}")));
+  } catch {
+    return design({});
+  }
+}
+
+export const getDocumentMarkWorkspace = createServerFn({ method: "GET" })
+  .middleware([permission])
+  .handler(async () => {
+    const { getPool } = await import("./db.server");
+    const db = getPool();
+    const [markRows, documentRows, applicationRows] = await Promise.all([
+      db.execute(
+        `SELECT m.*, COALESCE(u.full_name, 'Unknown') AS created_by_name
+           FROM document_marks m LEFT JOIN system_users u ON u.id = m.created_by
+          WHERE m.status = 'active' ORDER BY m.mark_type, m.name`,
+      ),
+      db.execute(
+        `SELECT d.id, d.title, d.category, d.owner, v.attachment_path, v.file_name, v.version_number
+           FROM documents d
+           JOIN document_versions v ON v.document_id = d.id
+          WHERE v.version_number = (SELECT MAX(v2.version_number) FROM document_versions v2 WHERE v2.document_id = d.id)
+            AND (v.content_type = 'application/pdf' OR v.file_name LIKE '%.pdf')
+          ORDER BY d.updated_at DESC`,
+      ),
+      db.execute(
+        `SELECT a.*, m.name AS mark_name, COALESCE(u.full_name, 'Unknown') AS applied_by_name
+           FROM document_mark_applications a
+           JOIN document_marks m ON m.id = a.mark_id
+           LEFT JOIN system_users u ON u.id = a.applied_by
+          ORDER BY a.created_at DESC LIMIT 100`,
+      ),
+    ]);
+    const marks = (markRows[0] as RowDataPacket[]).map((row): DocumentMark => ({
+      id: String(row["id"]),
+      name: String(row["name"]),
+      type: row["mark_type"] === "signature" ? "signature" : "stamp",
+      design: row["mark_type"] === "stamp" ? savedDesign(row["design_json"]) : null,
+      imagePath: String(row["image_attachment_path"] || ""),
+      createdByName: String(row["created_by_name"] || "Unknown"),
+      updatedAt: new Date(row["updated_at"] as string).toISOString(),
+    }));
+    const documents = (documentRows[0] as RowDataPacket[]).map((row): MarkingDocument => ({
+      id: String(row["id"]),
+      title: String(row["title"]),
+      category: String(row["category"] || "General"),
+      owner: String(row["owner"] || "Unassigned"),
+      attachmentPath: String(row["attachment_path"]),
+      fileName: String(row["file_name"]),
+      versionNumber: Number(row["version_number"] || 1),
+    }));
+    const applications = (applicationRows[0] as RowDataPacket[]).map((row): MarkApplication => ({
+      id: String(row["id"]),
+      sourceName: String(row["source_name"]),
+      outputName: String(row["output_name"]),
+      outputPath: String(row["output_attachment_path"]),
+      markName: String(row["mark_name"]),
+      markType: row["mark_type"] === "signature" ? "signature" : "stamp",
+      pageNumber: Number(row["page_number"]),
+      appliedDate: String(row["applied_date"] || ""),
+      appliedByName: String(row["applied_by_name"] || "Unknown"),
+      createdAt: new Date(row["created_at"] as string).toISOString(),
+    }));
+    return { marks, documents, applications };
+  });
+
+export const saveStamp = createServerFn({ method: "POST" })
+  .middleware([permission])
+  .validator((data: { id?: string; name: string; design: StampDesign }) => data)
+  .handler(async ({ data, context }) => {
+    const id = uuid.test(data.id || "") ? data.id! : randomUUID();
+    const name = text(data.name, 160);
+    if (!name) throw new Error("Stamp name is required.");
+    const { getPool } = await import("./db.server");
+    await getPool().execute(
+      `INSERT INTO document_marks (id, name, mark_type, design_json, created_by, updated_by)
+       VALUES (?, ?, 'stamp', ?, ?, ?)
+       ON DUPLICATE KEY UPDATE name = VALUES(name), design_json = VALUES(design_json),
+         updated_by = VALUES(updated_by), status = 'active'`,
+      [id, name, JSON.stringify(design(data.design)), context.user.id, context.user.id],
+    );
+    return { id };
+  });
+
+export const saveSignature = createServerFn({ method: "POST" })
+  .middleware([permission])
+  .validator((data: { id: string; name: string; imagePath: string }) => data)
+  .handler(async ({ data, context }) => {
+    if (!uuid.test(data.id) || !data.imagePath.startsWith(`${data.id}/`))
+      throw new Error("Invalid signature image.");
+    const name = text(data.name, 160);
+    if (!name) throw new Error("Signature name is required.");
+    const { getPool } = await import("./db.server");
+    await getPool().execute(
+      `INSERT INTO document_marks
+        (id, name, mark_type, image_attachment_path, created_by, updated_by)
+       VALUES (?, ?, 'signature', ?, ?, ?)`,
+      [data.id, name, data.imagePath, context.user.id, context.user.id],
+    );
+    return { id: data.id };
+  });
+
+export const archiveDocumentMark = createServerFn({ method: "POST" })
+  .middleware([permission])
+  .validator((data: { id: string }) => ({ id: text(data?.id, 36) }))
+  .handler(async ({ data, context }) => {
+    if (!uuid.test(data.id)) throw new Error("Invalid mark.");
+    const { getPool } = await import("./db.server");
+    await getPool().execute(
+      "UPDATE document_marks SET status = 'archived', updated_by = ? WHERE id = ?",
+      [context.user.id, data.id],
+    );
+    return { ok: true };
+  });
+
+export const applyDocumentMark = createServerFn({ method: "POST" })
+  .middleware([permission])
+  .validator(
+    (data: {
+      sourcePath: string;
+      markId: string;
+      pageNumber: number;
+      xRatio: number;
+      yRatio: number;
+      widthRatio: number;
+      rotation: number;
+      appliedDate: string;
+      stampPng?: string;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const [ownerId, fileId] = String(data.sourcePath || "").split("/");
+    if (!uuid.test(ownerId || "") || !uuid.test(fileId || "") || !uuid.test(data.markId))
+      throw new Error("Invalid document or mark.");
+    const attachmentOwnerId = ownerId!;
+    const attachmentFileId = fileId!;
+    const { requireAttachmentAccess } = await import("./attachment-access.server");
+    await requireAttachmentAccess(attachmentOwnerId, true);
+    const { getPool } = await import("./db.server");
+    const db = getPool();
+    const [markRows] = await db.execute(
+      "SELECT * FROM document_marks WHERE id = ? AND status = 'active' LIMIT 1",
+      [data.markId],
+    );
+    const mark = (markRows as RowDataPacket[])[0];
+    if (!mark) throw new Error("The selected stamp or signature no longer exists.");
+    const { readAttachmentRecord, saveAttachmentBuffer } = await import("./attachments.server");
+    const source = await readAttachmentRecord(`${attachmentOwnerId}/${attachmentFileId}`);
+    if (source.type !== "application/pdf" && !source.name.toLowerCase().endsWith(".pdf"))
+      throw new Error("Stamps and signatures can currently be applied to PDF documents.");
+    const { PDFDocument, degrees } = await import("pdf-lib");
+    const pdf = await PDFDocument.load(source.content);
+    const pageIndex = Math.floor(bounded(data.pageNumber, 1, 1, pdf.getPageCount())) - 1;
+    const page = pdf.getPage(pageIndex);
+    let imageBytes: Uint8Array;
+    if (mark["mark_type"] === "signature") {
+      const image = await readAttachmentRecord(String(mark["image_attachment_path"] || ""));
+      imageBytes = new Uint8Array(image.content);
+    } else {
+      const match = String(data.stampPng || "").match(/^data:image\/png;base64,([a-z0-9+/=]+)$/i);
+      const encodedStamp = match?.[1];
+      if (!encodedStamp || encodedStamp.length > 2_000_000)
+        throw new Error("The stamp preview is invalid.");
+      imageBytes = new Uint8Array(Buffer.from(encodedStamp, "base64"));
+    }
+    let embedded;
+    try {
+      embedded = await pdf.embedPng(imageBytes);
+    } catch {
+      embedded = await pdf.embedJpg(imageBytes);
+    }
+    const widthRatio = bounded(data.widthRatio, 0.22, 0.05, 0.65);
+    const xRatio = bounded(data.xRatio, 0.5, 0, 1);
+    const yRatio = bounded(data.yRatio, 0.5, 0, 1);
+    const rotation = bounded(data.rotation, 0, -25, 25);
+    const width = page.getWidth() * widthRatio;
+    const height = width * (embedded.height / embedded.width);
+    const centerX = page.getWidth() * xRatio;
+    const centerYFromTop = page.getHeight() * yRatio;
+    const x = Math.max(0, Math.min(page.getWidth() - width, centerX - width / 2));
+    const y = Math.max(
+      0,
+      Math.min(page.getHeight() - height, page.getHeight() - centerYFromTop - height / 2),
+    );
+    page.drawImage(embedded, {
+      x,
+      y,
+      width,
+      height,
+      rotate: degrees(rotation),
+      opacity: mark["mark_type"] === "stamp" ? 0.86 : 0.96,
+    });
+    const outputBytes = await pdf.save();
+    const suffix = mark["mark_type"] === "signature" ? "signed" : "stamped";
+    const outputName = `${source.name.replace(/\.pdf$/i, "")}-${suffix}-${Date.now()}.pdf`;
+    const output = await saveAttachmentBuffer(
+      attachmentOwnerId,
+      outputBytes,
+      outputName,
+      "application/pdf",
+      context.user.id,
+    );
+    const applicationId = randomUUID();
+    await db.execute(
+      `INSERT INTO document_mark_applications
+        (id, source_attachment_path, output_attachment_path, source_name, output_name,
+         mark_id, mark_type, page_number, x_ratio, y_ratio, width_ratio, rotation,
+         applied_date, applied_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        applicationId,
+        `${attachmentOwnerId}/${attachmentFileId}`,
+        output.path,
+        source.name,
+        outputName,
+        data.markId,
+        mark["mark_type"],
+        pageIndex + 1,
+        xRatio,
+        yRatio,
+        widthRatio,
+        rotation,
+        /^\d{4}-\d{2}-\d{2}$/.test(data.appliedDate || "") ? data.appliedDate : null,
+        context.user.id,
+      ],
+    );
+    const [documentRows] = await db.execute("SELECT id FROM documents WHERE id = ? LIMIT 1", [
+      attachmentOwnerId,
+    ]);
+    let versionNumber: number | null = null;
+    if ((documentRows as RowDataPacket[])[0]) {
+      const { addDocumentVersionServer } = await import("./documents.server");
+      const version = await addDocumentVersionServer(
+        {
+          documentId: attachmentOwnerId,
+          attachment: output,
+          notes: `${mark["mark_type"] === "signature" ? "Signed" : "Stamped"} with ${String(mark["name"])} on page ${pageIndex + 1}`,
+        },
+        context.user,
+      );
+      versionNumber = version.versionNumber;
+    }
+    return { applicationId, output, versionNumber };
+  });

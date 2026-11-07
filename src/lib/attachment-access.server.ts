@@ -34,6 +34,12 @@ export async function requireAttachmentAccess(ownerId: string, allowNew = false)
   )
     return user;
   if (!permissions.length) {
+    const [markRows] = await getPool().execute(
+      "SELECT id FROM document_marks WHERE id = ? LIMIT 1",
+      [ownerId],
+    );
+    if ((markRows as Array<{ id: string }>)[0] && user.permissions.includes("documents.manage"))
+      return user;
     const [existing] = await getPool().execute(
       "SELECT uploaded_by FROM attachment_files WHERE owner_id = ? LIMIT 1",
       [ownerId],

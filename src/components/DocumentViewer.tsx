@@ -3,10 +3,12 @@ import {
   Download,
   FileArchive,
   FileImage,
+  FileSignature,
   FileSpreadsheet,
   FileText,
   LoaderCircle,
 } from "lucide-react";
+import { DocumentMarkingDialog, type MarkingSource } from "@/components/DocumentMarkingDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +35,17 @@ function withQuery(url: string, key: string, value: string) {
 
 function extension(name: string) {
   return name.split(".").pop()?.toLowerCase() || "";
+}
+
+function attachmentPath(url: string) {
+  const parsed = new URL(url, window.location.origin);
+  const match = parsed.pathname.match(/^\/api\/attachments\/([^/]+)\/([^/]+)$/);
+  return match ? `${decodeURIComponent(match[1]!)}/${decodeURIComponent(match[2]!)}` : "";
+}
+
+function attachmentUrl(path: string) {
+  const [ownerId, fileId] = path.split("/");
+  return `/api/attachments/${encodeURIComponent(ownerId || "")}/${encodeURIComponent(fileId || "")}`;
 }
 
 function formatBytes(bytes: number) {
@@ -208,6 +221,7 @@ function PreviewBody({ preview }: { preview: PreviewData }) {
 
 export function GlobalDocumentViewer() {
   const [target, setTarget] = useState<PreviewTarget | null>(null);
+  const [markingSource, setMarkingSource] = useState<MarkingSource | null>(null);
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [error, setError] = useState("");
@@ -269,58 +283,84 @@ export function GlobalDocumentViewer() {
   }, [metadata?.name, target?.name]);
 
   return (
-    <Dialog open={Boolean(target)} onOpenChange={(open) => !open && setTarget(null)}>
-      <DialogContent className="flex h-[92vh] w-[96vw] max-w-7xl grid-rows-none flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="border-b px-5 py-4 pr-14 text-left">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-700">
-              <Icon className="size-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="truncate">
-                {metadata?.name || target?.name || "Document"}
-              </DialogTitle>
-              <DialogDescription className="mt-1">
-                {metadata
-                  ? `${formatBytes(metadata.size)} · ${metadata.type}`
-                  : "Secure in-app preview"}
-              </DialogDescription>
-            </div>
-            {target ? (
-              <div className="flex shrink-0 gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <a
-                    href={target.url}
-                    data-document-download="true"
-                    download={metadata?.name || target.name}
-                  >
-                    <Download className="mr-2 size-4" /> Download
-                  </a>
-                </Button>
+    <>
+      <Dialog open={Boolean(target)} onOpenChange={(open) => !open && setTarget(null)}>
+        <DialogContent className="flex h-[92vh] w-[96vw] max-w-7xl grid-rows-none flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="border-b px-5 py-4 pr-14 text-left">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-700">
+                <Icon className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="truncate">
+                  {metadata?.name || target?.name || "Document"}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {metadata
+                    ? `${formatBytes(metadata.size)} · ${metadata.type}`
+                    : "Secure in-app preview"}
+                </DialogDescription>
               </div>
+              {target ? (
+                <div className="flex shrink-0 gap-2">
+                  {(metadata?.type === "application/pdf" ||
+                    extension(metadata?.name || target.name || "") === "pdf") &&
+                  attachmentPath(target.url) ? (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setMarkingSource({
+                          path: attachmentPath(target.url),
+                          name: metadata?.name || target.name || "document.pdf",
+                        });
+                        setTarget(null);
+                      }}
+                    >
+                      <FileSignature className="mr-2 size-4" /> Stamp or sign
+                    </Button>
+                  ) : null}
+                  <Button asChild size="sm" variant="outline">
+                    <a
+                      href={target.url}
+                      data-document-download="true"
+                      download={metadata?.name || target.name}
+                    >
+                      <Download className="mr-2 size-4" /> Download
+                    </a>
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          </DialogHeader>
+          <div className="min-h-0 flex-1">
+            {loading ? (
+              <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                <span className="flex items-center gap-2">
+                  <LoaderCircle className="size-5 animate-spin" /> Preparing secure preview…
+                </span>
+              </div>
+            ) : error ? (
+              <div className="grid h-full place-items-center p-8 text-center">
+                <div>
+                  <FileText className="mx-auto size-12 text-rose-200" />
+                  <p className="mt-4 font-semibold text-rose-700">Document could not be opened</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                </div>
+              </div>
+            ) : preview ? (
+              <PreviewBody preview={preview} />
             ) : null}
           </div>
-        </DialogHeader>
-        <div className="min-h-0 flex-1">
-          {loading ? (
-            <div className="grid h-full place-items-center text-sm text-muted-foreground">
-              <span className="flex items-center gap-2">
-                <LoaderCircle className="size-5 animate-spin" /> Preparing secure preview…
-              </span>
-            </div>
-          ) : error ? (
-            <div className="grid h-full place-items-center p-8 text-center">
-              <div>
-                <FileText className="mx-auto size-12 text-rose-200" />
-                <p className="mt-4 font-semibold text-rose-700">Document could not be opened</p>
-                <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-              </div>
-            </div>
-          ) : preview ? (
-            <PreviewBody preview={preview} />
-          ) : null}
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <DocumentMarkingDialog
+        source={markingSource}
+        onOpenChange={(open) => !open && setMarkingSource(null)}
+        onApplied={(output) => {
+          setMarkingSource(null);
+          setTarget({ url: attachmentUrl(output.path), name: output.name });
+        }}
+      />
+    </>
   );
 }
