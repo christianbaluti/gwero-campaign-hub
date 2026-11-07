@@ -190,7 +190,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
           : "/rfqs";
   return (
     <AppShell title={copy.title} description={copy.description}>
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="mb-3 flex flex-wrap gap-2">
         <Input
           className="max-w-sm"
           placeholder={`Search ${copy.title.toLowerCase()}`}
@@ -207,17 +207,17 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="px-5 py-3">{copy.singular.toUpperCase()} name</th>
-                <th className="px-5 py-3">Client</th>
-                <th className="px-5 py-3">Due date</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Submission</th>
+                <th className="px-4 py-2.5">{copy.singular.toUpperCase()} name</th>
+                <th className="px-4 py-2.5">Client</th>
+                <th className="px-4 py-2.5">Due date</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Submission</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-5 py-8 text-muted-foreground" colSpan={5}>
+                  <td className="px-4 py-6 text-muted-foreground" colSpan={5}>
                     Loading…
                   </td>
                 </tr>
@@ -231,7 +231,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                       key={String(row["id"])}
                       className="border-b last:border-0 hover:bg-muted/30"
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <a
                           href={`${basePath}/${String(row["id"])}`}
                           className="font-semibold text-primary hover:underline"
@@ -242,7 +242,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           {String(row["reference"] || "No reference")}
                         </p>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9">
                             <AvatarImage src={String(row["client_logo"] || "")} />
@@ -251,13 +251,13 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           <span>{clientName}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-2">
                           <CalendarClock className="size-4 text-muted-foreground" />
                           {String(row["due_date"] || "Not set")}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <Badge
                           variant={row["status"] === "submitted" ? "default" : "secondary"}
                           className="capitalize"
@@ -265,7 +265,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           {String(row["status"])}
                         </Badge>
                       </td>
-                      <td className="px-5 py-4 capitalize">
+                      <td className="px-4 py-3 capitalize">
                         {String(row["submission_type"] || "email").replace("_", " ")}
                       </td>
                     </tr>
@@ -273,7 +273,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                 })
               ) : (
                 <tr>
-                  <td className="px-5 py-8 text-muted-foreground" colSpan={5}>
+                  <td className="px-4 py-6 text-muted-foreground" colSpan={5}>
                     No {copy.title.toLowerCase()} yet.
                   </td>
                 </tr>
@@ -292,7 +292,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
               managed from the client record.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field
               label={`${copy.singular.toUpperCase()} name`}
               value={form.title}

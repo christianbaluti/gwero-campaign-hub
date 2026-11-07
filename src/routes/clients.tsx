@@ -81,7 +81,7 @@ function ClientsPage() {
       description="Every account, relationship and piece of work in one place."
     >
       <Card className="mb-6 overflow-hidden border-primary/15 bg-gradient-to-br from-card via-card to-primary/5">
-        <CardContent className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <CardContent className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
             <p className="font-display text-lg font-semibold">Client directory</p>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -125,7 +125,7 @@ function ClientsPage() {
         </p>
       </div>
       {filtered.length ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((client) => {
             const displayName = client.company || client.name;
             return (
@@ -136,9 +136,9 @@ function ClientsPage() {
                 className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Card className="h-full overflow-hidden transition duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/30 group-hover:shadow-raised">
-                  <CardContent className="p-5">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="size-16 rounded-2xl border bg-white shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="size-14 rounded-xl border bg-white shadow-sm">
                         <AvatarImage
                           src={client.logo_path || undefined}
                           alt={`${displayName} logo`}
@@ -170,7 +170,7 @@ function ClientsPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm">
+                    <div className="mt-4 flex items-center justify-between border-t pt-3 text-sm">
                       <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
                         <Mail className="size-4 shrink-0" />
                         <span className="truncate">{client.email || "No email address"}</span>
@@ -185,7 +185,7 @@ function ClientsPage() {
         </div>
       ) : (
         <Card className="border-dashed">
-          <CardContent className="grid min-h-56 place-items-center p-8 text-center">
+          <CardContent className="grid min-h-40 place-items-center p-5 text-center">
             <div>
               <UsersRound className="mx-auto size-10 text-muted-foreground" />
               <h2 className="mt-4 font-display text-lg font-semibold">

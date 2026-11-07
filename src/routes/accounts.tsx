@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -375,7 +376,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="text-lg font-bold text-slate-900">{value}</span>
+      <MetricValue className="max-w-24 text-right text-slate-900" value={value} maxSize={1.125} />
     </div>
   );
 }

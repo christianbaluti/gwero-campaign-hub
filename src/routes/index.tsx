@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { AppShell, money } from "@/components/AppShell";
+import { MetricValue } from "@/components/ui/metric-value";
 import { db } from "@/lib/db";
 import type { LucideIcon } from "lucide-react";
 
@@ -124,18 +125,18 @@ function Dashboard() {
       title="Good morning, Gwero team"
       description="Here is what is happening across the business today."
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
         {error ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error.message}
           </div>
         ) : null}
-        <section className="relative overflow-hidden rounded-3xl border border-violet-100 bg-gradient-to-r from-[#f8f4ff] via-white to-[#f4edff] p-6 md:p-8">
+        <section className="relative overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-r from-[#f8f4ff] via-white to-[#f4edff] p-5 md:p-6">
           <div className="relative z-10 max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[.2em] text-violet-600">
               Gwero OS · Business operations
             </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-[#21143f] md:text-4xl">
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
               One workspace. Every moving part.
             </h2>
             <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
@@ -153,29 +154,33 @@ function Dashboard() {
               {isLoading ? "Updating…" : "Live from MySQL"}
             </span>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {metrics.map(({ label, value, hint, to, icon: Icon, tone }) => (
               <Link
                 key={label}
                 to={to as never}
-                className="group rounded-2xl border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                className="group min-w-0 rounded-xl border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="flex items-start justify-between">
-                  <span className={`grid size-11 place-items-center rounded-2xl ${tone}`}>
+                  <span className={`grid size-9 place-items-center rounded-xl ${tone}`}>
                     <Icon className="size-5" />
                   </span>
                   <ArrowRight className="size-4 text-slate-300 transition group-hover:translate-x-1 group-hover:text-violet-600" />
                 </div>
-                <p className="mt-4 text-3xl font-bold text-[#21143f]">{isLoading ? "—" : value}</p>
+                <MetricValue
+                  className="mt-3 text-[#21143f]"
+                  value={isLoading ? "—" : value}
+                  maxSize={1.75}
+                />
                 <p className="mt-1 text-sm font-semibold">{label}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
               </Link>
             ))}
           </div>
         </section>
-        <section className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
+        <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
           <div className="rounded-2xl border bg-card shadow-sm">
-            <div className="flex items-center justify-between border-b p-5">
+            <div className="flex items-center justify-between border-b p-4">
               <div>
                 <h2 className="font-bold">Needs your attention</h2>
                 <p className="mt-1 text-xs text-muted-foreground">Open work across teams</p>
@@ -206,14 +211,14 @@ function Dashboard() {
                 </Link>
               ))}
               {!isLoading && !data?.tasks.length ? (
-                <div className="p-10 text-center text-sm text-muted-foreground">
+                <div className="p-6 text-center text-sm text-muted-foreground">
                   No open work yet. Create a task to get the team moving.
                 </div>
               ) : null}
             </div>
           </div>
-          <div className="space-y-6">
-            <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
               <h2 className="font-bold">Quick actions</h2>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {(
@@ -227,7 +232,7 @@ function Dashboard() {
                   <Link
                     key={String(to)}
                     to={to as never}
-                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border bg-[#fbf9ff] text-sm font-semibold text-[#321568] transition hover:border-violet-300 hover:bg-violet-50"
+                    className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-lg border bg-[#fbf9ff] text-sm font-semibold text-[#321568] transition hover:border-violet-300 hover:bg-violet-50"
                   >
                     <Icon className="size-5" />
                     <span>
@@ -238,14 +243,14 @@ function Dashboard() {
                 ))}
               </div>
             </div>
-            <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
               <h2 className="font-bold">Financial snapshot</h2>
               <div className="mt-4 flex items-center gap-4">
                 <span className="grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
                   <CircleDollarSign className="size-6" />
                 </span>
-                <div>
-                  <p className="text-2xl font-bold">{money(outstanding, "MWK")}</p>
+                <div className="min-w-0 flex-1">
+                  <MetricValue value={money(outstanding, "MWK")} maxSize={1.5} />
                   <p className="text-xs text-muted-foreground">Outstanding on recent invoices</p>
                 </div>
               </div>

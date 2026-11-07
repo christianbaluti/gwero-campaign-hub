@@ -236,7 +236,7 @@ function IntegrationsTab({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-5 md:grid-cols-2">
+      <CardContent className="grid gap-4 md:grid-cols-2">
         <Field
           label="BidAF origin"
           value={form.origin}
@@ -312,7 +312,7 @@ function GeneralTab({
           Changes are stored centrally for the interface and outbound communication.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-5 md:grid-cols-2">
+      <CardContent className="grid gap-4 md:grid-cols-2">
         <Field
           label="System name"
           value={form.system_name}
