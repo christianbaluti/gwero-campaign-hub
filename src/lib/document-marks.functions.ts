@@ -284,6 +284,22 @@ export const applyDocumentMarks = createServerFn({ method: "POST" })
       "application/pdf",
       context.user.id,
     );
+    // Tender workspaces store their active file path in opportunity_documents. Advance that
+    // pointer to the marked output so reopening an RFQ, RFP, bid or EOI shows and submits the
+    // signed/stamped version instead of silently falling back to the original attachment.
+    await db.execute(
+      `UPDATE opportunity_documents
+          SET attachment_path = ?, content_type = ?, file_size = ?
+        WHERE attachment_path = ? AND (opportunity_id = ? OR document_id = ?)`,
+      [
+        output.path,
+        output.type,
+        output.size,
+        `${attachmentOwnerId}/${attachmentFileId}`,
+        attachmentOwnerId,
+        attachmentOwnerId,
+      ],
+    );
     const applicationIds: string[] = [];
     for (const placement of normalizedPlacements) {
       const applicationId = randomUUID();
