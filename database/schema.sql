@@ -239,6 +239,19 @@ CREATE TABLE IF NOT EXISTS cost_sheet_columns (
   CONSTRAINT cost_sheet_columns_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS cost_sheet_templates (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(180) NOT NULL,
+  description TEXT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'MWK',
+  column_rules LONGTEXT NULL,
+  columns_json LONGTEXT NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY cost_sheet_templates_name_idx (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS jobs (
   id CHAR(36) PRIMARY KEY, title VARCHAR(255) NOT NULL, client_id CHAR(36), project_id CHAR(36),
   job_type VARCHAR(60) NOT NULL DEFAULT 'once-off', assignee VARCHAR(255),

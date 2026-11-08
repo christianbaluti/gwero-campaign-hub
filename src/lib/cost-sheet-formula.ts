@@ -12,6 +12,7 @@ export const costSheetSystemColumnKeys = [
 export type CostSheetSystemColumnKey = (typeof costSheetSystemColumnKeys)[number];
 export type CostSheetSystemColumnRule = {
   label: string;
+  enabled: boolean;
   defaultValue?: number;
   formulaExpression?: string;
 };
@@ -21,15 +22,24 @@ export type CostSheetSystemColumnRules = Record<
 >;
 
 export const defaultCostSheetColumnRules: CostSheetSystemColumnRules = {
-  quantity: { label: "Qty", defaultValue: 1 },
-  unit_cost: { label: "Unit cost", defaultValue: 0 },
-  markup_percent: { label: "Markup", defaultValue: 0 },
-  line_cost: { label: "Line cost", formulaExpression: "quantity * unit_cost" },
+  quantity: { label: "Qty", enabled: true, defaultValue: 1 },
+  unit_cost: { label: "Unit cost", enabled: true, defaultValue: 0 },
+  markup_percent: { label: "Markup", enabled: true, defaultValue: 0 },
+  line_cost: {
+    label: "Line cost",
+    enabled: true,
+    formulaExpression: "quantity * unit_cost",
+  },
   sell_price: {
     label: "Sell price",
+    enabled: true,
     formulaExpression: "line_cost * (1 + markup_percent / 100)",
   },
-  gross_profit: { label: "Gross profit", formulaExpression: "sell_price - line_cost" },
+  gross_profit: {
+    label: "Gross profit",
+    enabled: true,
+    formulaExpression: "sell_price - line_cost",
+  },
 };
 
 export function normalizeCostSheetColumnRules(value: unknown): CostSheetSystemColumnRules {
@@ -53,12 +63,15 @@ export function normalizeCostSheetColumnRules(value: unknown): CostSheetSystemCo
         typeof candidate["label"] === "string" && candidate["label"].trim()
           ? candidate["label"].trim()
           : fallback.label;
+      const enabled =
+        typeof candidate["enabled"] === "boolean" ? candidate["enabled"] : fallback.enabled;
       if ("defaultValue" in fallback) {
         const defaultValue = Number(candidate["defaultValue"] ?? fallback.defaultValue);
         return [
           key,
           {
             label,
+            enabled,
             defaultValue: Number.isFinite(defaultValue) ? defaultValue : fallback.defaultValue,
           },
         ];
@@ -67,7 +80,7 @@ export function normalizeCostSheetColumnRules(value: unknown): CostSheetSystemCo
         typeof candidate["formulaExpression"] === "string" && candidate["formulaExpression"].trim()
           ? candidate["formulaExpression"].trim().toLowerCase()
           : fallback.formulaExpression;
-      return [key, { label, formulaExpression }];
+      return [key, { label, enabled, formulaExpression }];
     }),
   ) as CostSheetSystemColumnRules;
 }

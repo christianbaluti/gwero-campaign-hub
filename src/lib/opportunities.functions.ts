@@ -738,6 +738,12 @@ export const linkCostSheet = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertKind(data.kind);
     const db = await pool();
+    const table =
+      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
+    const opportunityRows = rows<{ client_id: string | null }>(
+      await db.query(`SELECT client_id FROM ${table} WHERE id = ? LIMIT 1`, [data.opportunityId]),
+    );
+    const opportunityClientId = opportunityRows[0]?.client_id || null;
     let id = data.costSheetId || null;
     if (data.create) {
       id = crypto.randomUUID();
@@ -747,19 +753,22 @@ export const linkCostSheet = createServerFn({ method: "POST" })
         [
           id,
           data.create.name,
-          data.create.clientId || null,
+          data.create.clientId || opportunityClientId,
           data.kind === "bid" ? data.opportunityId : null,
           data.create.currency,
           data.create.notes || null,
         ],
       );
     }
-    const table =
-      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
     await db.execute(`UPDATE ${table} SET cost_sheet_id = ? WHERE id = ?`, [
       id,
       data.opportunityId,
     ]);
+    if (id && opportunityClientId)
+      await db.execute("UPDATE cost_sheets SET client_id = COALESCE(client_id, ?) WHERE id = ?", [
+        opportunityClientId,
+        id,
+      ]);
     return { id };
   });
 
