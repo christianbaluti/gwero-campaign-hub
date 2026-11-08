@@ -18,6 +18,7 @@ export const tablePermissions: Readonly<Record<string, string>> = {
   cost_sheets: "opportunities.manage",
   cost_sheet_items: "opportunities.manage",
   cost_sheet_columns: "opportunities.manage",
+  cost_sheet_templates: "opportunities.manage",
   cost_sheet_supplier_quotes: "opportunities.manage",
   supplier_quotes: "procurement.manage",
   quotations: "opportunities.manage",

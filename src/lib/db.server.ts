@@ -322,6 +322,17 @@ const fields: Record<TableName, string[]> = {
     "created_at",
     "updated_at",
   ],
+  cost_sheet_templates: [
+    "id",
+    "name",
+    "description",
+    "currency",
+    "column_rules",
+    "columns_json",
+    "created_by",
+    "created_at",
+    "updated_at",
+  ],
   jobs: [
     "id",
     "title",
@@ -808,6 +819,7 @@ const jsonFields: Record<string, string[]> = {
   replies: ["attachments"],
   prospect_interactions: ["attachments"],
   cost_sheets: ["column_rules"],
+  cost_sheet_templates: ["column_rules", "columns_json"],
   cost_sheet_items: ["custom_values", "attachments"],
 };
 const booleanFields: Record<string, string[]> = {
@@ -849,6 +861,7 @@ const publicTables = new Set<TableName>([
   "cost_sheets",
   "cost_sheet_items",
   "cost_sheet_columns",
+  "cost_sheet_templates",
   "jobs",
   "tasks",
   "suppliers",

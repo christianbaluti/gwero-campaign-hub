@@ -326,6 +326,17 @@ export interface CostSheetColumn {
   created_at: string;
   updated_at: string;
 }
+export interface CostSheetTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  currency: string;
+  column_rules: Record<string, unknown> | null;
+  columns_json: Array<Record<string, unknown>>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 export interface Job {
   id: string;
   title: string;
@@ -882,6 +893,7 @@ export interface Tables {
   cost_sheets: CostSheet;
   cost_sheet_items: CostSheetItem;
   cost_sheet_columns: CostSheetColumn;
+  cost_sheet_templates: CostSheetTemplate;
   jobs: Job;
   tasks: Task;
   suppliers: Supplier;
