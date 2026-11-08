@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
@@ -32,8 +32,10 @@ import {
   createCostSheet,
   deleteCostSheet,
   deleteCostSheetTemplate,
+  getCostSheetCurrencies,
   getCostSheetDirectory,
   getCostSheetTemplates,
+  type CostSheetCurrency,
   type CostSheetDirectoryRecord,
   type CostSheetTemplateRecord,
 } from "@/lib/cost-sheets.functions";
@@ -72,6 +74,7 @@ function CostSheetsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const loadDirectory = useServerFn(getCostSheetDirectory);
+  const loadCurrencies = useServerFn(getCostSheetCurrencies);
   const loadTemplates = useServerFn(getCostSheetTemplates);
   const createSheet = useServerFn(createCostSheet);
   const removeSheet = useServerFn(deleteCostSheet);
@@ -94,6 +97,10 @@ function CostSheetsPage() {
     queryKey: ["cost-sheet-templates"],
     queryFn: () => loadTemplates(),
   });
+  const { data: currencies = [] } = useQuery({
+    queryKey: ["cost-sheet-currencies"],
+    queryFn: () => loadCurrencies(),
+  });
   const { data: clients = [] } = useQuery({
     queryKey: ["cost-sheet-clients"],
     queryFn: async () => {
@@ -115,6 +122,15 @@ function CostSheetsPage() {
         .includes(query),
     );
   }, [search, sheets]);
+  useEffect(() => {
+    if (!currencies.length) return;
+    setForm((current) => {
+      if (currencies.some((currency) => currency.code === current.currency)) return current;
+      const fallback = currencies.find((currency) => currency.is_default) || currencies[0];
+      if (!fallback) return current;
+      return { ...current, currency: fallback.code };
+    });
+  }, [currencies]);
   const createMutation = useMutation({
     mutationFn: () =>
       createSheet({
@@ -225,6 +241,7 @@ function CostSheetsPage() {
         form={form}
         setForm={setForm}
         clients={clients}
+        currencies={currencies}
         templates={templates}
         saving={createMutation.isPending}
         onSave={() => createMutation.mutate()}
@@ -332,6 +349,7 @@ function CreateSheetDialog({
   form,
   setForm,
   clients,
+  currencies,
   templates,
   saving,
   onSave,
@@ -341,6 +359,7 @@ function CreateSheetDialog({
   form: SheetForm;
   setForm: React.Dispatch<React.SetStateAction<SheetForm>>;
   clients: Array<{ id: string; name: string; company: string | null }>;
+  currencies: CostSheetCurrency[];
   templates: CostSheetTemplateRecord[];
   saving: boolean;
   onSave: () => void;
@@ -385,10 +404,13 @@ function CreateSheetDialog({
               value={form.templateId}
               onValueChange={(templateId) => {
                 const template = templates.find((item) => item.id === templateId);
+                const templateCurrency = currencies.find(
+                  (currency) => currency.code === template?.currency,
+                );
                 setForm((current) => ({
                   ...current,
                   templateId,
-                  currency: template?.currency || current.currency,
+                  currency: templateCurrency?.code || current.currency,
                 }));
               }}
             >
@@ -409,13 +431,29 @@ function CreateSheetDialog({
             ) : null}
           </Field>
           <Field label="Currency">
-            <Input
+            <Select
               value={form.currency}
-              maxLength={10}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))
-              }
-            />
+              onValueChange={(currency) => setForm((current) => ({ ...current, currency }))}
+              disabled={!currencies.length}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {currencies.map((currency) => (
+                  <SelectItem key={currency.id} value={currency.code}>
+                    {currency.code} — {currency.name}
+                    {currency.symbol ? ` (${currency.symbol})` : ""}
+                    {currency.is_default ? " · Default" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!currencies.length ? (
+              <p className="mt-2 text-xs text-destructive">
+                Add an active currency under Settings → Currencies before creating a cost sheet.
+              </p>
+            ) : null}
           </Field>
           <Field label="Notes" className="sm:col-span-2">
             <Textarea
@@ -431,7 +469,14 @@ function CreateSheetDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={saving || !form.name.trim()} onClick={onSave}>
+          <Button
+            disabled={
+              saving ||
+              !form.name.trim() ||
+              !currencies.some((currency) => currency.code === form.currency)
+            }
+            onClick={onSave}
+          >
             {saving ? "Creating…" : "Create cost sheet"}
           </Button>
         </DialogFooter>

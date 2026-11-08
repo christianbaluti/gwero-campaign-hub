@@ -109,6 +109,14 @@ export type CostSheetTemplateRecord = CostSheetTemplateDefinition & {
   updated_at?: string;
 };
 
+export type CostSheetCurrency = {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  is_default: boolean;
+};
+
 type ItemInput = {
   costSheetId: string;
   itemId?: string;
@@ -712,6 +720,19 @@ export const getCostSheetDirectory = createServerFn({ method: "GET" })
     return serialize(rows as CostSheetDirectoryRecord[]);
   });
 
+export const getCostSheetCurrencies = createServerFn({ method: "GET" })
+  .middleware([permissionMiddleware("opportunities.manage")])
+  .handler(async () => {
+    const { getPool } = await import("./db.server");
+    const [rows] = await getPool().query(
+      `SELECT id, code, name, symbol, is_default
+         FROM currencies
+        WHERE is_active = TRUE
+        ORDER BY is_default DESC, sort_order ASC, code ASC`,
+    );
+    return serialize(rows as CostSheetCurrency[]);
+  });
+
 export const getCostSheetTemplates = createServerFn({ method: "GET" })
   .middleware([permissionMiddleware("opportunities.manage")])
   .handler(async () => {
@@ -750,6 +771,13 @@ export const createCostSheet = createServerFn({ method: "POST" })
     if (!data.name.trim()) throw new Error("Add a cost sheet name.");
     const { getPool } = await import("./db.server");
     const db = getPool();
+    const currency = data.currency.trim().toUpperCase();
+    const [currencyRows] = await db.execute(
+      "SELECT code FROM currencies WHERE code = ? AND is_active = TRUE LIMIT 1",
+      [currency],
+    );
+    if (!(currencyRows as Array<{ code: string }>).length)
+      throw new Error("Choose an active currency configured in Settings.");
     const template = data.templateId ? await resolveTemplate(db, data.templateId) : null;
     if (data.templateId && !template) throw new Error("Cost sheet template not found.");
     const id = randomUUID();
@@ -764,7 +792,7 @@ export const createCostSheet = createServerFn({ method: "POST" })
           id,
           data.name.trim(),
           data.clientId || null,
-          data.currency || template?.currency || "MWK",
+          currency,
           data.notes?.trim() || null,
           JSON.stringify(template?.column_rules || normalizeCostSheetColumnRules(undefined)),
         ],
