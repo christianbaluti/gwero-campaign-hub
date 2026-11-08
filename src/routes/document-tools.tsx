@@ -46,6 +46,7 @@ import {
 } from "@/lib/document-marks.functions";
 import { renderStampDataUrl } from "@/lib/document-mark-renderer";
 import type { DocumentMark, StampDesign } from "@/lib/document-marks.types";
+import { cleanSignatureImage, signaturePngBlob } from "@/lib/signature-image";
 
 export const Route = createFileRoute("/document-tools")({ component: DocumentToolsPage });
 
@@ -257,7 +258,18 @@ function SignatureEditor({ onClose }: { onClose: () => void }) {
       const id = crypto.randomUUID();
       const body = new FormData();
       body.set("ownerId", id);
-      body.set("file", file);
+      const sourceUrl = URL.createObjectURL(file);
+      let uploadFile = file;
+      try {
+        const cleanedUrl = await cleanSignatureImage(sourceUrl);
+        const cleaned = signaturePngBlob(cleanedUrl);
+        uploadFile = new File([cleaned], `${file.name.replace(/\.[^.]+$/, "")}-clean.png`, {
+          type: "image/png",
+        });
+      } finally {
+        URL.revokeObjectURL(sourceUrl);
+      }
+      body.set("file", uploadFile);
       const response = await fetch("/api/attachments/upload", { method: "POST", body });
       const uploaded = (await response.json()) as { path?: string; error?: string };
       if (!response.ok || !uploaded.path)

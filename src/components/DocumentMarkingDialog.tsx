@@ -35,6 +35,7 @@ import {
 import { applyDocumentMarks, getDocumentMarkWorkspace } from "@/lib/document-marks.functions";
 import { renderStampDataUrl } from "@/lib/document-mark-renderer";
 import type { DocumentMark } from "@/lib/document-marks.types";
+import { cleanSignatureImage } from "@/lib/signature-image";
 
 export type MarkingSource = { path: string; name: string };
 export type MarkingResult = { path: string; name: string; type: string; size: number };
@@ -48,6 +49,7 @@ type Placement = {
   widthRatio: number;
   rotation: number;
   appliedDate: string;
+  imagePng?: string;
 };
 
 function attachmentUrl(path: string) {
@@ -90,6 +92,9 @@ export function DocumentMarkingDialog({
   const [yRatio, setYRatio] = useState(0.82);
   const [widthRatio, setWidthRatio] = useState(0.24);
   const [rotation, setRotation] = useState(0);
+  const [cleanSignature, setCleanSignature] = useState<{ markId: string; url: string } | null>(
+    null,
+  );
   const [appliedDate, setAppliedDate] = useState(today());
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null);
@@ -103,7 +108,32 @@ export function DocumentMarkingDialog({
   const marks = useMemo(() => data?.marks || [], [data?.marks]);
   const marksById = useMemo(() => new Map(marks.map((item) => [item.id, item])), [marks]);
   const mark = marksById.get(markId) || null;
-  const previewUrl = useMemo(() => markPreview(mark, appliedDate), [appliedDate, mark]);
+  const signatureReady =
+    mark?.type !== "signature" || (cleanSignature?.markId === mark.id && cleanSignature.url);
+  const previewUrl = useMemo(
+    () =>
+      mark?.type === "signature" && cleanSignature?.markId === mark.id
+        ? cleanSignature.url
+        : markPreview(mark, appliedDate),
+    [appliedDate, cleanSignature, mark],
+  );
+
+  useEffect(() => {
+    if (mark?.type !== "signature") {
+      setCleanSignature(null);
+      return;
+    }
+    let cancelled = false;
+    setCleanSignature(null);
+    void cleanSignatureImage(`${attachmentUrl(mark.imagePath)}?inline=1`)
+      .then((url) => {
+        if (!cancelled) setCleanSignature({ markId: mark.id, url });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [mark]);
 
   useEffect(() => {
     if (!source) return;
@@ -125,6 +155,11 @@ export function DocumentMarkingDialog({
   }, [markId, marks]);
 
   useEffect(() => {
+    if (mark && !editingPlacementId && placements.length === 0)
+      setWidthRatio(mark.type === "signature" ? 0.14 : 0.22);
+  }, [editingPlacementId, mark, placements.length]);
+
+  useEffect(() => {
     if (!source) return;
     let cancelled = false;
     let loadingTask: PDFDocumentLoadingTask | null = null;
@@ -137,7 +172,7 @@ export function DocumentMarkingDialog({
         const [response, pdfjs, workerModule] = await Promise.all([
           fetch(`${attachmentUrl(source.path)}?inline=1`),
           import("pdfjs-dist"),
-          import("pdfjs-dist/build/pdf.worker.min.mjs?worker&inline"),
+          import("pdfjs-dist/build/pdf.worker.min.mjs?worker"),
         ]);
         if (!response.ok) throw new Error("The PDF could not be opened.");
         pdfjsModule = pdfjs;
@@ -222,11 +257,13 @@ export function DocumentMarkingDialog({
               widthRatio: placement.widthRatio,
               rotation: placement.rotation,
               appliedDate: placement.appliedDate,
-              ...(placementMark.type === "stamp" && placementMark.design
-                ? {
-                    stampPng: renderStampDataUrl(placementMark.design, placement.appliedDate, 2),
-                  }
-                : {}),
+              ...(placement.imagePng
+                ? { imagePng: placement.imagePng }
+                : placementMark.type === "stamp" && placementMark.design
+                  ? {
+                      imagePng: renderStampDataUrl(placementMark.design, placement.appliedDate, 2),
+                    }
+                  : {}),
             };
           }),
         },
@@ -263,6 +300,9 @@ export function DocumentMarkingDialog({
       widthRatio,
       rotation,
       appliedDate,
+      ...(mark.type === "signature" && cleanSignature?.markId === mark.id
+        ? { imagePng: cleanSignature.url }
+        : {}),
     };
     setPlacements((current) =>
       editingPlacementId
@@ -349,7 +389,8 @@ export function DocumentMarkingDialog({
                 >
                   {visiblePlacements.map((placement, index) => {
                     const placementMark = marksById.get(placement.markId) || null;
-                    const url = markPreview(placementMark, placement.appliedDate);
+                    const url =
+                      placement.imagePng || markPreview(placementMark, placement.appliedDate);
                     return url ? (
                       <div
                         key={placement.id}
@@ -408,7 +449,14 @@ export function DocumentMarkingDialog({
             <div className="space-y-5">
               <div className="space-y-2">
                 <Label>Stamp or signature</Label>
-                <Select value={markId} onValueChange={setMarkId}>
+                <Select
+                  value={markId}
+                  onValueChange={(value) => {
+                    setMarkId(value);
+                    if (!editingPlacementId)
+                      setWidthRatio(marksById.get(value)?.type === "signature" ? 0.14 : 0.22);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Choose from your library" />
                   </SelectTrigger>
@@ -476,7 +524,7 @@ export function DocumentMarkingDialog({
                     <input
                       className="mt-2 w-full accent-violet-700"
                       type="range"
-                      min="5"
+                      min="3"
                       max="65"
                       value={Math.round(widthRatio * 100)}
                       onChange={(event) => setWidthRatio(Number(event.target.value) / 100)}
@@ -500,7 +548,7 @@ export function DocumentMarkingDialog({
                 <Button
                   className="mt-4 w-full"
                   variant={editingPlacementId ? "default" : "outline"}
-                  disabled={!mark || reading || !pageReady}
+                  disabled={!mark || !signatureReady || reading || !pageReady}
                   onClick={savePlacement}
                 >
                   {editingPlacementId ? (

@@ -169,7 +169,7 @@ type DocumentMarkPlacementInput = {
   widthRatio: number;
   rotation: number;
   appliedDate: string;
-  stampPng?: string;
+  imagePng?: string;
 };
 
 export const applyDocumentMarks = createServerFn({ method: "POST" })
@@ -216,14 +216,16 @@ export const applyDocumentMarks = createServerFn({ method: "POST" })
       let embedded = signatureImages.get(placement.markId);
       if (!embedded || mark["mark_type"] !== "signature") {
         let imageBytes: Uint8Array;
-        if (mark["mark_type"] === "signature") {
+        const suppliedImage = String(placement.imagePng || "").match(
+          /^data:image\/png;base64,([a-z0-9+/=]+)$/i,
+        )?.[1];
+        if (suppliedImage && suppliedImage.length <= 3_000_000) {
+          imageBytes = new Uint8Array(Buffer.from(suppliedImage, "base64"));
+        } else if (mark["mark_type"] === "signature") {
           const image = await readAttachmentRecord(String(mark["image_attachment_path"] || ""));
           imageBytes = new Uint8Array(image.content);
         } else {
-          const match = String(placement.stampPng || "").match(
-            /^data:image\/png;base64,([a-z0-9+/=]+)$/i,
-          );
-          const encodedStamp = match?.[1];
+          const encodedStamp = suppliedImage;
           if (!encodedStamp || encodedStamp.length > 2_000_000)
             throw new Error("One of the stamp previews is invalid.");
           imageBytes = new Uint8Array(Buffer.from(encodedStamp, "base64"));
@@ -235,7 +237,7 @@ export const applyDocumentMarks = createServerFn({ method: "POST" })
         }
         if (mark["mark_type"] === "signature") signatureImages.set(placement.markId, embedded);
       }
-      const widthRatio = bounded(placement.widthRatio, 0.22, 0.05, 0.65);
+      const widthRatio = bounded(placement.widthRatio, 0.14, 0.03, 0.65);
       const xRatio = bounded(placement.xRatio, 0.5, 0, 1);
       const yRatio = bounded(placement.yRatio, 0.5, 0, 1);
       const rotation = bounded(placement.rotation, 0, -25, 25);
@@ -284,21 +286,34 @@ export const applyDocumentMarks = createServerFn({ method: "POST" })
       "application/pdf",
       context.user.id,
     );
-    // Tender workspaces store their active file path in opportunity_documents. Advance that
-    // pointer to the marked output so reopening an RFQ, RFP, bid or EOI shows and submits the
-    // signed/stamped version instead of silently falling back to the original attachment.
+    // A signed file is a new tender document, never a replacement. Keeping the source row
+    // preserves the unsigned original and makes every generated variant visible in the workspace.
     await db.execute(
-      `UPDATE opportunity_documents
-          SET attachment_path = ?, content_type = ?, file_size = ?
+      `INSERT INTO opportunity_documents
+        (id, opportunity_type, opportunity_id, checklist_item_id, document_id, attachment_path,
+         display_name, content_type, file_size, document_role, include_in_submission,
+         outgoing_name, created_by)
+       SELECT UUID(), opportunity_type, opportunity_id, checklist_item_id, document_id, ?, ?, ?, ?,
+              document_role, include_in_submission, ?, ?
+         FROM opportunity_documents
         WHERE attachment_path = ? AND (opportunity_id = ? OR document_id = ?)`,
       [
         output.path,
+        output.name,
         output.type,
         output.size,
+        output.name,
+        context.user.id,
         `${attachmentOwnerId}/${attachmentFileId}`,
         attachmentOwnerId,
         attachmentOwnerId,
       ],
+    );
+    await db.execute(
+      `UPDATE opportunity_documents
+          SET include_in_submission = FALSE
+        WHERE attachment_path = ? AND (opportunity_id = ? OR document_id = ?)`,
+      [`${attachmentOwnerId}/${attachmentFileId}`, attachmentOwnerId, attachmentOwnerId],
     );
     const applicationIds: string[] = [];
     for (const placement of normalizedPlacements) {
