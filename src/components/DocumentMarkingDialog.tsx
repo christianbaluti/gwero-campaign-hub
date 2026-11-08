@@ -1,6 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, FileSignature, LoaderCircle, MousePointer2, Stamp } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileSignature,
+  LoaderCircle,
+  MousePointer2,
+  Pencil,
+  Plus,
+  Stamp,
+  Trash2,
+} from "lucide-react";
+import type { PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,12 +33,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { applyDocumentMark, getDocumentMarkWorkspace } from "@/lib/document-marks.functions";
+import { applyDocumentMarks, getDocumentMarkWorkspace } from "@/lib/document-marks.functions";
 import { renderStampDataUrl } from "@/lib/document-mark-renderer";
 import type { DocumentMark } from "@/lib/document-marks.types";
 
 export type MarkingSource = { path: string; name: string };
 export type MarkingResult = { path: string; name: string; type: string; size: number };
+
+type Placement = {
+  id: string;
+  markId: string;
+  pageNumber: number;
+  xRatio: number;
+  yRatio: number;
+  widthRatio: number;
+  rotation: number;
+  appliedDate: string;
+};
 
 function attachmentUrl(path: string) {
   const [ownerId, fileId] = path.split("/");
@@ -38,6 +62,16 @@ function today() {
   return new Date(value.valueOf() - offset * 60_000).toISOString().slice(0, 10);
 }
 
+function placementId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+}
+
+function markPreview(mark: DocumentMark | null, appliedDate: string) {
+  if (!mark) return "";
+  if (mark.type === "signature") return `${attachmentUrl(mark.imagePath)}?inline=1`;
+  return mark.design ? renderStampDataUrl(mark.design, appliedDate, 0.7) : "";
+}
+
 export function DocumentMarkingDialog({
   source,
   onOpenChange,
@@ -48,23 +82,29 @@ export function DocumentMarkingDialog({
   onApplied?: (output: MarkingResult) => void;
 }) {
   const queryClient = useQueryClient();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [markId, setMarkId] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
   const [pageCount, setPageCount] = useState(1);
-  const [pageRatio, setPageRatio] = useState(1.414);
   const [xRatio, setXRatio] = useState(0.75);
   const [yRatio, setYRatio] = useState(0.82);
   const [widthRatio, setWidthRatio] = useState(0.24);
   const [rotation, setRotation] = useState(0);
   const [appliedDate, setAppliedDate] = useState(today());
+  const [placements, setPlacements] = useState<Placement[]>([]);
+  const [editingPlacementId, setEditingPlacementId] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
+  const [pageReady, setPageReady] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["document-mark-workspace"],
     queryFn: () => getDocumentMarkWorkspace(),
     enabled: Boolean(source),
   });
   const marks = useMemo(() => data?.marks || [], [data?.marks]);
-  const mark = marks.find((item) => item.id === markId) || null;
+  const marksById = useMemo(() => new Map(marks.map((item) => [item.id, item])), [marks]);
+  const mark = marksById.get(markId) || null;
+  const previewUrl = useMemo(() => markPreview(mark, appliedDate), [appliedDate, mark]);
 
   useEffect(() => {
     if (!source) return;
@@ -74,6 +114,9 @@ export function DocumentMarkingDialog({
     setWidthRatio(0.24);
     setRotation(0);
     setAppliedDate(today());
+    setPlacements([]);
+    setEditingPlacementId(null);
+    setPdfData(null);
   }, [source]);
 
   useEffect(() => {
@@ -90,53 +133,95 @@ export function DocumentMarkingDialog({
       try {
         const response = await fetch(`${attachmentUrl(source.path)}?inline=1`);
         if (!response.ok) throw new Error("The PDF could not be opened.");
-        const { PDFDocument } = await import("pdf-lib");
-        const pdf = await PDFDocument.load(await response.arrayBuffer(), {
-          ignoreEncryption: true,
-        });
-        if (cancelled) return;
-        setPageCount(pdf.getPageCount());
-        const page = pdf.getPage(Math.max(0, Math.min(pdf.getPageCount() - 1, pageNumber - 1)));
-        setPageRatio(page.getHeight() / page.getWidth());
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (!cancelled) setPdfData(bytes);
       } catch (cause) {
         toast.error(cause instanceof Error ? cause.message : "The PDF could not be opened.");
-      } finally {
         if (!cancelled) setReading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [pageNumber, source]);
+  }, [source]);
 
-  const previewUrl = useMemo(() => {
-    if (!mark) return "";
-    if (mark.type === "signature") return `${attachmentUrl(mark.imagePath)}?inline=1`;
-    return mark.design ? renderStampDataUrl(mark.design, appliedDate, 0.7) : "";
-  }, [appliedDate, mark]);
+  useEffect(() => {
+    if (!pdfData) return;
+    let cancelled = false;
+    let renderTask: RenderTask | null = null;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
+    setReading(true);
+    setPageReady(false);
+    void (async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+        loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfData) });
+        const pdf = await loadingTask.promise;
+        if (cancelled) return;
+        setPageCount(pdf.numPages);
+        const safePage = Math.max(1, Math.min(pdf.numPages, pageNumber));
+        if (safePage !== pageNumber) {
+          setPageNumber(safePage);
+          return;
+        }
+        const page = await pdf.getPage(safePage);
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        const baseViewport = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: Math.min(2, 1400 / baseViewport.width) });
+        canvas.width = Math.ceil(viewport.width);
+        canvas.height = Math.ceil(viewport.height);
+        renderTask = page.render({ canvas, viewport });
+        await renderTask.promise;
+        if (!cancelled) setPageReady(true);
+      } catch (cause) {
+        if (!cancelled && !(cause instanceof Error && cause.name === "RenderingCancelledException"))
+          toast.error(
+            cause instanceof Error ? cause.message : "The PDF page could not be rendered.",
+          );
+      } finally {
+        if (!cancelled) setReading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      void loadingTask?.destroy();
+    };
+  }, [pageNumber, pdfData]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      if (!source || !mark) throw new Error("Choose a stamp or signature first.");
-      return applyDocumentMark({
+      if (!source) throw new Error("Choose a document first.");
+      if (!placements.length) throw new Error("Add at least one placement first.");
+      return applyDocumentMarks({
         data: {
           sourcePath: source.path,
-          markId: mark.id,
-          pageNumber,
-          xRatio,
-          yRatio,
-          widthRatio,
-          rotation,
-          appliedDate,
-          ...(mark.type === "stamp" && mark.design
-            ? { stampPng: renderStampDataUrl(mark.design, appliedDate, 2) }
-            : {}),
+          placements: placements.map((placement) => {
+            const placementMark = marksById.get(placement.markId);
+            if (!placementMark) throw new Error("A selected stamp or signature is unavailable.");
+            return {
+              markId: placement.markId,
+              pageNumber: placement.pageNumber,
+              xRatio: placement.xRatio,
+              yRatio: placement.yRatio,
+              widthRatio: placement.widthRatio,
+              rotation: placement.rotation,
+              appliedDate: placement.appliedDate,
+              ...(placementMark.type === "stamp" && placementMark.design
+                ? {
+                    stampPng: renderStampDataUrl(placementMark.design, placement.appliedDate, 2),
+                  }
+                : {}),
+            };
+          }),
         },
       });
     },
     onSuccess: (result) => {
       toast.success(
-        `${mark?.type === "signature" ? "Signature" : "Stamp"} applied. The original document is unchanged.`,
+        `${result.applicationIds.length} placement${result.applicationIds.length === 1 ? "" : "s"} applied. The original document is unchanged.`,
       );
       void queryClient.invalidateQueries({ queryKey: ["document-mark-workspace"] });
       void queryClient.invalidateQueries({ queryKey: ["document-workspace"] });
@@ -149,30 +234,161 @@ export function DocumentMarkingDialog({
 
   const place = (event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setXRatio(Math.max(0.02, Math.min(0.98, (event.clientX - bounds.left) / bounds.width)));
-    setYRatio(Math.max(0.02, Math.min(0.98, (event.clientY - bounds.top) / bounds.height)));
+    setXRatio(Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)));
+    setYRatio(Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)));
   };
+
+  const savePlacement = () => {
+    if (!mark) return;
+    const next: Placement = {
+      id: editingPlacementId || placementId(),
+      markId: mark.id,
+      pageNumber,
+      xRatio,
+      yRatio,
+      widthRatio,
+      rotation,
+      appliedDate,
+    };
+    setPlacements((current) =>
+      editingPlacementId
+        ? current.map((placement) => (placement.id === editingPlacementId ? next : placement))
+        : [...current, next],
+    );
+    setEditingPlacementId(null);
+    if (!editingPlacementId) {
+      setXRatio(Math.min(0.9, xRatio + 0.04));
+      setYRatio(Math.min(0.9, yRatio + 0.04));
+    }
+  };
+
+  const editPlacement = (placement: Placement) => {
+    setEditingPlacementId(placement.id);
+    setMarkId(placement.markId);
+    setPageNumber(placement.pageNumber);
+    setXRatio(placement.xRatio);
+    setYRatio(placement.yRatio);
+    setWidthRatio(placement.widthRatio);
+    setRotation(placement.rotation);
+    setAppliedDate(placement.appliedDate);
+  };
+
+  const visiblePlacements = placements.filter(
+    (placement) => placement.pageNumber === pageNumber && placement.id !== editingPlacementId,
+  );
 
   return (
     <Dialog open={Boolean(source)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[94vh] w-[96vw] max-w-7xl grid-rows-none flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex h-[96vh] w-[98vw] max-w-[1500px] grid-rows-none flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b px-5 py-4 pr-14 text-left">
           <DialogTitle className="flex items-center gap-2">
             <FileSignature className="size-5 text-violet-700" /> Stamp or sign document
           </DialogTitle>
           <DialogDescription className="truncate">
-            {source?.name} · the result is saved as a new protected PDF
+            {source?.name} · place multiple marks on the actual PDF pages, then apply them together
           </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_390px]">
-          <div className="min-h-[42vh] border-b bg-slate-200 lg:border-b-0 lg:border-r">
-            {source ? (
-              <iframe
-                title="PDF page preview"
-                src={`${attachmentUrl(source.path)}?inline=1#page=${pageNumber}&toolbar=0&view=Fit`}
-                className="h-full min-h-[42vh] w-full"
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="gwero-scrollbar min-h-[42vh] overflow-auto border-b bg-slate-200 p-4 lg:border-b-0 lg:border-r">
+            <div className="mb-3 flex items-center justify-between rounded-xl bg-white/90 px-3 py-2 shadow-sm">
+              <div>
+                <p className="text-sm font-semibold">Exact page preview</p>
+                <p className="text-xs text-muted-foreground">
+                  Page {pageNumber} of {pageCount} · click or drag directly on the document
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  disabled={pageNumber <= 1 || reading}
+                  onClick={() => setPageNumber((current) => Math.max(1, current - 1))}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  disabled={pageNumber >= pageCount || reading}
+                  onClick={() => setPageNumber((current) => Math.min(pageCount, current + 1))}
+                  aria-label="Next page"
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="relative mx-auto w-full max-w-[900px] overflow-hidden bg-white shadow-xl">
+              <canvas
+                ref={canvasRef}
+                className="block h-auto w-full"
+                aria-label="Rendered PDF page"
               />
-            ) : null}
+              {pageReady ? (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Place mark on PDF page ${pageNumber}`}
+                  className="absolute inset-0 cursor-crosshair overflow-hidden"
+                  onPointerDown={place}
+                  onPointerMove={(event) => event.buttons === 1 && place(event)}
+                >
+                  {visiblePlacements.map((placement, index) => {
+                    const placementMark = marksById.get(placement.markId) || null;
+                    const url = markPreview(placementMark, placement.appliedDate);
+                    return url ? (
+                      <div
+                        key={placement.id}
+                        className="pointer-events-none absolute"
+                        style={{
+                          left: `${placement.xRatio * 100}%`,
+                          top: `${placement.yRatio * 100}%`,
+                          width: `${placement.widthRatio * 100}%`,
+                          transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`,
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt="Queued document mark"
+                          draggable={false}
+                          className="block h-auto w-full select-none object-contain"
+                          style={{ opacity: placementMark?.type === "stamp" ? 0.86 : 0.96 }}
+                        />
+                        <span className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full bg-violet-700 text-[10px] font-bold text-white shadow">
+                          {index + 1}
+                        </span>
+                      </div>
+                    ) : null;
+                  })}
+                  {previewUrl ? (
+                    <div
+                      className="pointer-events-none absolute rounded-sm ring-2 ring-violet-500 ring-offset-2"
+                      style={{
+                        left: `${xRatio * 100}%`,
+                        top: `${yRatio * 100}%`,
+                        width: `${widthRatio * 100}%`,
+                        transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                      }}
+                    >
+                      <img
+                        src={previewUrl}
+                        alt="Current mark preview"
+                        draggable={false}
+                        className="block h-auto w-full select-none object-contain"
+                        style={{ opacity: mark?.type === "stamp" ? 0.86 : 0.96 }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {reading || !pageReady ? (
+                <div className="absolute inset-0 grid min-h-80 place-items-center bg-white/80 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <LoaderCircle className="size-4 animate-spin" /> Rendering exact PDF page…
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className="gwero-scrollbar overflow-y-auto p-5">
             <div className="space-y-5">
@@ -225,106 +441,148 @@ export function DocumentMarkingDialog({
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Position on page {pageNumber}</Label>
-                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                    <MousePointer2 className="size-3" /> click to place
+              <div className="rounded-xl border bg-slate-50 p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <Label>Placement controls</Label>
+                    <p className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <MousePointer2 className="size-3" /> Move it on the exact page preview
+                    </p>
+                  </div>
+                  <span className="text-xs font-medium text-violet-700">
+                    {Math.round(widthRatio * 100)}% wide
                   </span>
                 </div>
-                <div className="rounded-xl bg-slate-100 p-3">
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Choose stamp position"
-                    className="relative mx-auto w-full max-w-[245px] cursor-crosshair overflow-hidden border bg-white shadow-sm"
-                    style={{ aspectRatio: `1 / ${pageRatio}` }}
-                    onPointerDown={place}
-                    onPointerMove={(event) => event.buttons === 1 && place(event)}
-                  >
-                    <div className="absolute inset-x-4 top-5 space-y-2 opacity-20">
-                      {Array.from({ length: 12 }).map((_, index) => (
-                        <div
-                          key={index}
-                          className="h-1 rounded bg-slate-400"
-                          style={{ width: `${65 + (index % 4) * 8}%` }}
-                        />
-                      ))}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs">
+                      <Label>Size</Label>
+                      <span>{Math.round(widthRatio * 100)}%</span>
                     </div>
-                    {previewUrl ? (
-                      <img
-                        src={previewUrl}
-                        alt="Selected mark"
-                        draggable={false}
-                        className="pointer-events-none absolute h-auto select-none object-contain"
-                        style={{
-                          left: `${xRatio * 100}%`,
-                          top: `${yRatio * 100}%`,
-                          width: `${widthRatio * 100}%`,
-                          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
-                          opacity: mark?.type === "stamp" ? 0.86 : 0.96,
-                        }}
-                      />
-                    ) : null}
+                    <input
+                      className="mt-2 w-full accent-violet-700"
+                      type="range"
+                      min="5"
+                      max="65"
+                      value={Math.round(widthRatio * 100)}
+                      onChange={(event) => setWidthRatio(Number(event.target.value) / 100)}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs">
+                      <Label>Rotation</Label>
+                      <span>{rotation}°</span>
+                    </div>
+                    <input
+                      className="mt-2 w-full accent-violet-700"
+                      type="range"
+                      min="-25"
+                      max="25"
+                      value={rotation}
+                      onChange={(event) => setRotation(Number(event.target.value))}
+                    />
                   </div>
                 </div>
+                <Button
+                  className="mt-4 w-full"
+                  variant={editingPlacementId ? "default" : "outline"}
+                  disabled={!mark || reading || !pageReady}
+                  onClick={savePlacement}
+                >
+                  {editingPlacementId ? (
+                    <Check className="mr-2 size-4" />
+                  ) : (
+                    <Plus className="mr-2 size-4" />
+                  )}
+                  {editingPlacementId ? "Update placement" : "Add this placement"}
+                </Button>
               </div>
 
-              <div className="space-y-4 rounded-xl border p-4">
-                <div>
-                  <div className="flex justify-between text-xs">
-                    <Label>Size</Label>
-                    <span>{Math.round(widthRatio * 100)}%</span>
-                  </div>
-                  <input
-                    className="mt-2 w-full accent-violet-700"
-                    type="range"
-                    min="8"
-                    max="55"
-                    value={Math.round(widthRatio * 100)}
-                    onChange={(event) => setWidthRatio(Number(event.target.value) / 100)}
-                  />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Queued placements</Label>
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">
+                    {placements.length}
+                  </span>
                 </div>
-                <div>
-                  <div className="flex justify-between text-xs">
-                    <Label>Rotation</Label>
-                    <span>{rotation}°</span>
+                {placements.length ? (
+                  <div className="space-y-2">
+                    {placements.map((placement, index) => {
+                      const placementMark = marksById.get(placement.markId);
+                      return (
+                        <div
+                          key={placement.id}
+                          className={`flex items-center gap-3 rounded-xl border p-3 ${editingPlacementId === placement.id ? "border-violet-400 bg-violet-50" : "bg-white"}`}
+                        >
+                          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{placementMark?.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Page {placement.pageNumber} · {Math.round(placement.widthRatio * 100)}
+                              %
+                            </p>
+                          </div>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => editPlacement(placement)}
+                            aria-label={`Edit placement ${index + 1}`}
+                          >
+                            <Pencil className="size-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => {
+                              setPlacements((current) =>
+                                current.filter((item) => item.id !== placement.id),
+                              );
+                              if (editingPlacementId === placement.id) setEditingPlacementId(null);
+                            }}
+                            aria-label={`Remove placement ${index + 1}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <input
-                    className="mt-2 w-full accent-violet-700"
-                    type="range"
-                    min="-20"
-                    max="20"
-                    value={rotation}
-                    onChange={(event) => setRotation(Number(event.target.value))}
-                  />
-                </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed p-4 text-center text-xs text-muted-foreground">
+                    Position the current mark on the PDF, then add it. Repeat anywhere on any page.
+                  </p>
+                )}
               </div>
             </div>
           </div>
         </div>
         <DialogFooter className="border-t px-5 py-3 sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            {reading
-              ? "Reading PDF pages…"
-              : "Placement is recorded in the document audit history."}
+            {placements.length
+              ? `${placements.length} placement${placements.length === 1 ? "" : "s"} will be written into one new PDF version.`
+              : "The preview uses the exact PDF page dimensions used by the final document."}
           </p>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button
-              disabled={!mark || reading || mutation.isPending}
+              disabled={!placements.length || reading || mutation.isPending}
               onClick={() => mutation.mutate()}
             >
               {mutation.isPending ? (
                 <LoaderCircle className="mr-2 size-4 animate-spin" />
-              ) : mark?.type === "signature" ? (
+              ) : placements.some(
+                  (placement) => marksById.get(placement.markId)?.type === "signature",
+                ) ? (
                 <Check className="mr-2 size-4" />
               ) : (
                 <Stamp className="mr-2 size-4" />
               )}
-              {mark?.type === "signature" ? "Apply signature" : "Apply stamp"}
+              Apply {placements.length || ""} placement{placements.length === 1 ? "" : "s"}
             </Button>
           </div>
         </DialogFooter>

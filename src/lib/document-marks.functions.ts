@@ -8,6 +8,7 @@ import type {
   MarkingDocument,
   StampDesign,
 } from "./document-marks.types";
+import { centeredPdfPlacement } from "./document-mark-placement";
 
 const permission = permissionMiddleware("documents.manage");
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -160,85 +161,121 @@ export const archiveDocumentMark = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export const applyDocumentMark = createServerFn({ method: "POST" })
+type DocumentMarkPlacementInput = {
+  markId: string;
+  pageNumber: number;
+  xRatio: number;
+  yRatio: number;
+  widthRatio: number;
+  rotation: number;
+  appliedDate: string;
+  stampPng?: string;
+};
+
+export const applyDocumentMarks = createServerFn({ method: "POST" })
   .middleware([permission])
-  .validator(
-    (data: {
-      sourcePath: string;
-      markId: string;
-      pageNumber: number;
-      xRatio: number;
-      yRatio: number;
-      widthRatio: number;
-      rotation: number;
-      appliedDate: string;
-      stampPng?: string;
-    }) => data,
-  )
+  .validator((data: { sourcePath: string; placements: DocumentMarkPlacementInput[] }) => data)
   .handler(async ({ data, context }) => {
     const [ownerId, fileId] = String(data.sourcePath || "").split("/");
-    if (!uuid.test(ownerId || "") || !uuid.test(fileId || "") || !uuid.test(data.markId))
-      throw new Error("Invalid document or mark.");
+    if (!uuid.test(ownerId || "") || !uuid.test(fileId || "")) throw new Error("Invalid document.");
+    if (!Array.isArray(data.placements) || !data.placements.length)
+      throw new Error("Add at least one stamp or signature placement.");
+    if (data.placements.length > 50)
+      throw new Error("A document can contain up to 50 placements at a time.");
+    if (data.placements.some((placement) => !uuid.test(placement.markId)))
+      throw new Error("One of the selected stamps or signatures is invalid.");
     const attachmentOwnerId = ownerId!;
     const attachmentFileId = fileId!;
     const { requireAttachmentAccess } = await import("./attachment-access.server");
     await requireAttachmentAccess(attachmentOwnerId, true);
     const { getPool } = await import("./db.server");
     const db = getPool();
+    const markIds = [...new Set(data.placements.map((placement) => placement.markId))];
     const [markRows] = await db.execute(
-      "SELECT * FROM document_marks WHERE id = ? AND status = 'active' LIMIT 1",
-      [data.markId],
+      `SELECT * FROM document_marks
+        WHERE id IN (${markIds.map(() => "?").join(", ")}) AND status = 'active'`,
+      markIds,
     );
-    const mark = (markRows as RowDataPacket[])[0];
-    if (!mark) throw new Error("The selected stamp or signature no longer exists.");
+    const marks = new Map(
+      (markRows as RowDataPacket[]).map((row) => [String(row["id"]), row] as const),
+    );
+    if (marks.size !== markIds.length)
+      throw new Error("One of the selected stamps or signatures no longer exists.");
     const { readAttachmentRecord, saveAttachmentBuffer } = await import("./attachments.server");
     const source = await readAttachmentRecord(`${attachmentOwnerId}/${attachmentFileId}`);
     if (source.type !== "application/pdf" && !source.name.toLowerCase().endsWith(".pdf"))
       throw new Error("Stamps and signatures can currently be applied to PDF documents.");
     const { PDFDocument, degrees } = await import("pdf-lib");
     const pdf = await PDFDocument.load(source.content);
-    const pageIndex = Math.floor(bounded(data.pageNumber, 1, 1, pdf.getPageCount())) - 1;
-    const page = pdf.getPage(pageIndex);
-    let imageBytes: Uint8Array;
-    if (mark["mark_type"] === "signature") {
-      const image = await readAttachmentRecord(String(mark["image_attachment_path"] || ""));
-      imageBytes = new Uint8Array(image.content);
-    } else {
-      const match = String(data.stampPng || "").match(/^data:image\/png;base64,([a-z0-9+/=]+)$/i);
-      const encodedStamp = match?.[1];
-      if (!encodedStamp || encodedStamp.length > 2_000_000)
-        throw new Error("The stamp preview is invalid.");
-      imageBytes = new Uint8Array(Buffer.from(encodedStamp, "base64"));
+    const normalizedPlacements = [];
+    const signatureImages = new Map<string, Awaited<ReturnType<typeof pdf.embedPng>>>();
+    for (const placement of data.placements) {
+      const mark = marks.get(placement.markId)!;
+      const pageIndex = Math.floor(bounded(placement.pageNumber, 1, 1, pdf.getPageCount())) - 1;
+      const page = pdf.getPage(pageIndex);
+      let embedded = signatureImages.get(placement.markId);
+      if (!embedded || mark["mark_type"] !== "signature") {
+        let imageBytes: Uint8Array;
+        if (mark["mark_type"] === "signature") {
+          const image = await readAttachmentRecord(String(mark["image_attachment_path"] || ""));
+          imageBytes = new Uint8Array(image.content);
+        } else {
+          const match = String(placement.stampPng || "").match(
+            /^data:image\/png;base64,([a-z0-9+/=]+)$/i,
+          );
+          const encodedStamp = match?.[1];
+          if (!encodedStamp || encodedStamp.length > 2_000_000)
+            throw new Error("One of the stamp previews is invalid.");
+          imageBytes = new Uint8Array(Buffer.from(encodedStamp, "base64"));
+        }
+        try {
+          embedded = await pdf.embedPng(imageBytes);
+        } catch {
+          embedded = await pdf.embedJpg(imageBytes);
+        }
+        if (mark["mark_type"] === "signature") signatureImages.set(placement.markId, embedded);
+      }
+      const widthRatio = bounded(placement.widthRatio, 0.22, 0.05, 0.65);
+      const xRatio = bounded(placement.xRatio, 0.5, 0, 1);
+      const yRatio = bounded(placement.yRatio, 0.5, 0, 1);
+      const rotation = bounded(placement.rotation, 0, -25, 25);
+      const width = page.getWidth() * widthRatio;
+      const height = width * (embedded.height / embedded.width);
+      // pdf-lib rotates around the image's lower-left corner while CSS rotates around its
+      // centre. Offset that corner so the rendered PDF matches the exact-page preview.
+      const { x, y } = centeredPdfPlacement({
+        pageWidth: page.getWidth(),
+        pageHeight: page.getHeight(),
+        imageWidth: width,
+        imageHeight: height,
+        xRatio,
+        yRatio,
+        rotation,
+      });
+      page.drawImage(embedded, {
+        x,
+        y,
+        width,
+        height,
+        rotate: degrees(rotation),
+        opacity: mark["mark_type"] === "stamp" ? 0.86 : 0.96,
+      });
+      normalizedPlacements.push({
+        mark,
+        pageIndex,
+        xRatio,
+        yRatio,
+        widthRatio,
+        rotation,
+        appliedDate: /^\d{4}-\d{2}-\d{2}$/.test(placement.appliedDate || "")
+          ? placement.appliedDate
+          : null,
+      });
     }
-    let embedded;
-    try {
-      embedded = await pdf.embedPng(imageBytes);
-    } catch {
-      embedded = await pdf.embedJpg(imageBytes);
-    }
-    const widthRatio = bounded(data.widthRatio, 0.22, 0.05, 0.65);
-    const xRatio = bounded(data.xRatio, 0.5, 0, 1);
-    const yRatio = bounded(data.yRatio, 0.5, 0, 1);
-    const rotation = bounded(data.rotation, 0, -25, 25);
-    const width = page.getWidth() * widthRatio;
-    const height = width * (embedded.height / embedded.width);
-    const centerX = page.getWidth() * xRatio;
-    const centerYFromTop = page.getHeight() * yRatio;
-    const x = Math.max(0, Math.min(page.getWidth() - width, centerX - width / 2));
-    const y = Math.max(
-      0,
-      Math.min(page.getHeight() - height, page.getHeight() - centerYFromTop - height / 2),
-    );
-    page.drawImage(embedded, {
-      x,
-      y,
-      width,
-      height,
-      rotate: degrees(rotation),
-      opacity: mark["mark_type"] === "stamp" ? 0.86 : 0.96,
-    });
     const outputBytes = await pdf.save();
-    const suffix = mark["mark_type"] === "signature" ? "signed" : "stamped";
+    const markTypes = new Set(normalizedPlacements.map(({ mark }) => String(mark["mark_type"])));
+    const suffix =
+      markTypes.size > 1 ? "signed-stamped" : markTypes.has("signature") ? "signed" : "stamped";
     const outputName = `${source.name.replace(/\.pdf$/i, "")}-${suffix}-${Date.now()}.pdf`;
     const output = await saveAttachmentBuffer(
       attachmentOwnerId,
@@ -247,30 +284,34 @@ export const applyDocumentMark = createServerFn({ method: "POST" })
       "application/pdf",
       context.user.id,
     );
-    const applicationId = randomUUID();
-    await db.execute(
-      `INSERT INTO document_mark_applications
-        (id, source_attachment_path, output_attachment_path, source_name, output_name,
-         mark_id, mark_type, page_number, x_ratio, y_ratio, width_ratio, rotation,
-         applied_date, applied_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        applicationId,
-        `${attachmentOwnerId}/${attachmentFileId}`,
-        output.path,
-        source.name,
-        outputName,
-        data.markId,
-        mark["mark_type"],
-        pageIndex + 1,
-        xRatio,
-        yRatio,
-        widthRatio,
-        rotation,
-        /^\d{4}-\d{2}-\d{2}$/.test(data.appliedDate || "") ? data.appliedDate : null,
-        context.user.id,
-      ],
-    );
+    const applicationIds: string[] = [];
+    for (const placement of normalizedPlacements) {
+      const applicationId = randomUUID();
+      applicationIds.push(applicationId);
+      await db.execute(
+        `INSERT INTO document_mark_applications
+          (id, source_attachment_path, output_attachment_path, source_name, output_name,
+           mark_id, mark_type, page_number, x_ratio, y_ratio, width_ratio, rotation,
+           applied_date, applied_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          applicationId,
+          `${attachmentOwnerId}/${attachmentFileId}`,
+          output.path,
+          source.name,
+          outputName,
+          String(placement.mark["id"]),
+          placement.mark["mark_type"],
+          placement.pageIndex + 1,
+          placement.xRatio,
+          placement.yRatio,
+          placement.widthRatio,
+          placement.rotation,
+          placement.appliedDate,
+          context.user.id,
+        ],
+      );
+    }
     const [documentRows] = await db.execute("SELECT id FROM documents WHERE id = ? LIMIT 1", [
       attachmentOwnerId,
     ]);
@@ -281,11 +322,11 @@ export const applyDocumentMark = createServerFn({ method: "POST" })
         {
           documentId: attachmentOwnerId,
           attachment: output,
-          notes: `${mark["mark_type"] === "signature" ? "Signed" : "Stamped"} with ${String(mark["name"])} on page ${pageIndex + 1}`,
+          notes: `Applied ${normalizedPlacements.length} stamp/signature placement${normalizedPlacements.length === 1 ? "" : "s"} across ${new Set(normalizedPlacements.map((placement) => placement.pageIndex)).size} page${new Set(normalizedPlacements.map((placement) => placement.pageIndex)).size === 1 ? "" : "s"}`,
         },
         context.user,
       );
       versionNumber = version.versionNumber;
     }
-    return { applicationId, output, versionNumber };
+    return { applicationIds, output, versionNumber };
   });
