@@ -12,8 +12,7 @@ import {
   Stamp,
   Trash2,
 } from "lucide-react";
-import type { PDFDocumentLoadingTask, RenderTask } from "pdfjs-dist";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,7 +82,7 @@ export function DocumentMarkingDialog({
 }) {
   const queryClient = useQueryClient();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
+  const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [markId, setMarkId] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
   const [pageCount, setPageCount] = useState(1);
@@ -116,7 +115,7 @@ export function DocumentMarkingDialog({
     setAppliedDate(today());
     setPlacements([]);
     setEditingPlacementId(null);
-    setPdfData(null);
+    setPdfDocument(null);
   }, [source]);
 
   useEffect(() => {
@@ -128,44 +127,59 @@ export function DocumentMarkingDialog({
   useEffect(() => {
     if (!source) return;
     let cancelled = false;
+    let loadingTask: PDFDocumentLoadingTask | null = null;
+    let worker: Worker | null = null;
+    let pdfjsModule: typeof import("pdfjs-dist") | null = null;
     setReading(true);
+    setPageReady(false);
     void (async () => {
       try {
-        const response = await fetch(`${attachmentUrl(source.path)}?inline=1`);
+        const [response, pdfjs, workerModule] = await Promise.all([
+          fetch(`${attachmentUrl(source.path)}?inline=1`),
+          import("pdfjs-dist"),
+          import("pdfjs-dist/build/pdf.worker.min.mjs?worker&inline"),
+        ]);
         if (!response.ok) throw new Error("The PDF could not be opened.");
+        pdfjsModule = pdfjs;
+        worker = new workerModule.default();
+        pdfjs.GlobalWorkerOptions.workerPort = worker;
         const bytes = new Uint8Array(await response.arrayBuffer());
-        if (!cancelled) setPdfData(bytes);
+        loadingTask = pdfjs.getDocument({ data: bytes });
+        const pdf = await loadingTask.promise;
+        if (!cancelled) {
+          setPageCount(pdf.numPages);
+          setPdfDocument(pdf);
+        }
       } catch (cause) {
         toast.error(cause instanceof Error ? cause.message : "The PDF could not be opened.");
+      } finally {
         if (!cancelled) setReading(false);
       }
     })();
     return () => {
       cancelled = true;
+      setPdfDocument(null);
+      if (pdfjsModule?.GlobalWorkerOptions.workerPort === worker)
+        pdfjsModule.GlobalWorkerOptions.workerPort = null;
+      void loadingTask?.destroy();
+      worker?.terminate();
     };
   }, [source]);
 
   useEffect(() => {
-    if (!pdfData) return;
+    if (!pdfDocument) return;
     let cancelled = false;
     let renderTask: RenderTask | null = null;
-    let loadingTask: PDFDocumentLoadingTask | null = null;
     setReading(true);
     setPageReady(false);
     void (async () => {
       try {
-        const pdfjs = await import("pdfjs-dist");
-        pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-        loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfData) });
-        const pdf = await loadingTask.promise;
-        if (cancelled) return;
-        setPageCount(pdf.numPages);
-        const safePage = Math.max(1, Math.min(pdf.numPages, pageNumber));
+        const safePage = Math.max(1, Math.min(pdfDocument.numPages, pageNumber));
         if (safePage !== pageNumber) {
           setPageNumber(safePage);
           return;
         }
-        const page = await pdf.getPage(safePage);
+        const page = await pdfDocument.getPage(safePage);
         const canvas = canvasRef.current;
         if (!canvas || cancelled) return;
         const baseViewport = page.getViewport({ scale: 1 });
@@ -187,9 +201,8 @@ export function DocumentMarkingDialog({
     return () => {
       cancelled = true;
       renderTask?.cancel();
-      void loadingTask?.destroy();
     };
-  }, [pageNumber, pdfData]);
+  }, [pageNumber, pdfDocument]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -225,6 +238,7 @@ export function DocumentMarkingDialog({
       );
       void queryClient.invalidateQueries({ queryKey: ["document-mark-workspace"] });
       void queryClient.invalidateQueries({ queryKey: ["document-workspace"] });
+      void queryClient.invalidateQueries({ queryKey: ["opportunity-workspace"] });
       onApplied?.(result.output);
       onOpenChange(false);
     },
