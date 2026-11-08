@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -397,9 +398,9 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   );
 
   return (
-    <div className="min-w-0 space-y-6">
-      <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-emerald-50/60 shadow-sm">
-        <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-w-0 space-y-4">
+      <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-emerald-50/60 shadow-sm">
+        <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="capitalize">
@@ -407,7 +408,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
               </Badge>
               <span className="text-sm text-muted-foreground">{currency}</span>
             </div>
-            <h1 className="truncate font-display text-3xl font-bold text-foreground">
+            <h1 className="truncate font-display text-2xl font-bold text-foreground">
               {sheet.name}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -458,7 +459,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {rules.line_cost.enabled ? (
           <Metric
             label={rules.line_cost.label}
@@ -506,7 +507,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           {linkedQuotes.length ? (
             <div className="grid gap-3 lg:grid-cols-2">
               {linkedQuotes.map((quote) => (
@@ -787,7 +788,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                         columns.length +
                         costSheetSystemColumnKeys.filter((key) => rules[key].enabled).length
                       }
-                      className="px-6 py-16 text-center"
+                      className="px-5 py-8 text-center"
                     >
                       <FileImage className="mx-auto mb-3 size-9 text-muted-foreground/60" />
                       <p className="font-medium">No cost items yet</p>
@@ -1140,15 +1141,15 @@ function Metric({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-5">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+      <CardContent className="flex items-center gap-3 p-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <Icon className="size-5" />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="mt-1 truncate text-xl font-bold tabular-nums">{value}</p>
+          <MetricValue className="mt-1" value={value} maxSize={1.25} />
         </div>
       </CardContent>
     </Card>

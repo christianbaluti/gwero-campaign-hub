@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -161,7 +162,7 @@ export function OpportunityWorkspace({ kind, id }: { kind: OpportunityKind; id: 
           </div>
         </div>
       </div>
-      <div className="mb-5 grid gap-4 md:grid-cols-4">
+      <div className="mb-4 grid gap-3 md:grid-cols-4">
         <Metric
           label="Checklist progress"
           value={`${progress}%`}
@@ -183,7 +184,7 @@ export function OpportunityWorkspace({ kind, id }: { kind: OpportunityKind; id: 
           hint={opportunity["submitted_at"] ? "Submitted" : "Not submitted"}
         />
       </div>
-      <Tabs defaultValue="requirements" className="space-y-5">
+      <Tabs defaultValue="requirements" className="space-y-4">
         <TabsList className="h-auto w-full justify-start overflow-x-auto bg-white p-1.5">
           <TabsTrigger value="requirements">Requirements</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -256,7 +257,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint: st
     <Card>
       <CardContent className="p-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold capitalize">{value}</p>
+        <MetricValue className="mt-1 capitalize" value={value} maxSize={1.5} />
         <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
@@ -390,7 +391,7 @@ function Requirements({
             );
           })
         ) : (
-          <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+          <p className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">
             No requirements yet. Add every document or action needed for a complete response.
           </p>
         )}
@@ -613,7 +614,7 @@ function Documents({
             </div>
           ))
         ) : (
-          <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+          <p className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">
             No documents in this workspace yet.
           </p>
         )}
@@ -755,7 +756,7 @@ function Costing({
       </Card>
       {opportunity["cost_sheet_id"] ? (
         <Card className="lg:col-span-2">
-          <CardContent className="flex items-center justify-between p-5">
+          <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="font-medium">{String(opportunity["cost_sheet_name"])}</p>
               <p className="text-sm text-muted-foreground">Currently linked to this response.</p>
@@ -1269,7 +1270,7 @@ function Details({
             Edit details
           </Button>
         </CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Detail label="Reference" value={form.reference} />
           <Detail
             label="Client"

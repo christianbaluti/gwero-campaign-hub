@@ -207,7 +207,7 @@ export function MailboxSettings() {
         <h3 className="font-semibold">Connected sending accounts</h3>
         {mailboxes.map((m) => (
           <Card key={m.id}>
-            <CardContent className="flex flex-wrap items-center gap-3 pt-6">
+            <CardContent className="flex flex-wrap items-center gap-3 pt-4">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <p className="font-semibold">{m.name}</p>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -60,8 +61,8 @@ function AgreementsPage() {
       title="Agreements & SLAs"
       description="Track contracts, service commitments and renewals."
     >
-      <Card className="mb-6">
-        <CardContent className="flex flex-wrap gap-3 pt-6">
+      <Card className="mb-4">
+        <CardContent className="flex flex-wrap gap-2 pt-4">
           <Input
             className="max-w-xs"
             placeholder="Agreement title"
@@ -83,10 +84,10 @@ function AgreementsPage() {
           <Button onClick={() => create.mutate()}>Add agreement</Button>
         </CardContent>
       </Card>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {agreements.map((a) => (
           <Card key={a.id}>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <div className="flex justify-between gap-3">
                 <div>
                   <h2 className="font-semibold">{a.title}</h2>
@@ -103,7 +104,9 @@ function AgreementsPage() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Value</dt>
-                  <dd>{money(a.value, a.currency)}</dd>
+                  <dd>
+                    <MetricValue value={money(a.value, a.currency)} maxSize={0.875} />
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Response</dt>
