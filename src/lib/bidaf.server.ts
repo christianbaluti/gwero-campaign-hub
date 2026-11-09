@@ -176,7 +176,7 @@ async function fetchActiveOpportunities(
   return [...records.values()];
 }
 
-async function acquireLease() {
+async function acquireLease(force = false) {
   const { getPool } = await import("./db.server");
   const db = getPool();
   await db.execute("INSERT IGNORE INTO bidaf_sync_state (id) VALUES (?)", [SYNC_ID]);
@@ -186,8 +186,8 @@ async function acquireLease() {
             last_error = NULL
       WHERE id = ?
         AND (lease_until IS NULL OR lease_until < NOW(3))
-        AND (last_completed_at IS NULL OR last_completed_at < DATE_SUB(NOW(3), INTERVAL 1 HOUR))`,
-    [SYNC_ID],
+        AND (? = TRUE OR last_completed_at IS NULL OR last_completed_at < DATE_SUB(NOW(3), INTERVAL 1 HOUR))`,
+    [SYNC_ID, force],
   );
   if (result.affectedRows) return { acquired: true as const, db };
   const [rows] = await db.query<
@@ -250,14 +250,24 @@ async function syncOpportunity(connection: PoolConnection, item: BidafOpportunit
         local_kind: BidafOpportunityKind;
         local_opportunity_id: string;
         external_version: string;
+        is_suppressed: number;
       }
     >
   >(
-    `SELECT local_kind, local_opportunity_id, external_version
+    `SELECT local_kind, local_opportunity_id, external_version, is_suppressed
        FROM bidaf_opportunity_links WHERE external_opportunity_id = ? LIMIT 1`,
     [item.id],
   );
   const existing = links[0];
+  if (existing?.is_suppressed) {
+    await connection.execute(
+      `UPDATE bidaf_opportunity_links
+          SET lifecycle = ?, last_seen_at = ?, last_synced_at = NOW(3)
+        WHERE external_opportunity_id = ?`,
+      [item.lifecycle, databaseDate(item.last_seen_at), item.id],
+    );
+    return "unchanged" as const;
+  }
   if (existing?.external_version && existing.external_version === item.version) {
     await connection.execute(
       `UPDATE bidaf_opportunity_links
@@ -402,12 +412,12 @@ async function syncOpportunity(connection: PoolConnection, item: BidafOpportunit
   return existing ? ("updated" as const) : ("created" as const);
 }
 
-export async function runBidafOpportunitySync(): Promise<SyncResult> {
+export async function runBidafOpportunitySync(force = false): Promise<SyncResult> {
   const config = await configuration();
   if (!config)
     return { status: "skipped", reason: "not_configured", seen: 0, created: 0, updated: 0 };
 
-  const lease = await acquireLease();
+  const lease = await acquireLease(force);
   if (!lease.acquired)
     return { status: "skipped", reason: lease.reason, seen: 0, created: 0, updated: 0 };
 

@@ -350,6 +350,8 @@ ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_instructions T
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
 
 CREATE TABLE IF NOT EXISTS requests (
   id CHAR(36) PRIMARY KEY, reference VARCHAR(80), title VARCHAR(255) NOT NULL, issuer VARCHAR(255),
@@ -372,6 +374,8 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
 
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_type VARCHAR(30) NOT NULL DEFAULT 'email';
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
@@ -383,6 +387,8 @@ ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
 
 CREATE TABLE IF NOT EXISTS bidaf_sync_state (
   id VARCHAR(80) PRIMARY KEY,
@@ -424,6 +430,8 @@ CREATE TABLE IF NOT EXISTS bidaf_opportunity_links (
   UNIQUE KEY bidaf_opportunity_links_local_key (local_kind, local_opportunity_id),
   KEY bidaf_opportunity_links_synced_idx (last_synced_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE bidaf_opportunity_links ADD COLUMN IF NOT EXISTS is_suppressed BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS currencies (
   id CHAR(36) PRIMARY KEY, code VARCHAR(10) NOT NULL, name VARCHAR(120) NOT NULL,
