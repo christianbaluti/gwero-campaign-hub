@@ -364,7 +364,6 @@ export const deleteOpportunity = createServerFn({ method: "POST" })
         [data.kind, data.id],
       );
       if (data.kind === "bid") {
-        await connection.execute("UPDATE projects SET bid_id = NULL WHERE bid_id = ?", [data.id]);
         await connection.execute("UPDATE cost_sheets SET bid_id = NULL WHERE bid_id = ?", [
           data.id,
         ]);
