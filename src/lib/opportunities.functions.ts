@@ -142,8 +142,11 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
         "SELECT * FROM currencies WHERE is_active = TRUE ORDER BY is_default DESC, sort_order, code",
       ),
       db.query(
-        `SELECT d.id, d.title, d.category, d.owner, d.version, d.file_url
+        `SELECT d.id, d.title, d.category, d.owner, d.version, d.file_url,
+                v.attachment_path, v.file_name, v.content_type, v.file_size
            FROM documents d
+           LEFT JOIN document_versions v ON v.document_id = d.id
+             AND v.version_number = (SELECT MAX(v2.version_number) FROM document_versions v2 WHERE v2.document_id = d.id)
            LEFT JOIN document_access da ON da.document_id = d.id AND da.user_id = ?
           WHERE ? = 1 OR d.owner_id = ? OR d.owner_id IS NULL OR da.user_id IS NOT NULL
           ORDER BY d.updated_at DESC`,

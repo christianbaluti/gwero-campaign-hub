@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { DocumentMergeDialog, type MergeCandidate } from "@/components/DocumentMergeDialog";
 import { EmailMessageContent } from "@/components/EmailMessageContent";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -473,6 +474,7 @@ function Documents({
   refresh: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [mode, setMode] = useState<"upload" | "library">("upload");
   const [checklistId, setChecklistId] = useState("");
   const [documentId, setDocumentId] = useState("");
@@ -532,6 +534,39 @@ function Documents({
   const library = (dependencies?.documents || []).filter((doc) =>
     String(doc["title"]).toLowerCase().includes(query.toLowerCase()),
   );
+  const mergeCandidates = useMemo<MergeCandidate[]>(() => {
+    const tenderDocuments = data.documents
+      .filter((doc) => {
+        const name = String(doc["outgoing_name"] || doc["display_name"] || "");
+        return (
+          Boolean(doc["attachment_path"]) &&
+          (doc["content_type"] === "application/pdf" || name.toLowerCase().endsWith(".pdf"))
+        );
+      })
+      .map((doc) => ({
+        kind: "tender" as const,
+        id: String(doc["id"]),
+        name: String(doc["outgoing_name"] || doc["display_name"]),
+        path: String(doc["attachment_path"]),
+        detail: "Tender document",
+      }));
+    const libraryDocuments = (dependencies?.documents || [])
+      .filter((doc) => {
+        const name = String(doc["file_name"] || doc["title"] || "");
+        return (
+          Boolean(doc["attachment_path"]) &&
+          (doc["content_type"] === "application/pdf" || name.toLowerCase().endsWith(".pdf"))
+        );
+      })
+      .map((doc) => ({
+        kind: "library" as const,
+        id: String(doc["id"]),
+        name: String(doc["file_name"] || doc["title"]),
+        path: String(doc["attachment_path"]),
+        detail: `${String(doc["title"])}${doc["version"] ? ` · v${String(doc["version"])}` : ""}`,
+      }));
+    return [...tenderDocuments, ...libraryDocuments];
+  }, [data.documents, dependencies?.documents]);
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between">
@@ -541,10 +576,15 @@ function Documents({
             Upload new work or reuse controlled documents already in the system.
           </CardDescription>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <FilePlus2 className="mr-2 size-4" />
-          Add document
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setMergeOpen(true)}>
+            Merge PDFs
+          </Button>
+          <Button onClick={() => setOpen(true)}>
+            <FilePlus2 className="mr-2 size-4" />
+            Add document
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {data.documents.length ? (
@@ -671,6 +711,15 @@ function Documents({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <DocumentMergeDialog
+          open={mergeOpen}
+          onOpenChange={setMergeOpen}
+          kind={kind}
+          opportunityId={id}
+          opportunityTitle={String(data.opportunity["title"] || names[kind])}
+          candidates={mergeCandidates}
+          onSaved={refresh}
+        />
       </CardContent>
     </Card>
   );
