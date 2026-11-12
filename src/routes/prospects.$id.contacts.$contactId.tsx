@@ -33,6 +33,9 @@ import {
 } from "@/components/ui/select";
 import { db } from "@/lib/db";
 import { sendProspectEmail, syncReplies } from "@/lib/crm.functions";
+import { getEmailIdentityWorkspace } from "@/lib/email-identity.functions";
+
+type SendingAccount = { id: string; name: string; from_email: string; is_default: boolean };
 
 export const Route = createFileRoute("/prospects/$id/contacts/$contactId")({
   component: ProspectContactPage,
@@ -89,11 +92,11 @@ function ProspectContactPage() {
       ).data || [],
     refetchInterval: 30_000,
   });
-  const { data: mailboxes = [] } = useQuery({
-    queryKey: ["mailboxes"],
-    queryFn: async () =>
-      (await db.from("mailboxes").select("*").order("is_default", { ascending: false })).data || [],
+  const { data: identity } = useQuery({
+    queryKey: ["email-identity-workspace"],
+    queryFn: () => getEmailIdentityWorkspace() as Promise<{ mailboxes: SendingAccount[] }>,
   });
+  const mailboxes = identity?.mailboxes || [];
   const selectedMailbox = message.mailboxId || mailboxes[0]?.id || "";
 
   useEffect(() => {
@@ -259,11 +262,11 @@ function ProspectContactPage() {
         </Button>
       }
     >
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
         <Card className="self-start">
-          <CardContent className="pt-6">
+          <CardContent className="pt-4">
             <div className="flex flex-col items-center text-center">
-              <Avatar className="size-24">
+              <Avatar className="size-20">
                 <AvatarImage src={contact.avatar_url || undefined} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
@@ -272,7 +275,7 @@ function ProspectContactPage() {
                 {contact.job_title || "Position not set"}
               </p>
             </div>
-            <div className="mt-6 space-y-3 text-sm">
+            <div className="mt-4 space-y-3 text-sm">
               {contact.email ? (
                 <a
                   href={`mailto:${contact.email}`}

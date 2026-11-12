@@ -8,6 +8,7 @@ const ENV_KEYS: Record<string, string> = {
   google_oauth_client_secret: "GOOGLE_OAUTH_CLIENT_SECRET",
   microsoft_oauth_client_id: "MICROSOFT_OAUTH_CLIENT_ID",
   microsoft_oauth_client_secret: "MICROSOFT_OAUTH_CLIENT_SECRET",
+  bidaf_api_token: "BIDAF_API_TOKEN",
 };
 
 async function encryptionKey() {

@@ -1,9 +1,20 @@
-import { useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarClock, FileUp, Plus } from "lucide-react";
+import {
+  Archive,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  LoaderCircle,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { ConfirmAction } from "@/components/ConfirmAction";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,11 +38,15 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  archiveOpportunity,
   createOpportunity,
+  deleteOpportunity,
   listOpportunities,
   listOpportunityDependencies,
+  type OpportunityListResult,
   type OpportunityKind,
 } from "@/lib/opportunities.functions";
+import { triggerBidafOpportunitySync } from "@/lib/bidaf.functions";
 
 type RecordRow = Record<string, unknown>;
 type Attachment = { path: string; name: string; type: string; size: number };
@@ -85,6 +100,10 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [archived, setArchived] = useState(false);
   const [ownerId, setOwnerId] = useState(() => crypto.randomUUID());
   const [files, setFiles] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -92,27 +111,29 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
     ...initialForm,
     status: kind === "bid" ? "identified" : kind === "eoi" ? "preparing" : "received",
   });
-  const { data: records = [], isLoading } = useQuery({
-    queryKey: ["opportunities", kind],
-    queryFn: () => listOpportunities({ data: { kind } }) as Promise<RecordRow[]>,
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+  const { data, isLoading } = useQuery({
+    queryKey: ["opportunities", kind, page, pageSize, debouncedSearch, archived],
+    queryFn: () =>
+      listOpportunities({
+        data: { kind, page, pageSize, search: debouncedSearch, archived },
+      }) as Promise<OpportunityListResult>,
   });
+  const records = data?.items || [];
+  useEffect(() => {
+    if (data && data.page !== page) setPage(data.page);
+  }, [data, page]);
   const { data: dependencies } = useQuery({
     queryKey: ["opportunity-dependencies"],
     queryFn: () =>
       listOpportunityDependencies() as Promise<{ clients: RecordRow[]; currencies: RecordRow[] }>,
   });
-  const filtered = useMemo(() => {
-    const value = search.trim().toLowerCase();
-    if (!value) return records;
-    return records.filter((row) =>
-      [row["title"], row["client_company"], row["client_name"], row["reference"]].some((item) =>
-        String(item || "")
-          .toLowerCase()
-          .includes(value),
-      ),
-    );
-  }, [records, search]);
-
   const create = useMutation({
     mutationFn: () =>
       createOpportunity({
@@ -149,6 +170,39 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
         status: kind === "bid" ? "identified" : kind === "eoi" ? "preparing" : "received",
       });
       void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const archive = useMutation({
+    mutationFn: (payload: { id: string; archived: boolean }) =>
+      archiveOpportunity({ data: { kind, ...payload } }),
+    onSuccess: (_, variables) => {
+      toast.success(variables.archived ? "Tender archived." : "Tender restored.");
+      void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteOpportunity({ data: { kind, id } }),
+    onSuccess: () => {
+      toast.success("Tender permanently deleted.");
+      void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const bidaf = useMutation({
+    mutationFn: () => triggerBidafOpportunitySync(),
+    onSuccess: (result) => {
+      for (const opportunityKind of ["bid", "eoi", "rfp", "rfq"])
+        void qc.invalidateQueries({ queryKey: ["opportunities", opportunityKind] });
+      if (result.status === "completed")
+        toast.success(
+          `BidAF checked: ${result.created} new, ${result.updated} updated, ${result.seen} active opportunities found.`,
+        );
+      else if (result.reason === "not_configured")
+        toast.error("Configure the BidAF connection in Settings first.");
+      else toast.info("A BidAF check is already running. The lists will update when it finishes.");
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -190,13 +244,31 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
           : "/rfqs";
   return (
     <AppShell title={copy.title} description={copy.description}>
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="mb-3 flex flex-wrap gap-2">
         <Input
           className="max-w-sm"
           placeholder={`Search ${copy.title.toLowerCase()}`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        <Button
+          variant={archived ? "default" : "outline"}
+          onClick={() => {
+            setArchived((current) => !current);
+            setPage(1);
+          }}
+        >
+          <Archive className="mr-2 size-4" />
+          {archived ? "Viewing archive" : "Archive"}
+        </Button>
+        <Button variant="outline" onClick={() => bidaf.mutate()} disabled={bidaf.isPending}>
+          {bidaf.isPending ? (
+            <LoaderCircle className="mr-2 size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 size-4" />
+          )}
+          Check BidAF now
+        </Button>
         <Button className="ml-auto" onClick={() => setOpen(true)}>
           <Plus className="mr-2 size-4" />
           New {copy.singular.toUpperCase()}
@@ -207,22 +279,23 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="px-5 py-3">{copy.singular.toUpperCase()} name</th>
-                <th className="px-5 py-3">Client</th>
-                <th className="px-5 py-3">Due date</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Submission</th>
+                <th className="px-4 py-2.5">{copy.singular.toUpperCase()} name</th>
+                <th className="px-4 py-2.5">Client</th>
+                <th className="px-4 py-2.5">Due date</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Submission</th>
+                <th className="px-4 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-5 py-8 text-muted-foreground" colSpan={5}>
+                  <td className="px-4 py-6 text-muted-foreground" colSpan={6}>
                     Loading…
                   </td>
                 </tr>
-              ) : filtered.length ? (
-                filtered.map((row) => {
+              ) : records.length ? (
+                records.map((row) => {
                   const clientName = String(
                     row["client_company"] || row["client_name"] || "No client",
                   );
@@ -231,7 +304,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                       key={String(row["id"])}
                       className="border-b last:border-0 hover:bg-muted/30"
                     >
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <a
                           href={`${basePath}/${String(row["id"])}`}
                           className="font-semibold text-primary hover:underline"
@@ -242,7 +315,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           {String(row["reference"] || "No reference")}
                         </p>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9">
                             <AvatarImage src={String(row["client_logo"] || "")} />
@@ -251,13 +324,13 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           <span>{clientName}</span>
                         </div>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-2">
                           <CalendarClock className="size-4 text-muted-foreground" />
                           {String(row["due_date"] || "Not set")}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <Badge
                           variant={row["status"] === "submitted" ? "default" : "secondary"}
                           className="capitalize"
@@ -265,16 +338,62 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
                           {String(row["status"])}
                         </Badge>
                       </td>
-                      <td className="px-5 py-4 capitalize">
+                      <td className="px-4 py-3 capitalize">
                         {String(row["submission_type"] || "email").replace("_", " ")}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          {archived ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  archive.mutate({ id: String(row["id"]), archived: false })
+                                }
+                                disabled={archive.isPending}
+                              >
+                                <RotateCcw className="mr-1.5 size-4" /> Restore
+                              </Button>
+                              <ConfirmAction
+                                title={`Permanently delete ${String(row["title"])}?`}
+                                description="This removes the tender and its checklist, documents, comments, submissions and replies. This cannot be undone."
+                                confirmLabel="Delete permanently"
+                                onConfirm={() => remove.mutateAsync(String(row["id"]))}
+                                disabled={remove.isPending}
+                                trigger={
+                                  <Button variant="ghost" size="icon" aria-label="Delete tender">
+                                    <Trash2 className="size-4 text-destructive" />
+                                  </Button>
+                                }
+                              />
+                            </>
+                          ) : (
+                            <ConfirmAction
+                              title={`Archive ${String(row["title"])}?`}
+                              description="It will leave the active list and remain available in the archive."
+                              confirmLabel="Archive"
+                              onConfirm={() =>
+                                archive.mutateAsync({ id: String(row["id"]), archived: true })
+                              }
+                              disabled={archive.isPending}
+                              trigger={
+                                <Button variant="ghost" size="icon" aria-label="Archive tender">
+                                  <Archive className="size-4" />
+                                </Button>
+                              }
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td className="px-5 py-8 text-muted-foreground" colSpan={5}>
-                    No {copy.title.toLowerCase()} yet.
+                  <td className="px-4 py-6 text-muted-foreground" colSpan={6}>
+                    No {archived ? "archived " : ""}
+                    {copy.title.toLowerCase()} found.
                   </td>
                 </tr>
               )}
@@ -282,6 +401,59 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
           </table>
         </CardContent>
       </Card>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p className="text-muted-foreground">
+          {data?.total
+            ? `${(data.page - 1) * data.pageSize + 1}–${Math.min(data.page * data.pageSize, data.total)} of ${data.total}`
+            : "0 results"}
+        </p>
+        <div className="flex items-center gap-2">
+          <Select
+            value={String(pageSize)}
+            onValueChange={(value) => {
+              setPageSize(Number(value));
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="w-[118px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 25, 50].map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size} per page
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={(data?.page || 1) <= 1 || isLoading}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <span className="min-w-20 text-center">
+            Page {data?.page || 1} of{" "}
+            {Math.max(1, Math.ceil((data?.total || 0) / (data?.pageSize || pageSize)))}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={
+              (data?.page || 1) >=
+                Math.max(1, Math.ceil((data?.total || 0) / (data?.pageSize || pageSize))) ||
+              isLoading
+            }
+            onClick={() => setPage((current) => current + 1)}
+            aria-label="Next page"
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
@@ -292,7 +464,7 @@ export function OpportunityListPage({ kind }: { kind: OpportunityKind }) {
               managed from the client record.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field
               label={`${copy.singular.toUpperCase()} name`}
               value={form.title}

@@ -10,11 +10,17 @@ export const Route = createFileRoute("/api/cron/notifications")({
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         const { runNotificationEscalations } = await import("@/lib/notifications.server");
         const { processCampaignQueue } = await import("@/lib/campaigns.server");
-        const [notifications, campaigns] = await Promise.all([
+        const { runBidafOpportunitySync } = await import("@/lib/bidaf.server");
+        const bidaf = runBidafOpportunitySync().catch((error) => ({
+          status: "failed" as const,
+          error: error instanceof Error ? error.message : "BidAF synchronization failed.",
+        }));
+        const [notifications, campaigns, opportunities] = await Promise.all([
           runNotificationEscalations(),
           processCampaignQueue(),
+          bidaf,
         ]);
-        return Response.json({ notifications, campaigns });
+        return Response.json({ notifications, campaigns, opportunities });
       },
     },
   },

@@ -173,6 +173,35 @@ async function enrichCampaignLocations() {
   );
 }
 
+async function restoreUnsignedTenderDocuments() {
+  const [result] = await connection.execute(
+    `INSERT INTO opportunity_documents
+      (id, opportunity_type, opportunity_id, checklist_item_id, document_id, attachment_path,
+       display_name, content_type, file_size, document_role, include_in_submission,
+       outgoing_name, created_by)
+     SELECT UUID(), current_file.opportunity_type, current_file.opportunity_id,
+            current_file.checklist_item_id, current_file.document_id, marks.source_attachment_path,
+            marks.source_name, source_file.content_type, source_file.file_size,
+            current_file.document_role, FALSE, marks.source_name, current_file.created_by
+       FROM (
+         SELECT source_attachment_path, output_attachment_path, MAX(source_name) AS source_name
+           FROM document_mark_applications
+          GROUP BY source_attachment_path, output_attachment_path
+       ) marks
+       JOIN opportunity_documents current_file
+         ON current_file.attachment_path = marks.output_attachment_path
+       JOIN attachment_files source_file
+         ON CONCAT(source_file.owner_id, '/', source_file.id) = marks.source_attachment_path
+       LEFT JOIN opportunity_documents original_file
+         ON original_file.opportunity_type = current_file.opportunity_type
+        AND original_file.opportunity_id = current_file.opportunity_id
+        AND original_file.attachment_path = marks.source_attachment_path
+      WHERE original_file.id IS NULL`,
+  );
+  if (result.affectedRows)
+    console.log(`Restored ${result.affectedRows} unsigned tender document(s).`);
+}
+
 try {
   const schema = readFileSync(resolve("database/schema.sql"), "utf8");
   for (const statement of schema
@@ -222,6 +251,7 @@ try {
     }
     await connection.query(statement);
   }
+  await restoreUnsignedTenderDocuments();
   await enrichCampaignLocations();
   const checksum = createHash("sha256").update(schema).digest("hex");
   await connection.execute(

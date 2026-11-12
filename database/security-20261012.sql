@@ -5,5 +5,6 @@ INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID()
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID(), 'hr.manage', 'Manage hr', 'hr');
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID(), 'finance.manage', 'Manage finance', 'finance');
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID(), 'documents.manage', 'Manage documents', 'documents');
+INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID(), 'accounts.manage', 'Manage portal accounts', 'accounts');
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES (UUID(), 'notes.manage', 'Manage notes', 'notes');
 INSERT IGNORE INTO role_permissions (id, role_id, permission_id) SELECT UUID(), r.id, p.id FROM roles r CROSS JOIN permissions p WHERE r.name = 'Administrator';

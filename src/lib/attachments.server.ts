@@ -24,15 +24,16 @@ export async function saveAttachmentBuffer(
   content: Uint8Array,
   name: string,
   type = "application/octet-stream",
+  uploadedBy?: string,
 ) {
   if (!uuid.test(ownerId)) throw new Error("Invalid attachment owner ID");
   if (content.byteLength > 20 * 1024 * 1024) throw new Error("Attachment exceeds 20 MB");
   const fileId = randomUUID();
   const path = `${ownerId}/${fileId}`;
   await getPool().execute(
-    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [fileId, ownerId, name, type, content.byteLength, Buffer.from(content)],
+    `INSERT INTO attachment_files (id, owner_id, file_name, content_type, file_size, content, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [fileId, ownerId, name, type, content.byteLength, Buffer.from(content), uploadedBy || null],
   );
   return { path, name, type, size: content.byteLength };
 }

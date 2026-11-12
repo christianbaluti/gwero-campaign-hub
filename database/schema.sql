@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS mailboxes (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), UNIQUE KEY mailboxes_from_email_key (from_email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS created_by CHAR(36) NULL;
+
 CREATE TABLE IF NOT EXISTS mailbox_secrets (
   mailbox_id CHAR(36) PRIMARY KEY, smtp_password TEXT, imap_password TEXT, oauth_access_token TEXT,
   oauth_refresh_token TEXT, oauth_expires_at DATETIME(3), updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
@@ -210,6 +212,7 @@ CREATE TABLE IF NOT EXISTS cost_sheets (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE cost_sheets ADD COLUMN IF NOT EXISTS column_rules LONGTEXT NULL;
+ALTER TABLE cost_sheets ADD COLUMN IF NOT EXISTS bid_id CHAR(36) NULL;
 
 CREATE TABLE IF NOT EXISTS cost_sheet_items (
   id CHAR(36) PRIMARY KEY, cost_sheet_id CHAR(36) NOT NULL, category VARCHAR(60) NOT NULL DEFAULT 'labour',
@@ -237,6 +240,19 @@ CREATE TABLE IF NOT EXISTS cost_sheet_columns (
   UNIQUE KEY cost_sheet_columns_key (cost_sheet_id, column_key),
   KEY cost_sheet_columns_sheet (cost_sheet_id, display_order),
   CONSTRAINT cost_sheet_columns_sheet_fk FOREIGN KEY (cost_sheet_id) REFERENCES cost_sheets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS cost_sheet_templates (
+  id CHAR(36) PRIMARY KEY,
+  name VARCHAR(180) NOT NULL,
+  description TEXT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'MWK',
+  column_rules LONGTEXT NULL,
+  columns_json LONGTEXT NULL,
+  created_by CHAR(36) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY cost_sheet_templates_name_idx (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -337,6 +353,8 @@ ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_instructions T
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE prequalifications ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
 
 CREATE TABLE IF NOT EXISTS requests (
   id CHAR(36) PRIMARY KEY, reference VARCHAR(80), title VARCHAR(255) NOT NULL, issuer VARCHAR(255),
@@ -359,6 +377,8 @@ ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE requests ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE requests ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
 
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_type VARCHAR(30) NOT NULL DEFAULT 'email';
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_email VARCHAR(320) NULL;
@@ -370,6 +390,51 @@ ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_instructions TEXT NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submission_time TIME NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS cost_sheet_id CHAR(36) NULL;
 ALTER TABLE bids ADD COLUMN IF NOT EXISTS submitted_at DATETIME(3) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS archived_at DATETIME(3) NULL;
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS status_before_archive VARCHAR(40) NULL;
+
+CREATE TABLE IF NOT EXISTS bidaf_sync_state (
+  id VARCHAR(80) PRIMARY KEY,
+  status VARCHAR(30) NOT NULL DEFAULT 'idle',
+  last_started_at DATETIME(3) NULL,
+  last_completed_at DATETIME(3) NULL,
+  lease_until DATETIME(3) NULL,
+  last_error TEXT NULL,
+  records_seen INT NOT NULL DEFAULT 0,
+  records_created INT NOT NULL DEFAULT 0,
+  records_updated INT NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS bidaf_buyer_links (
+  external_buyer_id VARCHAR(120) PRIMARY KEY,
+  client_id CHAR(36) NOT NULL,
+  buyer_name VARCHAR(255) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY bidaf_buyer_links_client_idx (client_id),
+  CONSTRAINT bidaf_buyer_links_client_fk FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS bidaf_opportunity_links (
+  external_opportunity_id VARCHAR(120) PRIMARY KEY,
+  local_kind VARCHAR(20) NOT NULL,
+  local_opportunity_id CHAR(36) NOT NULL,
+  external_version VARCHAR(128) NULL,
+  lifecycle VARCHAR(40) NULL,
+  source_url VARCHAR(1000) NULL,
+  source_payload LONGTEXT NULL,
+  first_seen_at DATETIME(3) NULL,
+  last_seen_at DATETIME(3) NULL,
+  last_synced_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY bidaf_opportunity_links_local_key (local_kind, local_opportunity_id),
+  KEY bidaf_opportunity_links_synced_idx (last_synced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE bidaf_opportunity_links ADD COLUMN IF NOT EXISTS is_suppressed BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE TABLE IF NOT EXISTS currencies (
   id CHAR(36) PRIMARY KEY, code VARCHAR(10) NOT NULL, name VARCHAR(120) NOT NULL,
@@ -578,6 +643,127 @@ CREATE TABLE IF NOT EXISTS system_users (
 
 ALTER TABLE system_users ADD COLUMN IF NOT EXISTS password_hash TEXT NULL;
 
+CREATE TABLE IF NOT EXISTS email_signatures (
+  id CHAR(36) PRIMARY KEY, mailbox_id CHAR(36) NOT NULL, owner_id CHAR(36) NOT NULL,
+  name VARCHAR(160) NOT NULL, signature_type VARCHAR(30) NOT NULL DEFAULT 'html',
+  content_html LONGTEXT NULL, content_text LONGTEXT NULL, image_url VARCHAR(1000) NULL,
+  created_by CHAR(36) NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY email_signatures_owner (owner_id, mailbox_id),
+  CONSTRAINT email_signatures_mailbox_fk FOREIGN KEY (mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE,
+  CONSTRAINT email_signatures_owner_fk FOREIGN KEY (owner_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS mailbox_access (
+  mailbox_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  can_send BOOLEAN NOT NULL DEFAULT TRUE, can_manage BOOLEAN NOT NULL DEFAULT FALSE,
+  is_default BOOLEAN NOT NULL DEFAULT FALSE, active_signature_id CHAR(36) NULL,
+  granted_by CHAR(36) NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (mailbox_id, user_id), KEY mailbox_access_user (user_id, can_send),
+  CONSTRAINT mailbox_access_mailbox_fk FOREIGN KEY (mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE,
+  CONSTRAINT mailbox_access_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE,
+  CONSTRAINT mailbox_access_signature_fk FOREIGN KEY (active_signature_id) REFERENCES email_signatures(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS meetings (
+  id CHAR(36) PRIMARY KEY, title VARCHAR(255) NOT NULL, description LONGTEXT NULL,
+  starts_at DATETIME(3) NOT NULL, ends_at DATETIME(3) NOT NULL,
+  timezone VARCHAR(80) NOT NULL DEFAULT 'Africa/Blantyre', provider VARCHAR(40) NOT NULL DEFAULT 'gwero',
+  join_url VARCHAR(1500) NOT NULL, embed_url VARCHAR(1500) NULL, location VARCHAR(500) NULL,
+  attendee_emails LONGTEXT NOT NULL, status VARCHAR(30) NOT NULL DEFAULT 'scheduled',
+  created_by CHAR(36) NOT NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY meetings_starts (starts_at, status), KEY meetings_creator (created_by, starts_at),
+  CONSTRAINT meetings_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS meeting_attendees (
+  meeting_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  response_status VARCHAR(30) NOT NULL DEFAULT 'accepted',
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (meeting_id, user_id), KEY meeting_attendees_user (user_id, response_status),
+  CONSTRAINT meeting_attendees_meeting_fk FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE,
+  CONSTRAINT meeting_attendees_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS portal_accounts (
+  id CHAR(36) PRIMARY KEY, portal_name VARCHAR(200) NOT NULL,
+  category VARCHAR(80) NOT NULL DEFAULT 'Other', portal_url VARCHAR(1000),
+  website_url VARCHAR(1000), notes TEXT, status VARCHAR(30) NOT NULL DEFAULT 'active',
+  created_by CHAR(36), updated_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY portal_accounts_name (portal_name), KEY portal_accounts_category (category, status),
+  CONSTRAINT portal_accounts_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL,
+  CONSTRAINT portal_accounts_updater_fk FOREIGN KEY (updated_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_categories (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL, description TEXT,
+  color VARCHAR(30) NOT NULL DEFAULT 'violet', created_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  UNIQUE KEY document_categories_name (name),
+  CONSTRAINT document_categories_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS category_id CHAR(36) NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS owner_id CHAR(36) NULL;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'active';
+ALTER TABLE documents ADD INDEX IF NOT EXISTS documents_category_idx (category_id);
+ALTER TABLE documents ADD INDEX IF NOT EXISTS documents_owner_idx (owner_id);
+
+CREATE TABLE IF NOT EXISTS document_versions (
+  id CHAR(36) PRIMARY KEY, document_id CHAR(36) NOT NULL, version_number INT UNSIGNED NOT NULL,
+  attachment_path VARCHAR(1000) NOT NULL, file_name VARCHAR(500) NOT NULL,
+  content_type VARCHAR(255) NOT NULL, file_size INT UNSIGNED NOT NULL,
+  notes TEXT, created_by CHAR(36), created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  UNIQUE KEY document_versions_number (document_id, version_number),
+  KEY document_versions_document_created (document_id, created_at),
+  CONSTRAINT document_versions_document_fk FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT document_versions_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_access (
+  document_id CHAR(36) NOT NULL, user_id CHAR(36) NOT NULL,
+  access_level VARCHAR(20) NOT NULL DEFAULT 'view', granted_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (document_id, user_id), KEY document_access_user (user_id, access_level),
+  CONSTRAINT document_access_document_fk FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+  CONSTRAINT document_access_user_fk FOREIGN KEY (user_id) REFERENCES system_users(id) ON DELETE CASCADE,
+  CONSTRAINT document_access_granter_fk FOREIGN KEY (granted_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_marks (
+  id CHAR(36) PRIMARY KEY, name VARCHAR(160) NOT NULL,
+  mark_type VARCHAR(20) NOT NULL, design_json LONGTEXT,
+  image_attachment_path VARCHAR(1000), status VARCHAR(30) NOT NULL DEFAULT 'active',
+  created_by CHAR(36), updated_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  KEY document_marks_type_status (mark_type, status),
+  CONSTRAINT document_marks_creator_fk FOREIGN KEY (created_by) REFERENCES system_users(id) ON DELETE SET NULL,
+  CONSTRAINT document_marks_updater_fk FOREIGN KEY (updated_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS document_mark_applications (
+  id CHAR(36) PRIMARY KEY, source_attachment_path VARCHAR(1000) NOT NULL,
+  output_attachment_path VARCHAR(1000) NOT NULL, source_name VARCHAR(500) NOT NULL,
+  output_name VARCHAR(500) NOT NULL, mark_id CHAR(36) NOT NULL, mark_type VARCHAR(20) NOT NULL,
+  page_number INT UNSIGNED NOT NULL, x_ratio DECIMAL(8,6) NOT NULL,
+  y_ratio DECIMAL(8,6) NOT NULL, width_ratio DECIMAL(8,6) NOT NULL,
+  rotation DECIMAL(6,2) NOT NULL DEFAULT 0, applied_date DATE, applied_by CHAR(36),
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  KEY document_mark_applications_created (created_at),
+  CONSTRAINT document_mark_applications_mark_fk FOREIGN KEY (mark_id) REFERENCES document_marks(id),
+  CONSTRAINT document_mark_applications_user_fk FOREIGN KEY (applied_by) REFERENCES system_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT IGNORE INTO document_categories (id, name, description, color)
+VALUES (UUID(), 'General', 'General business documents', 'slate');
+
 CREATE TABLE IF NOT EXISTS auth_sessions (
   id CHAR(36) PRIMARY KEY, user_id CHAR(36) NOT NULL, token_hash CHAR(64) NOT NULL,
   expires_at DATETIME(3) NOT NULL, created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -749,6 +935,14 @@ CREATE TABLE IF NOT EXISTS attachment_files (
   KEY attachment_files_owner (owner_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+INSERT IGNORE INTO document_versions
+  (id, document_id, version_number, attachment_path, file_name, content_type, file_size, created_at)
+SELECT UUID(), d.id, 1, CONCAT(af.owner_id, '/', af.id), af.file_name, af.content_type, af.file_size, af.created_at
+  FROM documents d
+  JOIN attachment_files af
+    ON d.file_url = CONCAT('/api/attachments/', af.owner_id, '/', af.id)
+ WHERE NOT EXISTS (SELECT 1 FROM document_versions v WHERE v.document_id = d.id);
+
 CREATE TABLE IF NOT EXISTS ai_prospect_searches (
   id CHAR(36) PRIMARY KEY, prompt LONGTEXT NOT NULL, search_context LONGTEXT,
   results_json LONGTEXT NOT NULL, status VARCHAR(40) NOT NULL DEFAULT 'completed',
@@ -762,6 +956,7 @@ INSERT IGNORE INTO roles (id, name, description, is_system) VALUES
 
 INSERT IGNORE INTO permissions (id, permission_key, name, module) VALUES
   (UUID(), 'settings.manage', 'Manage settings', 'Settings'),
+  (UUID(), 'accounts.manage', 'Manage portal accounts', 'Accounts'),
   (UUID(), 'users.manage', 'Manage users and roles', 'Settings'),
   (UUID(), 'prospects.view', 'View prospects', 'Prospects'),
   (UUID(), 'prospects.manage', 'Create and update prospects', 'Prospects'),

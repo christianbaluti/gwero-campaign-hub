@@ -23,19 +23,22 @@ import {
   ShoppingCart,
   Truck,
   Files,
+  Stamp,
+  KeyRound,
   UserPlus,
   IdCard,
   Wallet,
   Receipt,
-  Search,
   Bell,
   CircleHelp,
   Settings,
   LogOut,
   ChevronDown,
+  CalendarDays,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { getAuthStatus, logout } from "@/lib/auth.functions";
+import { syncBidafOpportunities } from "@/lib/bidaf.functions";
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -51,6 +54,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { StickyNotes } from "@/components/StickyNotes";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import { GlobalDocumentViewer } from "@/components/DocumentViewer";
 
 type NavItem = { to: string; label: string; icon: LucideIcon };
 const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, label, icon });
@@ -58,7 +63,10 @@ const nav = (to: string, label: string, icon: LucideIcon): NavItem => ({ to, lab
 const navGroups = [
   {
     label: "Overview",
-    items: [nav("/", "Dashboard", LayoutDashboard)],
+    items: [
+      nav("/", "Dashboard", LayoutDashboard),
+      nav("/meetings", "Calendar & meetings", CalendarDays),
+    ],
   },
   {
     label: "Sales",
@@ -104,6 +112,8 @@ const navGroups = [
     label: "Business",
     items: [
       nav("/documents", "Documents", Files),
+      nav("/document-tools", "Stamps & signatures", Stamp),
+      nav("/accounts", "Portal accounts", KeyRound),
       nav("/finance", "Finance & Accounts", Receipt),
       nav("/agreements", "Agreements & SLAs", FileSignature),
       nav("/settings", "Settings", Settings),
@@ -156,7 +166,14 @@ export function AppShell({
   }, [brand["icon_url"]]);
   useEffect(() => {
     void processNotificationEmails().catch(() => undefined);
-  }, []);
+    void syncBidafOpportunities()
+      .then((result) => {
+        if (result.status !== "completed" || (!result.created && !result.updated)) return;
+        for (const kind of ["bid", "eoi", "rfp", "rfq"])
+          void qc.invalidateQueries({ queryKey: ["opportunities", kind] });
+      })
+      .catch(() => undefined);
+  }, [qc]);
   return (
     <div
       className="flex min-h-screen max-w-full overflow-x-clip bg-background"
@@ -192,7 +209,7 @@ export function AppShell({
             <p className="text-[11px] font-medium text-violet-500">Operations system</p>
           </div>
         </div>
-        <nav className="gwero-scrollbar flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 py-3">
+        <nav className="gwero-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2">
           {navGroups.map((group) => (
             <div key={group.label} className="space-y-1">
               <p className="px-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -203,10 +220,10 @@ export function AppShell({
                   key={item.to}
                   to={item.to as never}
                   activeOptions={{ exact: item.to === "/" }}
-                  className="flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-accent hover:text-accent-foreground"
+                  className="flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-accent hover:text-accent-foreground"
                   activeProps={{
                     className:
-                      "flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-semibold bg-accent text-accent-foreground",
+                      "flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-semibold bg-accent text-accent-foreground",
                   }}
                 >
                   <item.icon className="h-4 w-4" />
@@ -216,7 +233,7 @@ export function AppShell({
             </div>
           ))}
         </nav>
-        <div className="m-4 rounded-2xl bg-gradient-to-br from-[#f5efff] to-[#ede4ff] p-4">
+        <div className="m-3 rounded-xl bg-gradient-to-br from-[#f5efff] to-[#ede4ff] p-3">
           <p className="font-semibold text-[#321568]">Build better business.</p>
           <p className="mt-1 text-xs leading-5 text-violet-600">One connected operating system.</p>
         </div>
@@ -224,13 +241,7 @@ export function AppShell({
 
       <div className="flex w-full min-w-0 flex-1 flex-col md:pl-64">
         <header className="fixed left-0 right-0 top-0 z-30 flex min-h-20 items-center gap-4 border-b border-violet-100 bg-white/95 px-5 backdrop-blur md:left-64 md:px-8">
-          <div className="relative hidden max-w-xl flex-1 lg:block">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <input
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none transition focus:border-violet-300 focus:bg-white focus:ring-4 focus:ring-violet-50"
-              placeholder="Search across Gwero OS…"
-            />
-          </div>
+          <GlobalSearch />
           <div className="ml-auto flex items-center gap-2">
             <StickyNotes />
             <button aria-label="Help" className="rounded-xl p-2 text-slate-500 hover:bg-accent">
@@ -364,15 +375,15 @@ export function AppShell({
             </Link>
           ))}
         </div>
-        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:px-7 md:pb-7 md:pt-28">
+        <main className="min-w-0 flex-1 overflow-x-clip p-4 md:px-6 md:pb-6 md:pt-24">
           <div className="mx-auto min-w-0 max-w-[1500px]">
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
-                <h1 className="break-words font-display text-2xl font-bold tracking-tight text-[#21143f] md:text-3xl">
+                <h1 className="break-words font-display text-2xl font-bold tracking-tight text-[#21143f]">
                   {title}
                 </h1>
                 {description ? (
-                  <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
                 ) : null}
               </div>
               {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
@@ -381,6 +392,7 @@ export function AppShell({
           </div>
         </main>
       </div>
+      <GlobalDocumentViewer />
     </div>
   );
 }

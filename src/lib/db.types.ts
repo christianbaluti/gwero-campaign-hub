@@ -61,6 +61,7 @@ export interface Mailbox {
   is_default: boolean;
   last_sync_at: string | null;
   last_status: string | null;
+  created_by: string | null;
   created_at: string;
 }
 export interface MailboxSecret {
@@ -326,6 +327,17 @@ export interface CostSheetColumn {
   created_at: string;
   updated_at: string;
 }
+export interface CostSheetTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  currency: string;
+  column_rules: Record<string, unknown> | null;
+  columns_json: Array<Record<string, unknown>>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 export interface Job {
   id: string;
   title: string;
@@ -479,11 +491,85 @@ export interface Document {
   entity_type: string;
   entity_id: string | null;
   owner: string | null;
+  owner_id: string | null;
   version: string | null;
   file_url: string | null;
+  category_id: string | null;
+  status: string;
   issue_date: string | null;
   expiry_date: string | null;
   notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface DocumentCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  version_number: number;
+  attachment_path: string;
+  file_name: string;
+  content_type: string;
+  file_size: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+export interface DocumentAccess {
+  document_id: string;
+  user_id: string;
+  access_level: "view" | "edit" | "manage";
+  granted_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface DocumentMark {
+  id: string;
+  name: string;
+  mark_type: "stamp" | "signature";
+  design_json: Json | null;
+  image_attachment_path: string | null;
+  status: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface DocumentMarkApplication {
+  id: string;
+  source_attachment_path: string;
+  output_attachment_path: string;
+  source_name: string;
+  output_name: string;
+  mark_id: string;
+  mark_type: "stamp" | "signature";
+  page_number: number;
+  x_ratio: number;
+  y_ratio: number;
+  width_ratio: number;
+  rotation: number;
+  applied_date: string | null;
+  applied_by: string | null;
+  created_at: string;
+}
+export interface PortalAccount {
+  id: string;
+  portal_name: string;
+  category: string;
+  portal_url: string | null;
+  website_url: string | null;
+  notes: string | null;
+  status: string;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -808,6 +894,7 @@ export interface Tables {
   cost_sheets: CostSheet;
   cost_sheet_items: CostSheetItem;
   cost_sheet_columns: CostSheetColumn;
+  cost_sheet_templates: CostSheetTemplate;
   jobs: Job;
   tasks: Task;
   suppliers: Supplier;
@@ -819,6 +906,12 @@ export interface Tables {
   requests: Request;
   marketing_activities: MarketingActivity;
   documents: Document;
+  document_categories: DocumentCategory;
+  document_versions: DocumentVersion;
+  document_access: DocumentAccess;
+  document_marks: DocumentMark;
+  document_mark_applications: DocumentMarkApplication;
+  portal_accounts: PortalAccount;
   vacancies: Vacancy;
   applicants: Applicant;
   employees: Employee;

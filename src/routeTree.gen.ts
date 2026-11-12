@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as AgreementsRouteImport } from './routes/agreements'
 import { Route as BidsRouteImport } from './routes/bids'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CostSheetsRouteImport } from './routes/cost-sheets'
 import { Route as DealsRouteImport } from './routes/deals'
+import { Route as DocumentToolsRouteImport } from './routes/document-tools'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as FinanceRouteImport } from './routes/finance'
 import { Route as HrRouteImport } from './routes/hr'
@@ -40,6 +42,8 @@ import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
 import { Route as CostSheetsIdRouteImport } from './routes/cost-sheets.$id'
+import { Route as MeetingsIndexRouteImport } from './routes/meetings.index'
+import { Route as MeetingsIdRouteImport } from './routes/meetings.$id'
 import { Route as PrequalificationsIdRouteImport } from './routes/prequalifications.$id'
 import { Route as ProspectsIdRouteImport } from './routes/prospects.$id'
 import { Route as QuotationsIdRouteImport } from './routes/quotations.$id'
@@ -61,6 +65,11 @@ import { Route as ProspectsIdContactsContactIdRouteImport } from './routes/prosp
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountsRoute = AccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgreementsRoute = AgreementsRouteImport.update({
@@ -86,6 +95,11 @@ const CostSheetsRoute = CostSheetsRouteImport.update({
 const DealsRoute = DealsRouteImport.update({
   id: '/deals',
   path: '/deals',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentToolsRoute = DocumentToolsRouteImport.update({
+  id: '/document-tools',
+  path: '/document-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocumentsRoute = DocumentsRouteImport.update({
@@ -213,6 +227,16 @@ const CostSheetsIdRoute = CostSheetsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => CostSheetsRoute,
 } as any)
+const MeetingsIndexRoute = MeetingsIndexRouteImport.update({
+  id: '/meetings/',
+  path: '/meetings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MeetingsIdRoute = MeetingsIdRouteImport.update({
+  id: '/meetings/$id',
+  path: '/meetings/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PrequalificationsIdRoute = PrequalificationsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -304,11 +328,13 @@ const ProspectsIdContactsContactIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agreements': typeof AgreementsRoute
   '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -333,12 +359,14 @@ export interface FileRoutesByFullPath {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/meetings/$id': typeof MeetingsIdRoute
   '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
   '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/meetings/': typeof MeetingsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
@@ -354,11 +382,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agreements': typeof AgreementsRoute
   '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -383,12 +413,14 @@ export interface FileRoutesByTo {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/meetings/$id': typeof MeetingsIdRoute
   '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
   '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns': typeof CampaignsIndexRoute
+  '/meetings': typeof MeetingsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
@@ -405,11 +437,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agreements': typeof AgreementsRoute
   '/bids': typeof BidsRouteWithChildren
   '/clients': typeof ClientsRouteWithChildren
   '/cost-sheets': typeof CostSheetsRouteWithChildren
   '/deals': typeof DealsRoute
+  '/document-tools': typeof DocumentToolsRoute
   '/documents': typeof DocumentsRoute
   '/finance': typeof FinanceRoute
   '/hr': typeof HrRoute
@@ -434,12 +468,14 @@ export interface FileRoutesById {
   '/campaigns/$id': typeof CampaignsIdRoute
   '/clients/$id': typeof ClientsIdRoute
   '/cost-sheets/$id': typeof CostSheetsIdRoute
+  '/meetings/$id': typeof MeetingsIdRoute
   '/prequalifications/$id': typeof PrequalificationsIdRoute
   '/prospects/$id': typeof ProspectsIdRouteWithChildren
   '/quotations/$id': typeof QuotationsIdRoute
   '/rfps/$id': typeof RfpsIdRoute
   '/rfqs/$id': typeof RfqsIdRoute
   '/campaigns/': typeof CampaignsIndexRoute
+  '/meetings/': typeof MeetingsIndexRoute
   '/api/attachments/upload': typeof ApiAttachmentsUploadRoute
   '/api/cron/campaigns': typeof ApiCronCampaignsRoute
   '/api/cron/notifications': typeof ApiCronNotificationsRoute
@@ -457,11 +493,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accounts'
     | '/agreements'
     | '/bids'
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -486,12 +524,14 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/meetings/$id'
     | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
     | '/rfqs/$id'
     | '/campaigns/'
+    | '/meetings/'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
     | '/api/cron/notifications'
@@ -507,11 +547,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accounts'
     | '/agreements'
     | '/bids'
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -536,12 +578,14 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/meetings/$id'
     | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
     | '/rfqs/$id'
     | '/campaigns'
+    | '/meetings'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
     | '/api/cron/notifications'
@@ -557,11 +601,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/accounts'
     | '/agreements'
     | '/bids'
     | '/clients'
     | '/cost-sheets'
     | '/deals'
+    | '/document-tools'
     | '/documents'
     | '/finance'
     | '/hr'
@@ -586,12 +632,14 @@ export interface FileRouteTypes {
     | '/campaigns/$id'
     | '/clients/$id'
     | '/cost-sheets/$id'
+    | '/meetings/$id'
     | '/prequalifications/$id'
     | '/prospects/$id'
     | '/quotations/$id'
     | '/rfps/$id'
     | '/rfqs/$id'
     | '/campaigns/'
+    | '/meetings/'
     | '/api/attachments/upload'
     | '/api/cron/campaigns'
     | '/api/cron/notifications'
@@ -608,11 +656,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountsRoute: typeof AccountsRoute
   AgreementsRoute: typeof AgreementsRoute
   BidsRoute: typeof BidsRouteWithChildren
   ClientsRoute: typeof ClientsRouteWithChildren
   CostSheetsRoute: typeof CostSheetsRouteWithChildren
   DealsRoute: typeof DealsRoute
+  DocumentToolsRoute: typeof DocumentToolsRoute
   DocumentsRoute: typeof DocumentsRoute
   FinanceRoute: typeof FinanceRoute
   HrRoute: typeof HrRoute
@@ -634,7 +684,9 @@ export interface RootRouteChildren {
   VendorsRoute: typeof VendorsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
+  MeetingsIdRoute: typeof MeetingsIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
+  MeetingsIndexRoute: typeof MeetingsIndexRoute
   ApiAttachmentsUploadRoute: typeof ApiAttachmentsUploadRoute
   ApiCronCampaignsRoute: typeof ApiCronCampaignsRoute
   ApiCronNotificationsRoute: typeof ApiCronNotificationsRoute
@@ -655,6 +707,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accounts': {
+      id: '/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agreements': {
@@ -690,6 +749,13 @@ declare module '@tanstack/react-router' {
       path: '/deals'
       fullPath: '/deals'
       preLoaderRoute: typeof DealsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/document-tools': {
+      id: '/document-tools'
+      path: '/document-tools'
+      fullPath: '/document-tools'
+      preLoaderRoute: typeof DocumentToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents': {
@@ -866,6 +932,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/cost-sheets/$id'
       preLoaderRoute: typeof CostSheetsIdRouteImport
       parentRoute: typeof CostSheetsRoute
+    }
+    '/meetings/': {
+      id: '/meetings/'
+      path: '/meetings'
+      fullPath: '/meetings/'
+      preLoaderRoute: typeof MeetingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/meetings/$id': {
+      id: '/meetings/$id'
+      path: '/meetings/$id'
+      fullPath: '/meetings/$id'
+      preLoaderRoute: typeof MeetingsIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/prequalifications/$id': {
       id: '/prequalifications/$id'
@@ -1091,11 +1171,13 @@ const RfqsRouteWithChildren = RfqsRoute._addFileChildren(RfqsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountsRoute: AccountsRoute,
   AgreementsRoute: AgreementsRoute,
   BidsRoute: BidsRouteWithChildren,
   ClientsRoute: ClientsRouteWithChildren,
   CostSheetsRoute: CostSheetsRouteWithChildren,
   DealsRoute: DealsRoute,
+  DocumentToolsRoute: DocumentToolsRoute,
   DocumentsRoute: DocumentsRoute,
   FinanceRoute: FinanceRoute,
   HrRoute: HrRoute,
@@ -1117,7 +1199,9 @@ const rootRouteChildren: RootRouteChildren = {
   VendorsRoute: VendorsRoute,
   ApiHealthRoute: ApiHealthRoute,
   CampaignsIdRoute: CampaignsIdRoute,
+  MeetingsIdRoute: MeetingsIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
+  MeetingsIndexRoute: MeetingsIndexRoute,
   ApiAttachmentsUploadRoute: ApiAttachmentsUploadRoute,
   ApiCronCampaignsRoute: ApiCronCampaignsRoute,
   ApiCronNotificationsRoute: ApiCronNotificationsRoute,

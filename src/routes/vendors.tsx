@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, FileText, Paperclip, Pencil, Plus, Search, Trash2 } from "lucide-react";
@@ -91,6 +91,10 @@ function VendorsPage() {
   const [quoteForm, setQuoteForm] = useState(emptyQuote);
   const [quoteOwnerId, setQuoteOwnerId] = useState<string>(() => crypto.randomUUID());
   const [uploading, setUploading] = useState(false);
+  useEffect(() => {
+    const linkedSearch = new URLSearchParams(window.location.search).get("search");
+    if (linkedSearch) setSearch(linkedSearch);
+  }, []);
   const { data, isLoading } = useQuery({
     queryKey: ["vendor-workspace"],
     queryFn: () => getVendorWorkspace() as Promise<Workspace>,
@@ -282,7 +286,7 @@ function VendorsPage() {
           </Button>
         </div>
       </div>
-      <Tabs defaultValue="vendors" className="space-y-5">
+      <Tabs defaultValue="vendors" className="space-y-4">
         <TabsList>
           <TabsTrigger value="vendors">Vendors ({vendors.length})</TabsTrigger>
           <TabsTrigger value="quotes">Source quotations ({quotes.length})</TabsTrigger>
@@ -295,10 +299,10 @@ function VendorsPage() {
                 Organisations you regularly source products or services from.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {isLoading ? <p className="text-muted-foreground">Loading vendors…</p> : null}
               {filteredVendors.map((vendor) => (
-                <article key={String(vendor["id"])} className="rounded-2xl border p-4">
+                <article key={String(vendor["id"])} className="rounded-xl border p-3">
                   <div className="flex items-start gap-3">
                     <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                       <Building2 className="size-5" />
@@ -339,7 +343,7 @@ function VendorsPage() {
                 </article>
               ))}
               {!filteredVendors.length && !isLoading ? (
-                <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground md:col-span-2 xl:col-span-3">
                   No vendors match this search. Add a vendor or save the quotation as an external
                   source.
                 </div>
@@ -359,37 +363,37 @@ function VendorsPage() {
               <table className="w-full min-w-[900px] text-sm">
                 <thead className="border-y bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-5 py-3">Source</th>
-                    <th className="px-5 py-3">Reference</th>
-                    <th className="px-5 py-3">Date / validity</th>
-                    <th className="px-5 py-3 text-right">Amount</th>
-                    <th className="px-5 py-3">Document</th>
-                    <th className="px-5 py-3">Used by</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
+                    <th className="px-4 py-2.5">Source</th>
+                    <th className="px-4 py-2.5">Reference</th>
+                    <th className="px-4 py-2.5">Date / validity</th>
+                    <th className="px-4 py-2.5 text-right">Amount</th>
+                    <th className="px-4 py-2.5">Document</th>
+                    <th className="px-4 py-2.5">Used by</th>
+                    <th className="px-4 py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredQuotes.map((quote) => (
                     <tr key={String(quote["id"])} className="border-b last:border-0">
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <p className="font-medium">{String(quote["source_name"])}</p>
                         <Badge variant="outline" className="mt-1">
                           {quote["supplier_id"] ? "Vendor" : "External source"}
                         </Badge>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         {String(quote["quote_reference"] || "No reference")}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <p>{String(quote["quote_date"] || "No date").slice(0, 10)}</p>
                         <p className="text-xs text-muted-foreground">
                           Valid until {String(quote["valid_until"] || "not set").slice(0, 10)}
                         </p>
                       </td>
-                      <td className="px-5 py-4 text-right font-semibold">
+                      <td className="px-4 py-3 text-right font-semibold">
                         {money(Number(quote["amount"] || 0), String(quote["currency"] || "MWK"))}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         {quote["attachment_path"] ? (
                           <a
                             className="inline-flex items-center gap-1 text-primary hover:underline"
@@ -404,11 +408,11 @@ function VendorsPage() {
                           <span className="text-muted-foreground">No document</span>
                         )}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         {Number(quote["linked_sheets"] || 0)} cost sheet
                         {Number(quote["linked_sheets"] || 0) === 1 ? "" : "s"}
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-4 py-3">
                         <div className="flex justify-end">
                           <Button
                             variant="ghost"
@@ -438,7 +442,7 @@ function VendorsPage() {
                   ))}
                   {!filteredQuotes.length && !isLoading ? (
                     <tr>
-                      <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                         No source quotations yet.
                       </td>
                     </tr>

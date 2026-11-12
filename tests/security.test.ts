@@ -1,10 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { requiredTablePermission } from "../src/lib/security-policy.ts";
-import { attachmentHeaders, validateAttachmentBytes } from "../src/lib/attachment-policy.ts";
+import {
+  attachmentHeaders,
+  attachmentPreviewHeaders,
+  validateAttachmentBytes,
+} from "../src/lib/attachment-policy.ts";
 test("sensitive modules and unknown tables fail closed", () => {
   assert.equal(requiredTablePermission("payroll_items", "select"), "finance.manage");
   assert.equal(requiredTablePermission("employees", "delete"), "hr.manage");
+  assert.equal(requiredTablePermission("portal_accounts", "select"), "accounts.manage");
+  assert.equal(requiredTablePermission("document_marks", "insert"), "documents.manage");
+  assert.equal(requiredTablePermission("document_mark_applications", "select"), "documents.manage");
   assert.equal(requiredTablePermission("mailboxes", "update"), "settings.manage");
   assert.equal(requiredTablePermission("prospects", "select"), "prospects.view");
   assert.equal(requiredTablePermission("prospects", "insert"), "prospects.manage");
@@ -37,4 +44,18 @@ test("legacy uploads are forced to inert downloads and filenames cannot inject h
   assert.doesNotMatch(headers["content-disposition"], /[\r\n]/);
   assert.match(headers["content-security-policy"], /sandbox/);
   assert.match(headers["cache-control"], /no-store/);
+});
+
+test("safe documents can be rendered inline without enabling active content", () => {
+  const pdf = attachmentPreviewHeaders("proposal.pdf", "application/pdf", 120);
+  assert.equal(pdf["content-type"], "application/pdf");
+  assert.match(pdf["content-disposition"], /^inline;/);
+  assert.match(pdf["content-security-policy"], /sandbox/);
+
+  const office = attachmentPreviewHeaders(
+    "proposal.docx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    120,
+  );
+  assert.equal(office["content-type"], "application/octet-stream");
 });

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmAction } from "@/components/ConfirmAction";
 import { MailboxSettings } from "@/components/settings/MailboxSettings";
+import { EmailSignatureSettings } from "@/components/settings/EmailSignatureSettings";
 import { CurrencySettings } from "@/components/settings/CurrencySettings";
 import {
   Select,
@@ -35,6 +36,7 @@ import {
   saveProviderSecrets,
   saveSystemSettings,
 } from "@/lib/settings.functions";
+import { syncBidafOpportunities } from "@/lib/bidaf.functions";
 import {
   createRole,
   deleteSystemUser,
@@ -95,6 +97,7 @@ function SettingsPage() {
     google_oauth_client_secret: "Google OAuth client secret",
     microsoft_oauth_client_id: "Microsoft OAuth client ID",
     microsoft_oauth_client_secret: "Microsoft OAuth client secret",
+    bidaf_api_token: "BidAF API token",
   };
   return (
     <AppShell
@@ -119,9 +122,10 @@ function SettingsPage() {
         <TabsList className="h-auto w-full justify-start overflow-x-auto bg-white p-1.5">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="email">Email connections</TabsTrigger>
-          <TabsTrigger value="templates">Email templates</TabsTrigger>
+          <TabsTrigger value="templates">Templates & signatures</TabsTrigger>
           <TabsTrigger value="currencies">Currencies</TabsTrigger>
           <TabsTrigger value="ai">AI & Prospecting</TabsTrigger>
+          <TabsTrigger value="integrations">Integrations</TabsTrigger>
           <TabsTrigger value="access">Users & access</TabsTrigger>
         </TabsList>
         <TabsContent value="general">
@@ -155,6 +159,13 @@ function SettingsPage() {
             refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
           />
         </TabsContent>
+        <TabsContent value="integrations">
+          <IntegrationsTab
+            initial={values}
+            configured={data.configured.bidaf}
+            refresh={() => qc.invalidateQueries({ queryKey: ["settings-overview"] })}
+          />
+        </TabsContent>
         <TabsContent value="access">
           <AccessTab
             data={data}
@@ -163,6 +174,109 @@ function SettingsPage() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+function IntegrationsTab({
+  initial,
+  configured,
+  refresh,
+}: {
+  initial: Record<string, string>;
+  configured: boolean;
+  refresh: () => void;
+}) {
+  const [form, setForm] = useState({
+    origin: initial["bidaf_origin"] || "https://bidaf.africa",
+    organisationId: initial["bidaf_organisation_id"] || "",
+    country: initial["bidaf_country"] || "MW",
+    token: "",
+  });
+  const save = useMutation({
+    mutationFn: async () => {
+      await saveSystemSettings({
+        data: {
+          group: "integrations",
+          values: {
+            bidaf_origin: form.origin,
+            bidaf_organisation_id: form.organisationId,
+            bidaf_country: form.country.toUpperCase(),
+          },
+        },
+      });
+      await saveProviderSecrets({ data: { bidaf_api_token: form.token } });
+      return syncBidafOpportunities();
+    },
+    onSuccess: (result) => {
+      refresh();
+      setForm((current) => ({ ...current, token: "" }));
+      if (result.status === "completed") {
+        toast.success(
+          `BidAF connected: ${result.created} added, ${result.updated} updated, ${result.seen} checked.`,
+        );
+      } else {
+        toast.success("BidAF settings saved. The hourly sync is already up to date.");
+      }
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const set = (key: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>BidAF opportunity discovery</CardTitle>
+            <CardDescription>
+              Import active opportunities hourly and route them into Bids, EOI, RFPs and RFQs.
+            </CardDescription>
+          </div>
+          <Badge variant={configured ? "default" : "secondary"}>
+            {configured ? "Token configured" : "Token required"}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-4 md:grid-cols-2">
+        <Field
+          label="BidAF origin"
+          value={form.origin}
+          placeholder="https://bidaf.africa"
+          onChange={(value) => set("origin", value)}
+        />
+        <Field
+          label="Organisation ID"
+          value={form.organisationId}
+          onChange={(value) => set("organisationId", value)}
+        />
+        <Field
+          label="Country code"
+          value={form.country}
+          placeholder="MW"
+          onChange={(value) => set("country", value.slice(0, 2).toUpperCase())}
+        />
+        <Field
+          label={configured ? "Replace API token" : "API token"}
+          type="password"
+          value={form.token}
+          placeholder={configured ? "Leave blank to keep the current token" : "baf_test_…"}
+          onChange={(value) => set("token", value)}
+        />
+        <p className="text-sm text-muted-foreground md:col-span-2">
+          The token is encrypted at rest and used only by the server. Saving also performs a safe,
+          idempotent sync; later runs are limited to once per hour.
+        </p>
+        <Button
+          className="md:w-fit"
+          disabled={
+            save.isPending || !form.origin || !form.organisationId || (!configured && !form.token)
+          }
+          onClick={() => save.mutate()}
+        >
+          {save.isPending ? "Connecting…" : "Save and sync BidAF"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -199,7 +313,7 @@ function GeneralTab({
           Changes are stored centrally for the interface and outbound communication.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-5 md:grid-cols-2">
+      <CardContent className="grid gap-4 md:grid-cols-2">
         <Field
           label="System name"
           value={form.system_name}
@@ -556,81 +670,84 @@ function TemplatesTab({
     onError: (e: Error) => toast.error(e.message),
   });
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_1.3fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create or replace a template</CardTitle>
-          <CardDescription>
-            Use placeholders such as {"{{first_name}}"}, {"{{company}}"} and {"{{system_name}}"}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Field
-            label="Template name"
-            value={form.name}
-            onChange={(v) => setForm((o) => ({ ...o, name: v }))}
-          />
-          <Field
-            label="Event key"
-            value={form.event_key}
-            onChange={(v) => setForm((o) => ({ ...o, event_key: v }))}
-            placeholder="campaign.follow_up"
-          />
-          <Field
-            label="Subject"
-            value={form.subject}
-            onChange={(v) => setForm((o) => ({ ...o, subject: v }))}
-          />
-          <div className="space-y-2">
-            <Label>HTML body</Label>
-            <Textarea
-              rows={8}
-              value={form.body_html}
-              onChange={(e) => setForm((o) => ({ ...o, body_html: e.target.value }))}
+    <>
+      <div className="grid gap-5 lg:grid-cols-[1fr_1.3fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Create or replace a template</CardTitle>
+            <CardDescription>
+              Use placeholders such as {"{{first_name}}"}, {"{{company}}"} and {"{{system_name}}"}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field
+              label="Template name"
+              value={form.name}
+              onChange={(v) => setForm((o) => ({ ...o, name: v }))}
             />
-          </div>
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={form.is_active}
-              onCheckedChange={(v) => setForm((o) => ({ ...o, is_active: v }))}
+            <Field
+              label="Event key"
+              value={form.event_key}
+              onChange={(v) => setForm((o) => ({ ...o, event_key: v }))}
+              placeholder="campaign.follow_up"
             />
-            <Label>Active</Label>
-          </div>
-          <Button
-            onClick={() => save.mutate()}
-            disabled={!form.name || !form.event_key || !form.subject}
-          >
-            Save template
-          </Button>
-        </CardContent>
-      </Card>
-      <div className="space-y-3">
-        {templates.map((t) => (
-          <Card key={t.id}>
-            <CardHeader>
-              <div className="flex justify-between gap-3">
-                <div>
-                  <CardTitle className="text-base">{t.name}</CardTitle>
-                  <CardDescription>
-                    {t.event_key} · {t.subject}
-                  </CardDescription>
+            <Field
+              label="Subject"
+              value={form.subject}
+              onChange={(v) => setForm((o) => ({ ...o, subject: v }))}
+            />
+            <div className="space-y-2">
+              <Label>HTML body</Label>
+              <Textarea
+                rows={8}
+                value={form.body_html}
+                onChange={(e) => setForm((o) => ({ ...o, body_html: e.target.value }))}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={form.is_active}
+                onCheckedChange={(v) => setForm((o) => ({ ...o, is_active: v }))}
+              />
+              <Label>Active</Label>
+            </div>
+            <Button
+              onClick={() => save.mutate()}
+              disabled={!form.name || !form.event_key || !form.subject}
+            >
+              Save template
+            </Button>
+          </CardContent>
+        </Card>
+        <div className="space-y-3">
+          {templates.map((t) => (
+            <Card key={t.id}>
+              <CardHeader>
+                <div className="flex justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base">{t.name}</CardTitle>
+                    <CardDescription>
+                      {t.event_key} · {t.subject}
+                    </CardDescription>
+                  </div>
+                  <Badge variant={t.is_active ? "default" : "secondary"}>
+                    {t.is_active ? "Active" : "Off"}
+                  </Badge>
                 </div>
-                <Badge variant={t.is_active ? "default" : "secondary"}>
-                  {t.is_active ? "Active" : "Off"}
-                </Badge>
-              </div>
-            </CardHeader>
-          </Card>
-        ))}
-        {!templates.length ? (
-          <Card>
-            <CardContent className="py-10 text-center text-muted-foreground">
-              No templates created yet.
-            </CardContent>
-          </Card>
-        ) : null}
+              </CardHeader>
+            </Card>
+          ))}
+          {!templates.length ? (
+            <Card>
+              <CardContent className="py-10 text-center text-muted-foreground">
+                No templates created yet.
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
       </div>
-    </div>
+      <EmailSignatureSettings />
+    </>
   );
 }
 

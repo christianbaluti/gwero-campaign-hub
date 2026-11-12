@@ -132,7 +132,7 @@ function safeFilename(value: string) {
 
 export const listOpportunityDependencies = createServerFn({ method: "GET" })
   .middleware([permissionMiddleware("opportunities.manage")])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     const db = await pool();
     const [clients, currencies, documents, users, mailboxes, costSheets] = await Promise.all([
       db.query(
@@ -142,13 +142,24 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
         "SELECT * FROM currencies WHERE is_active = TRUE ORDER BY is_default DESC, sort_order, code",
       ),
       db.query(
-        "SELECT id, title, category, owner, version, file_url FROM documents ORDER BY updated_at DESC",
+        `SELECT d.id, d.title, d.category, d.owner, d.version, d.file_url,
+                v.attachment_path, v.file_name, v.content_type, v.file_size
+           FROM documents d
+           LEFT JOIN document_versions v ON v.document_id = d.id
+             AND v.version_number = (SELECT MAX(v2.version_number) FROM document_versions v2 WHERE v2.document_id = d.id)
+           LEFT JOIN document_access da ON da.document_id = d.id AND da.user_id = ?
+          WHERE ? = 1 OR d.owner_id = ? OR d.owner_id IS NULL OR da.user_id IS NOT NULL
+          ORDER BY d.updated_at DESC`,
+        [context.user.id, context.user.roleName === "Administrator" ? 1 : 0, context.user.id],
       ),
       db.query(
         "SELECT id, full_name, email FROM system_users WHERE status = 'active' ORDER BY full_name",
       ),
       db.query(
-        "SELECT id, name, from_email, provider, is_default FROM mailboxes ORDER BY is_default DESC, name",
+        `SELECT m.id, m.name, m.from_email, m.provider, ma.is_default
+           FROM mailboxes m JOIN mailbox_access ma ON ma.mailbox_id = m.id
+          WHERE ma.user_id = ? AND ma.can_send = TRUE ORDER BY ma.is_default DESC, m.name`,
+        [context.user.id],
       ),
       db.query(
         "SELECT id, name, client_id, status, currency FROM cost_sheets ORDER BY updated_at DESC",
@@ -164,37 +175,212 @@ export const listOpportunityDependencies = createServerFn({ method: "GET" })
     });
   });
 
+export type OpportunityListResult = {
+  items: SerializableRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export const listOpportunities = createServerFn({ method: "GET" })
   .middleware([permissionMiddleware("opportunities.manage")])
-  .validator((data: { kind: OpportunityKind }) => data)
+  .validator(
+    (data: {
+      kind: OpportunityKind;
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      archived?: boolean;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     assertKind(data.kind);
     const db = await pool();
-    const query =
+    const pageSize = [10, 25, 50].includes(Number(data.pageSize)) ? Number(data.pageSize) : 10;
+    const page = Math.max(1, Math.floor(Number(data.page) || 1));
+    const search = String(data.search || "")
+      .trim()
+      .slice(0, 120);
+    const pattern = `%${search}%`;
+    const archived = data.archived === true;
+    const definition =
       data.kind === "bid"
-        ? `SELECT b.id, b.title, b.reference, b.status, b.closing_date AS due_date,
-                  b.value, b.currency, b.submission_type, c.name AS client_name,
-                  c.company AS client_company, c.logo_path AS client_logo
-             FROM bids b LEFT JOIN clients c ON c.id = b.client_id
-            ORDER BY b.created_at DESC`
+        ? {
+            alias: "b",
+            from: "FROM bids b LEFT JOIN clients c ON c.id = b.client_id",
+            select: `SELECT b.id, b.title, b.reference, b.status, b.closing_date AS due_date,
+                     b.value, b.currency, b.submission_type, c.name AS client_name,
+                     c.company AS client_company, c.logo_path AS client_logo`,
+            title: "b.title",
+            client: "COALESCE(c.company, c.name, b.buyer)",
+            initialWhere: [] as string[],
+            params: [] as unknown[],
+          }
         : data.kind === "eoi"
-          ? `SELECT p.id, COALESCE(p.title, p.buyer) AS title, p.reference, p.status,
-                    COALESCE(p.due_date, p.valid_until) AS due_date,
-                    p.value, p.currency, p.response_channel AS submission_type,
-                    c.name AS client_name, COALESCE(c.company, p.buyer) AS client_company,
-                    c.logo_path AS client_logo
-               FROM prequalifications p LEFT JOIN clients c ON c.id = p.client_id
-              ORDER BY p.created_at DESC`
-          : `SELECT r.id, r.title, r.reference, r.status, r.due_date,
-                  r.value, r.currency, r.submission_type, c.name AS client_name,
-                  c.company AS client_company, c.logo_path AS client_logo
-             FROM requests r LEFT JOIN clients c ON c.id = r.client_id
-            WHERE r.request_type = ? ORDER BY r.created_at DESC`;
-    return serial(
-      rows<SerializableRecord>(
-        await db.query(query, data.kind === "bid" || data.kind === "eoi" ? [] : [data.kind]),
+          ? {
+              alias: "p",
+              from: "FROM prequalifications p LEFT JOIN clients c ON c.id = p.client_id",
+              select: `SELECT p.id, COALESCE(p.title, p.buyer) AS title, p.reference, p.status,
+                       COALESCE(p.due_date, p.valid_until) AS due_date,
+                       p.value, p.currency, p.response_channel AS submission_type,
+                       c.name AS client_name, COALESCE(c.company, p.buyer) AS client_company,
+                       c.logo_path AS client_logo`,
+              title: "COALESCE(p.title, p.buyer)",
+              client: "COALESCE(c.company, c.name, p.buyer)",
+              initialWhere: [] as string[],
+              params: [] as unknown[],
+            }
+          : {
+              alias: "r",
+              from: "FROM requests r LEFT JOIN clients c ON c.id = r.client_id",
+              select: `SELECT r.id, r.title, r.reference, r.status, r.due_date,
+                       r.value, r.currency, r.submission_type, c.name AS client_name,
+                       c.company AS client_company, c.logo_path AS client_logo`,
+              title: "r.title",
+              client: "COALESCE(c.company, c.name, r.issuer)",
+              initialWhere: ["r.request_type = ?"],
+              params: [data.kind] as unknown[],
+            };
+    const where = [...definition.initialWhere];
+    const params = [...definition.params];
+    where.push(
+      archived
+        ? `${definition.alias}.status = 'archived'`
+        : `${definition.alias}.status <> 'archived'`,
+    );
+    if (search) {
+      where.push(
+        `(${definition.title} LIKE ? OR ${definition.alias}.reference LIKE ? OR ${definition.client} LIKE ?)`,
+      );
+      params.push(pattern, pattern, pattern);
+    }
+    const clause = `WHERE ${where.join(" AND ")}`;
+    const total = Number(
+      rows<{ total: number }>(
+        await db.query(`SELECT COUNT(*) AS total ${definition.from} ${clause}`, params),
+      )[0]?.total || 0,
+    );
+    const maxPage = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(page, maxPage);
+    const offset = (safePage - 1) * pageSize;
+    const items = rows<SerializableRecord>(
+      await db.query(
+        `${definition.select} ${definition.from} ${clause}
+         ORDER BY ${definition.alias}.created_at DESC LIMIT ${pageSize} OFFSET ${offset}`,
+        params,
       ),
     );
+    return serial({ items, total, page: safePage, pageSize }) as OpportunityListResult;
+  });
+
+function opportunityTable(kind: OpportunityKind) {
+  return kind === "bid" ? "bids" : kind === "eoi" ? "prequalifications" : "requests";
+}
+
+function restoredOpportunityStatus(kind: OpportunityKind) {
+  return kind === "bid" ? "identified" : kind === "eoi" ? "preparing" : "received";
+}
+
+export const archiveOpportunity = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("opportunities.manage")])
+  .validator((data: { kind: OpportunityKind; id: string; archived: boolean }) => data)
+  .handler(async ({ data }) => {
+    assertKind(data.kind);
+    if (!/^[0-9a-f-]{36}$/i.test(data.id)) throw new Error("Invalid opportunity.");
+    const db = await pool();
+    const table = opportunityTable(data.kind);
+    const typeClause = table === "requests" ? " AND request_type = ?" : "";
+    const params = table === "requests" ? [data.id, data.kind] : [data.id];
+    const current = rows<{ status: string; status_before_archive: string | null }>(
+      await db.query(
+        `SELECT status, status_before_archive FROM ${table} WHERE id = ?${typeClause} LIMIT 1`,
+        params,
+      ),
+    )[0];
+    if (!current) throw new Error("Opportunity not found.");
+    if (data.archived) {
+      if (current.status !== "archived")
+        await db.execute(
+          `UPDATE ${table}
+              SET status_before_archive = status, status = 'archived', archived_at = NOW(3)
+            WHERE id = ?${typeClause}`,
+          params,
+        );
+    } else {
+      const restored = current.status_before_archive || restoredOpportunityStatus(data.kind);
+      await db.execute(
+        `UPDATE ${table}
+            SET status = ?, status_before_archive = NULL, archived_at = NULL
+          WHERE id = ?${typeClause}`,
+        [restored, ...params],
+      );
+    }
+    return { ok: true };
+  });
+
+export const deleteOpportunity = createServerFn({ method: "POST" })
+  .middleware([permissionMiddleware("opportunities.manage")])
+  .validator((data: { kind: OpportunityKind; id: string }) => data)
+  .handler(async ({ data }) => {
+    assertKind(data.kind);
+    if (!/^[0-9a-f-]{36}$/i.test(data.id)) throw new Error("Invalid opportunity.");
+    const db = await pool();
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      const table = opportunityTable(data.kind);
+      const typeClause = table === "requests" ? " AND request_type = ?" : "";
+      const params = table === "requests" ? [data.id, data.kind] : [data.id];
+      const [records] = await connection.query(
+        `SELECT id FROM ${table} WHERE id = ? AND status = 'archived'${typeClause} LIMIT 1 FOR UPDATE`,
+        params,
+      );
+      if (!(records as Array<{ id: string }>)[0])
+        throw new Error("Archive this opportunity before deleting it permanently.");
+      await connection.execute(
+        "DELETE FROM replies WHERE opportunity_type = ? AND opportunity_id = ?",
+        [data.kind, data.id],
+      );
+      await connection.execute(
+        `DELETE FROM document_mark_applications
+          WHERE source_attachment_path LIKE ? OR output_attachment_path LIKE ?`,
+        [`${data.id}/%`, `${data.id}/%`],
+      );
+      await connection.execute(
+        "DELETE FROM notifications WHERE entity_type = ? AND entity_id = ?",
+        [data.kind, data.id],
+      );
+      for (const child of [
+        "opportunity_submissions",
+        "opportunity_documents",
+        "opportunity_checklist_items",
+        "opportunity_comments",
+      ])
+        await connection.execute(
+          `DELETE FROM ${child} WHERE opportunity_type = ? AND opportunity_id = ?`,
+          [data.kind, data.id],
+        );
+      await connection.execute(
+        `UPDATE bidaf_opportunity_links
+            SET is_suppressed = TRUE, last_synced_at = NOW(3)
+          WHERE local_kind = ? AND local_opportunity_id = ?`,
+        [data.kind, data.id],
+      );
+      if (data.kind === "bid") {
+        await connection.execute("UPDATE cost_sheets SET bid_id = NULL WHERE bid_id = ?", [
+          data.id,
+        ]);
+      }
+      await connection.execute(`DELETE FROM ${table} WHERE id = ?${typeClause}`, params);
+      await connection.execute("DELETE FROM attachment_files WHERE owner_id = ?", [data.id]);
+      await connection.commit();
+      return { ok: true };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   });
 
 export const createOpportunity = createServerFn({ method: "POST" })
@@ -598,6 +784,8 @@ export const addOpportunityDocument = createServerFn({ method: "POST" })
     const db = await pool();
     let attachment = data.attachment;
     if (!attachment && data.documentId) {
+      const { requireAttachmentAccess } = await import("./attachment-access.server");
+      await requireAttachmentAccess(data.documentId);
       const document = rows<{ title: string; file_url: string | null }>(
         await db.query("SELECT title, file_url FROM documents WHERE id = ? LIMIT 1", [
           data.documentId,
@@ -731,6 +919,12 @@ export const linkCostSheet = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertKind(data.kind);
     const db = await pool();
+    const table =
+      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
+    const opportunityRows = rows<{ client_id: string | null }>(
+      await db.query(`SELECT client_id FROM ${table} WHERE id = ? LIMIT 1`, [data.opportunityId]),
+    );
+    const opportunityClientId = opportunityRows[0]?.client_id || null;
     let id = data.costSheetId || null;
     if (data.create) {
       id = crypto.randomUUID();
@@ -740,19 +934,22 @@ export const linkCostSheet = createServerFn({ method: "POST" })
         [
           id,
           data.create.name,
-          data.create.clientId || null,
+          data.create.clientId || opportunityClientId,
           data.kind === "bid" ? data.opportunityId : null,
           data.create.currency,
           data.create.notes || null,
         ],
       );
     }
-    const table =
-      data.kind === "bid" ? "bids" : data.kind === "eoi" ? "prequalifications" : "requests";
     await db.execute(`UPDATE ${table} SET cost_sheet_id = ? WHERE id = ?`, [
       id,
       data.opportunityId,
     ]);
+    if (id && opportunityClientId)
+      await db.execute("UPDATE cost_sheets SET client_id = COALESCE(client_id, ?) WHERE id = ?", [
+        opportunityClientId,
+        id,
+      ]);
     return { id };
   });
 
@@ -791,6 +988,7 @@ export const submitOpportunity = createServerFn({ method: "POST" })
     if (!opportunity) throw new Error("Opportunity not found.");
     const submissionId = crypto.randomUUID();
     let messageId: string | null = null;
+    let submittedBodyHtml = data.bodyHtml || null;
     if (data.channel === "email") {
       if (
         !data.mailboxId ||
@@ -801,15 +999,27 @@ export const submitOpportunity = createServerFn({ method: "POST" })
         throw new Error("Choose a mailbox and add the recipient, subject and message.");
       assertEmail(data.recipientEmail, "Recipient");
       splitEmails(data.cc).forEach((email) => assertEmail(email, "CC address"));
-      const mailbox = rows<SerializableRecord>(
-        await db.query("SELECT * FROM mailboxes WHERE id = ? LIMIT 1", [data.mailboxId]),
-      )[0];
+      const { requireMailboxAccess, applyActiveEmailSignature } =
+        await import("./email-identity.server");
+      const mailbox = (await requireMailboxAccess(
+        db,
+        data.mailboxId,
+        context.user,
+      )) as SerializableRecord;
       const secret = rows<SerializableRecord>(
         await db.query("SELECT * FROM mailbox_secrets WHERE mailbox_id = ? LIMIT 1", [
           data.mailboxId,
         ]),
       )[0];
       if (!mailbox) throw new Error("Sending account not found.");
+      const signedBody = await applyActiveEmailSignature(
+        db,
+        context.user.id,
+        data.mailboxId,
+        data.bodyHtml,
+        data.bodyText || data.bodyHtml.replace(/<[^>]+>/g, " "),
+      );
+      submittedBodyHtml = signedBody.html;
       const fileRows = rows<Record<string, unknown>>(
         await db.query(
           `SELECT od.*, af.content FROM opportunity_documents od
@@ -858,8 +1068,8 @@ export const submitOpportunity = createServerFn({ method: "POST" })
         to: data.recipientEmail,
         cc: splitEmails(data.cc),
         subject: data.subject.trim(),
-        html: data.bodyHtml,
-        text: data.bodyText || data.bodyHtml.replace(/<[^>]+>/g, " "),
+        html: signedBody.html,
+        text: signedBody.text,
         attachments,
         messageId,
       });
@@ -909,7 +1119,7 @@ export const submitOpportunity = createServerFn({ method: "POST" })
           body: JSON.stringify({
             message: {
               subject: data.subject,
-              body: { contentType: "HTML", content: data.bodyHtml },
+              body: { contentType: "HTML", content: signedBody.html },
               toRecipients: [{ emailAddress: { address: data.recipientEmail } }],
               ccRecipients: splitEmails(data.cc).map((address) => ({ emailAddress: { address } })),
               attachments: attachments.map((file) => ({
@@ -938,7 +1148,7 @@ export const submitOpportunity = createServerFn({ method: "POST" })
         data.recipientEmail || null,
         JSON.stringify(splitEmails(data.cc)),
         data.subject || null,
-        data.bodyHtml || null,
+        submittedBodyHtml,
         data.fileMode || "separate",
         String(opportunity["submission_instructions"] || ""),
         messageId,

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -131,7 +132,7 @@ function CampaignsPage() {
         </Button>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(
           [
             ["Active campaigns", totals.active, Send],
@@ -141,10 +142,10 @@ function CampaignsPage() {
           ] as const
         ).map(([label, value, Icon]) => (
           <Card key={String(label)}>
-            <CardContent className="flex items-center justify-between p-5">
-              <div>
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">{String(label)}</p>
-                <p className="mt-1 font-display text-3xl font-semibold">{String(value)}</p>
+                <MetricValue className="mt-1 font-display" value={value} maxSize={1.75} />
               </div>
               <span className="rounded-2xl bg-primary/10 p-3 text-primary">
                 <Icon className="h-5 w-5" />
@@ -154,7 +155,7 @@ function CampaignsPage() {
         ))}
       </div>
 
-      <Card className="mt-6">
+      <Card className="mt-4">
         <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <CardTitle>Campaign workspace</CardTitle>
@@ -264,7 +265,7 @@ function CampaignsPage() {
             );
           })}
           {!isLoading && !filtered.length ? (
-            <div className="rounded-2xl border border-dashed py-14 text-center">
+            <div className="rounded-xl border border-dashed py-8 text-center">
               <Send className="mx-auto h-8 w-8 text-muted-foreground" />
               <p className="mt-3 font-medium">No campaigns match this view.</p>
               <p className="text-sm text-muted-foreground">

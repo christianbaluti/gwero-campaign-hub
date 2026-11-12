@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ConfirmAction } from "@/components/ConfirmAction";
+import { DocumentMergeDialog, type MergeCandidate } from "@/components/DocumentMergeDialog";
 import { EmailMessageContent } from "@/components/EmailMessageContent";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -161,7 +163,7 @@ export function OpportunityWorkspace({ kind, id }: { kind: OpportunityKind; id: 
           </div>
         </div>
       </div>
-      <div className="mb-5 grid gap-4 md:grid-cols-4">
+      <div className="mb-4 grid gap-3 md:grid-cols-4">
         <Metric
           label="Checklist progress"
           value={`${progress}%`}
@@ -183,7 +185,7 @@ export function OpportunityWorkspace({ kind, id }: { kind: OpportunityKind; id: 
           hint={opportunity["submitted_at"] ? "Submitted" : "Not submitted"}
         />
       </div>
-      <Tabs defaultValue="requirements" className="space-y-5">
+      <Tabs defaultValue="requirements" className="space-y-4">
         <TabsList className="h-auto w-full justify-start overflow-x-auto bg-white p-1.5">
           <TabsTrigger value="requirements">Requirements</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -256,7 +258,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint: st
     <Card>
       <CardContent className="p-4">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold capitalize">{value}</p>
+        <MetricValue className="mt-1 capitalize" value={value} maxSize={1.5} />
         <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
@@ -390,7 +392,7 @@ function Requirements({
             );
           })
         ) : (
-          <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+          <p className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">
             No requirements yet. Add every document or action needed for a complete response.
           </p>
         )}
@@ -472,6 +474,7 @@ function Documents({
   refresh: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [mode, setMode] = useState<"upload" | "library">("upload");
   const [checklistId, setChecklistId] = useState("");
   const [documentId, setDocumentId] = useState("");
@@ -531,6 +534,39 @@ function Documents({
   const library = (dependencies?.documents || []).filter((doc) =>
     String(doc["title"]).toLowerCase().includes(query.toLowerCase()),
   );
+  const mergeCandidates = useMemo<MergeCandidate[]>(() => {
+    const tenderDocuments = data.documents
+      .filter((doc) => {
+        const name = String(doc["outgoing_name"] || doc["display_name"] || "");
+        return (
+          Boolean(doc["attachment_path"]) &&
+          (doc["content_type"] === "application/pdf" || name.toLowerCase().endsWith(".pdf"))
+        );
+      })
+      .map((doc) => ({
+        kind: "tender" as const,
+        id: String(doc["id"]),
+        name: String(doc["outgoing_name"] || doc["display_name"]),
+        path: String(doc["attachment_path"]),
+        detail: "Tender document",
+      }));
+    const libraryDocuments = (dependencies?.documents || [])
+      .filter((doc) => {
+        const name = String(doc["file_name"] || doc["title"] || "");
+        return (
+          Boolean(doc["attachment_path"]) &&
+          (doc["content_type"] === "application/pdf" || name.toLowerCase().endsWith(".pdf"))
+        );
+      })
+      .map((doc) => ({
+        kind: "library" as const,
+        id: String(doc["id"]),
+        name: String(doc["file_name"] || doc["title"]),
+        path: String(doc["attachment_path"]),
+        detail: `${String(doc["title"])}${doc["version"] ? ` · v${String(doc["version"])}` : ""}`,
+      }));
+    return [...tenderDocuments, ...libraryDocuments];
+  }, [data.documents, dependencies?.documents]);
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between">
@@ -540,10 +576,15 @@ function Documents({
             Upload new work or reuse controlled documents already in the system.
           </CardDescription>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <FilePlus2 className="mr-2 size-4" />
-          Add document
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setMergeOpen(true)}>
+            Merge PDFs
+          </Button>
+          <Button onClick={() => setOpen(true)}>
+            <FilePlus2 className="mr-2 size-4" />
+            Add document
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {data.documents.length ? (
@@ -613,7 +654,7 @@ function Documents({
             </div>
           ))
         ) : (
-          <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
+          <p className="rounded-xl border border-dashed p-6 text-center text-muted-foreground">
             No documents in this workspace yet.
           </p>
         )}
@@ -670,6 +711,15 @@ function Documents({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <DocumentMergeDialog
+          open={mergeOpen}
+          onOpenChange={setMergeOpen}
+          kind={kind}
+          opportunityId={id}
+          opportunityTitle={String(data.opportunity["title"] || names[kind])}
+          candidates={mergeCandidates}
+          onSaved={refresh}
+        />
       </CardContent>
     </Card>
   );
@@ -755,7 +805,7 @@ function Costing({
       </Card>
       {opportunity["cost_sheet_id"] ? (
         <Card className="lg:col-span-2">
-          <CardContent className="flex items-center justify-between p-5">
+          <CardContent className="flex items-center justify-between p-4">
             <div>
               <p className="font-medium">{String(opportunity["cost_sheet_name"])}</p>
               <p className="text-sm text-muted-foreground">Currently linked to this response.</p>
@@ -1269,7 +1319,7 @@ function Details({
             Edit details
           </Button>
         </CardHeader>
-        <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Detail label="Reference" value={form.reference} />
           <Detail
             label="Client"

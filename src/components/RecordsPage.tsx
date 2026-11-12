@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Link } from "@tanstack/react-router";
@@ -193,6 +193,11 @@ export function RecordsTable({
     Object.fromEntries(fields.map((f) => [f.name, f.defaultValue ?? ""])),
   );
 
+  useEffect(() => {
+    const linkedSearch = new URLSearchParams(window.location.search).get("search");
+    if (linkedSearch) setSearch(linkedSearch);
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q || !searchKeys.length) return rows;
@@ -245,8 +250,8 @@ export function RecordsTable({
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
         {searchKeys.length ? (
           <Input
             className="max-w-xs"
@@ -263,7 +268,7 @@ export function RecordsTable({
             <DialogHeader>
               <DialogTitle>{createLabel}</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {fields.map((f) => (
                 <div key={f.name} className="space-y-1.5">
                   <Label>{f.label}</Label>
@@ -290,23 +295,23 @@ export function RecordsTable({
             <thead className="border-b border-border bg-muted/50 text-left text-xs uppercase text-muted-foreground">
               <tr>
                 {columns.map((c) => (
-                  <th key={c.key} className="px-4 py-3 font-medium">
+                  <th key={c.key} className="px-3 py-2.5 font-medium">
                     {c.label}
                   </th>
                 ))}
-                <th className="w-12 px-4 py-3" />
+                <th className="w-11 px-3 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td className="px-4 py-6 text-muted-foreground" colSpan={columns.length + 1}>
+                  <td className="px-3 py-5 text-muted-foreground" colSpan={columns.length + 1}>
                     Loading…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-muted-foreground" colSpan={columns.length + 1}>
+                  <td className="px-3 py-5 text-muted-foreground" colSpan={columns.length + 1}>
                     {emptyLabel}
                   </td>
                 </tr>
@@ -314,7 +319,7 @@ export function RecordsTable({
                 filtered.map((row) => (
                   <tr key={String(row["id"])} className="border-b border-border last:border-0">
                     {columns.map((c, i) => (
-                      <td key={c.key} className={`px-4 py-3 ${c.className ?? ""}`}>
+                      <td key={c.key} className={`px-3 py-2.5 ${c.className ?? ""}`}>
                         {i === 0 && detailTo ? (
                           <Link
                             to={detailTo(row)}
@@ -329,7 +334,7 @@ export function RecordsTable({
                         )}
                       </td>
                     ))}
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2.5">
                       <ConfirmAction
                         title="Delete record?"
                         onConfirm={() => remove.mutateAsync(String(row["id"]))}

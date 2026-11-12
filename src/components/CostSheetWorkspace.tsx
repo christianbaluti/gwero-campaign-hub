@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Calculator,
+  BookmarkPlus,
   ExternalLink,
   FileText,
   FileImage,
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -38,9 +41,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  applyCostSheetTemplate,
+  deleteCostSheet,
   deleteCostSheetColumn,
   deleteCostSheetItem,
   getCostSheetWorkspace,
+  getCostSheetTemplates,
+  saveCostSheetAsTemplate,
   saveCostSheetColumn,
   saveCostSheetColumnRules,
   saveCostSheetItem,
@@ -50,6 +57,7 @@ import {
   type CostSheetColumn,
   type CostSheetItem,
   type CostSheetSourceQuote,
+  type CostSheetTemplateRecord,
 } from "@/lib/cost-sheets.functions";
 import {
   calculateCostSheetRow,
@@ -129,6 +137,7 @@ function valueForColumn(item: CostSheetItem, column: CostSheetColumn) {
 }
 
 export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const loadWorkspace = useServerFn(getCostSheetWorkspace);
   const saveItem = useServerFn(saveCostSheetItem);
@@ -137,11 +146,19 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   const saveRules = useServerFn(saveCostSheetColumnRules);
   const removeColumn = useServerFn(deleteCostSheetColumn);
   const saveSheet = useServerFn(updateCostSheet);
+  const removeSheet = useServerFn(deleteCostSheet);
   const setSourceQuote = useServerFn(setCostSheetSourceQuote);
+  const loadTemplates = useServerFn(getCostSheetTemplates);
+  const applyTemplate = useServerFn(applyCostSheetTemplate);
+  const saveAsTemplate = useServerFn(saveCostSheetAsTemplate);
   const queryKey = ["cost-sheet-workspace", costSheetId];
   const { data, isLoading, error } = useQuery({
     queryKey,
     queryFn: () => loadWorkspace({ data: { costSheetId } }),
+  });
+  const { data: templates = [] } = useQuery({
+    queryKey: ["cost-sheet-templates"],
+    queryFn: () => loadTemplates(),
   });
   const sheet = data?.sheet as SheetRecord | undefined;
   const columns = data?.columns || emptyColumns;
@@ -188,6 +205,10 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
     normalizeCostSheetColumnRules(undefined),
   );
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [templateForm, setTemplateForm] = useState({ name: "", description: "" });
   const [selectedQuoteId, setSelectedQuoteId] = useState("");
   const [sheetForm, setSheetForm] = useState({ name: "", status: "draft", notes: "" });
 
@@ -313,6 +334,16 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
     },
     onError: (mutationError: Error) => toast.error(mutationError.message),
   });
+  const deleteSheetMutation = useMutation({
+    mutationFn: () => removeSheet({ data: { costSheetId } }),
+    onSuccess: async () => {
+      toast.success("Cost sheet deleted.");
+      queryClient.removeQueries({ queryKey });
+      await queryClient.invalidateQueries({ queryKey: ["cost-sheet-directory"] });
+      await navigate({ to: "/cost-sheets" });
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  });
   const rulesMutation = useMutation({
     mutationFn: () => saveRules({ data: { costSheetId, rules: rulesForm } }),
     onSuccess: async () => {
@@ -330,6 +361,26 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
       setQuoteOpen(false);
       setSelectedQuoteId("");
       await refresh();
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  });
+  const applyTemplateMutation = useMutation({
+    mutationFn: () => applyTemplate({ data: { costSheetId, templateId: selectedTemplateId } }),
+    onSuccess: async () => {
+      toast.success("Template applied. Existing custom columns were kept.");
+      setTemplateOpen(false);
+      setSelectedTemplateId("");
+      await refresh();
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  });
+  const saveTemplateMutation = useMutation({
+    mutationFn: () => saveAsTemplate({ data: { costSheetId, ...templateForm } }),
+    onSuccess: async () => {
+      toast.success("Reusable template saved.");
+      setSaveTemplateOpen(false);
+      setTemplateForm({ name: "", description: "" });
+      await queryClient.invalidateQueries({ queryKey: ["cost-sheet-templates"] });
     },
     onError: (mutationError: Error) => toast.error(mutationError.message),
   });
@@ -361,9 +412,9 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
   );
 
   return (
-    <div className="min-w-0 space-y-6">
-      <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-emerald-50/60 shadow-sm">
-        <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-w-0 space-y-4">
+      <section className="overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-emerald-50/60 shadow-sm">
+        <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="capitalize">
@@ -371,7 +422,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
               </Badge>
               <span className="text-sm text-muted-foreground">{currency}</span>
             </div>
-            <h1 className="truncate font-display text-3xl font-bold text-foreground">
+            <h1 className="truncate font-display text-2xl font-bold text-foreground">
               {sheet.name}
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -382,6 +433,18 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setTemplateOpen(true)}>
+              <FileText className="mr-2 size-4" /> Apply template
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setTemplateForm({ name: `${sheet.name} template`, description: "" });
+                setSaveTemplateOpen(true);
+              }}
+            >
+              <BookmarkPlus className="mr-2 size-4" /> Save template
+            </Button>
             <Button
               variant="outline"
               onClick={() => {
@@ -391,6 +454,17 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
             >
               <Settings2 className="mr-2 size-4" /> Sheet details
             </Button>
+            <ConfirmAction
+              title={`Delete ${sheet.name}?`}
+              description="This permanently removes the cost sheet, its items, custom columns and quotation links. Linked opportunities will be kept and unlinked."
+              onConfirm={() => deleteSheetMutation.mutateAsync()}
+              disabled={deleteSheetMutation.isPending}
+              trigger={
+                <Button variant="outline" className="text-destructive hover:text-destructive">
+                  <Trash2 className="mr-2 size-4" /> Delete sheet
+                </Button>
+              }
+            />
             <Button variant="outline" onClick={openNewColumn}>
               <Plus className="mr-2 size-4" /> Custom column
             </Button>
@@ -410,19 +484,31 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric
-          label={rules.line_cost.label}
-          value={money(totals.cost, currency)}
-          icon={Calculator}
-        />
-        <Metric label={rules.sell_price.label} value={money(totals.sell, currency)} icon={Sigma} />
-        <Metric
-          label={rules.gross_profit.label}
-          value={money(totals.profit, currency)}
-          icon={Calculator}
-        />
-        <Metric label="Margin" value={`${totals.margin.toFixed(1)}%`} icon={Sigma} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {rules.line_cost.enabled ? (
+          <Metric
+            label={rules.line_cost.label}
+            value={money(totals.cost, currency)}
+            icon={Calculator}
+          />
+        ) : null}
+        {rules.sell_price.enabled ? (
+          <Metric
+            label={rules.sell_price.label}
+            value={money(totals.sell, currency)}
+            icon={Sigma}
+          />
+        ) : null}
+        {rules.gross_profit.enabled ? (
+          <Metric
+            label={rules.gross_profit.label}
+            value={money(totals.profit, currency)}
+            icon={Calculator}
+          />
+        ) : null}
+        {rules.sell_price.enabled && rules.gross_profit.enabled ? (
+          <Metric label="Margin" value={`${totals.margin.toFixed(1)}%`} icon={Sigma} />
+        ) : null}
       </section>
 
       <Card className="overflow-hidden">
@@ -446,7 +532,7 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           {linkedQuotes.length ? (
             <div className="grid gap-3 lg:grid-cols-2">
               {linkedQuotes.map((quote) => (
@@ -492,15 +578,21 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                     Item
                   </th>
                   <th className="min-w-32 border-b px-3 py-3 font-semibold">Category</th>
-                  <th className="min-w-24 border-b px-3 py-3 text-right font-semibold">
-                    {rules.quantity.label}
-                  </th>
-                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    {rules.unit_cost.label}
-                  </th>
-                  <th className="min-w-28 border-b px-3 py-3 text-right font-semibold">
-                    {rules.markup_percent.label}
-                  </th>
+                  {rules.quantity.enabled ? (
+                    <th className="min-w-24 border-b px-3 py-3 text-right font-semibold">
+                      {rules.quantity.label}
+                    </th>
+                  ) : null}
+                  {rules.unit_cost.enabled ? (
+                    <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                      {rules.unit_cost.label}
+                    </th>
+                  ) : null}
+                  {rules.markup_percent.enabled ? (
+                    <th className="min-w-28 border-b px-3 py-3 text-right font-semibold">
+                      {rules.markup_percent.label}
+                    </th>
+                  ) : null}
                   {columns.map((column) => (
                     <th
                       key={column.id}
@@ -542,15 +634,21 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                       </div>
                     </th>
                   ))}
-                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    {rules.line_cost.label}
-                  </th>
-                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    {rules.sell_price.label}
-                  </th>
-                  <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
-                    {rules.gross_profit.label}
-                  </th>
+                  {rules.line_cost.enabled ? (
+                    <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                      {rules.line_cost.label}
+                    </th>
+                  ) : null}
+                  {rules.sell_price.enabled ? (
+                    <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                      {rules.sell_price.label}
+                    </th>
+                  ) : null}
+                  {rules.gross_profit.enabled ? (
+                    <th className="min-w-32 border-b px-3 py-3 text-right font-semibold">
+                      {rules.gross_profit.label}
+                    </th>
+                  ) : null}
                   <th className="min-w-36 border-b px-3 py-3 font-semibold">Images</th>
                   <th className="w-24 border-b px-3 py-3 text-right font-semibold">Actions</th>
                 </tr>
@@ -571,11 +669,19 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                           {item.category}
                         </Badge>
                       </td>
-                      <td className="px-3 py-4 text-right tabular-nums">{item.quantity}</td>
-                      <td className="px-3 py-4 text-right tabular-nums">
-                        {money(item.unit_cost, currency)}
-                      </td>
-                      <td className="px-3 py-4 text-right tabular-nums">{item.markup_percent}%</td>
+                      {rules.quantity.enabled ? (
+                        <td className="px-3 py-4 text-right tabular-nums">{item.quantity}</td>
+                      ) : null}
+                      {rules.unit_cost.enabled ? (
+                        <td className="px-3 py-4 text-right tabular-nums">
+                          {money(item.unit_cost, currency)}
+                        </td>
+                      ) : null}
+                      {rules.markup_percent.enabled ? (
+                        <td className="px-3 py-4 text-right tabular-nums">
+                          {item.markup_percent}%
+                        </td>
+                      ) : null}
                       {columns.map((column) => {
                         const value = calculation.custom[column.column_key];
                         const formulaError = calculation.errors[column.column_key];
@@ -601,42 +707,48 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                           </td>
                         );
                       })}
-                      <td className="px-3 py-4 text-right font-medium tabular-nums">
-                        {calculation.errors["line_cost"] ? (
-                          <span
-                            className="text-destructive"
-                            title={calculation.errors["line_cost"]}
-                          >
-                            #ERROR
-                          </span>
-                        ) : (
-                          money(calculation.lineCost, currency)
-                        )}
-                      </td>
-                      <td className="px-3 py-4 text-right font-semibold tabular-nums text-primary">
-                        {calculation.errors["sell_price"] ? (
-                          <span
-                            className="text-destructive"
-                            title={calculation.errors["sell_price"]}
-                          >
-                            #ERROR
-                          </span>
-                        ) : (
-                          money(calculation.sellPrice, currency)
-                        )}
-                      </td>
-                      <td className="px-3 py-4 text-right font-medium tabular-nums">
-                        {calculation.errors["gross_profit"] ? (
-                          <span
-                            className="text-destructive"
-                            title={calculation.errors["gross_profit"]}
-                          >
-                            #ERROR
-                          </span>
-                        ) : (
-                          money(calculation.grossProfit, currency)
-                        )}
-                      </td>
+                      {rules.line_cost.enabled ? (
+                        <td className="px-3 py-4 text-right font-medium tabular-nums">
+                          {calculation.errors["line_cost"] ? (
+                            <span
+                              className="text-destructive"
+                              title={calculation.errors["line_cost"]}
+                            >
+                              #ERROR
+                            </span>
+                          ) : (
+                            money(calculation.lineCost, currency)
+                          )}
+                        </td>
+                      ) : null}
+                      {rules.sell_price.enabled ? (
+                        <td className="px-3 py-4 text-right font-semibold tabular-nums text-primary">
+                          {calculation.errors["sell_price"] ? (
+                            <span
+                              className="text-destructive"
+                              title={calculation.errors["sell_price"]}
+                            >
+                              #ERROR
+                            </span>
+                          ) : (
+                            money(calculation.sellPrice, currency)
+                          )}
+                        </td>
+                      ) : null}
+                      {rules.gross_profit.enabled ? (
+                        <td className="px-3 py-4 text-right font-medium tabular-nums">
+                          {calculation.errors["gross_profit"] ? (
+                            <span
+                              className="text-destructive"
+                              title={calculation.errors["gross_profit"]}
+                            >
+                              #ERROR
+                            </span>
+                          ) : (
+                            money(calculation.grossProfit, currency)
+                          )}
+                        </td>
+                      ) : null}
                       <td className="px-3 py-3">
                         <div className="flex min-h-10 items-center -space-x-2">
                           {(item.attachments || []).slice(0, 4).map((attachment) => (
@@ -695,7 +807,14 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                 })}
                 {!items.length ? (
                   <tr>
-                    <td colSpan={11 + columns.length} className="px-6 py-16 text-center">
+                    <td
+                      colSpan={
+                        4 +
+                        columns.length +
+                        costSheetSystemColumnKeys.filter((key) => rules[key].enabled).length
+                      }
+                      className="px-5 py-8 text-center"
+                    >
                       <FileImage className="mx-auto mb-3 size-9 text-muted-foreground/60" />
                       <p className="font-medium">No cost items yet</p>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -714,7 +833,17 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                     <td className="sticky left-0 z-10 bg-muted px-4 py-4" colSpan={2}>
                       Totals
                     </td>
-                    <td colSpan={3} />
+                    {[rules.quantity, rules.unit_cost, rules.markup_percent].filter(
+                      (rule) => rule.enabled,
+                    ).length ? (
+                      <td
+                        colSpan={
+                          [rules.quantity, rules.unit_cost, rules.markup_percent].filter(
+                            (rule) => rule.enabled,
+                          ).length
+                        }
+                      />
+                    ) : null}
                     {columns.map((column) => (
                       <td key={column.id} className="px-3 py-4 text-right tabular-nums">
                         {column.data_type === "text"
@@ -724,15 +853,21 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
                             })}
                       </td>
                     ))}
-                    <td className="px-3 py-4 text-right tabular-nums">
-                      {money(totals.cost, currency)}
-                    </td>
-                    <td className="px-3 py-4 text-right tabular-nums text-primary">
-                      {money(totals.sell, currency)}
-                    </td>
-                    <td className="px-3 py-4 text-right tabular-nums">
-                      {money(totals.profit, currency)}
-                    </td>
+                    {rules.line_cost.enabled ? (
+                      <td className="px-3 py-4 text-right tabular-nums">
+                        {money(totals.cost, currency)}
+                      </td>
+                    ) : null}
+                    {rules.sell_price.enabled ? (
+                      <td className="px-3 py-4 text-right tabular-nums text-primary">
+                        {money(totals.sell, currency)}
+                      </td>
+                    ) : null}
+                    {rules.gross_profit.enabled ? (
+                      <td className="px-3 py-4 text-right tabular-nums">
+                        {money(totals.profit, currency)}
+                      </td>
+                    ) : null}
                     <td colSpan={2} />
                   </tr>
                 </tfoot>
@@ -835,6 +970,56 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <TemplateDialog
+        open={templateOpen}
+        onOpenChange={setTemplateOpen}
+        templates={templates}
+        selectedId={selectedTemplateId}
+        onSelect={setSelectedTemplateId}
+        saving={applyTemplateMutation.isPending}
+        onSave={() => applyTemplateMutation.mutate()}
+      />
+      <Dialog open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save as reusable template</DialogTitle>
+            <DialogDescription>
+              Saves the current column visibility, formulas, defaults and custom columns. Line items
+              are not copied.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Field label="Template name">
+              <Input
+                value={templateForm.name}
+                onChange={(event) =>
+                  setTemplateForm((current) => ({ ...current, name: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Description">
+              <Textarea
+                rows={3}
+                value={templateForm.description}
+                onChange={(event) =>
+                  setTemplateForm((current) => ({ ...current, description: event.target.value }))
+                }
+              />
+            </Field>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveTemplateOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!templateForm.name.trim() || saveTemplateMutation.isPending}
+              onClick={() => saveTemplateMutation.mutate()}
+            >
+              {saveTemplateMutation.isPending ? "Saving…" : "Save template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={Boolean(preview)}
         onOpenChange={(open) => {
@@ -856,6 +1041,64 @@ export function CostSheetWorkspace({ costSheetId }: { costSheetId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function TemplateDialog({
+  open,
+  onOpenChange,
+  templates,
+  selectedId,
+  onSelect,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  templates: CostSheetTemplateRecord[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const selected = templates.find((template) => template.id === selectedId);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Apply a cost sheet template</DialogTitle>
+          <DialogDescription>
+            Template formulas and defaults replace the built-in column rules. Matching custom
+            columns are updated; unrelated columns and line items remain intact.
+          </DialogDescription>
+        </DialogHeader>
+        <Field label="Template">
+          <Select value={selectedId} onValueChange={onSelect}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a template" />
+            </SelectTrigger>
+            <SelectContent>
+              {templates.map((template) => (
+                <SelectItem key={template.id} value={template.id}>
+                  {template.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selected ? (
+            <p className="mt-2 text-xs text-muted-foreground">{selected.description}</p>
+          ) : null}
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={!selectedId || saving} onClick={onSave}>
+            {saving ? "Applying…" : "Apply template"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -923,15 +1166,15 @@ function Metric({
 }) {
   return (
     <Card>
-      <CardContent className="flex items-center gap-4 p-5">
-        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary">
+      <CardContent className="flex items-center gap-3 p-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
           <Icon className="size-5" />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {label}
           </p>
-          <p className="mt-1 truncate text-xl font-bold tabular-nums">{value}</p>
+          <MetricValue className="mt-1" value={value} maxSize={1.25} />
         </div>
       </CardContent>
     </Card>
@@ -998,38 +1241,44 @@ function ItemDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label={rules.quantity.label}>
-            <Input
-              type="number"
-              min="0"
-              step="any"
-              value={form.quantity}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, quantity: event.target.value }))
-              }
-            />
-          </Field>
-          <Field label={rules.unit_cost.label}>
-            <Input
-              type="number"
-              min="0"
-              step="any"
-              value={form.unitCost}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, unitCost: event.target.value }))
-              }
-            />
-          </Field>
-          <Field label={rules.markup_percent.label}>
-            <Input
-              type="number"
-              step="any"
-              value={form.markupPercent}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, markupPercent: event.target.value }))
-              }
-            />
-          </Field>
+          {rules.quantity.enabled ? (
+            <Field label={rules.quantity.label}>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={form.quantity}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, quantity: event.target.value }))
+                }
+              />
+            </Field>
+          ) : null}
+          {rules.unit_cost.enabled ? (
+            <Field label={rules.unit_cost.label}>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={form.unitCost}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, unitCost: event.target.value }))
+                }
+              />
+            </Field>
+          ) : null}
+          {rules.markup_percent.enabled ? (
+            <Field label={rules.markup_percent.label}>
+              <Input
+                type="number"
+                step="any"
+                value={form.markupPercent}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, markupPercent: event.target.value }))
+                }
+              />
+            </Field>
+          ) : null}
           {columns
             .filter((column) => column.data_type !== "formula")
             .map((column) => (
@@ -1321,8 +1570,9 @@ function ColumnRulesDialog({
         <DialogHeader>
           <DialogTitle>Configure default columns</DialogTitle>
           <DialogDescription>
-            Rename built-in columns, set new-row defaults, and control how calculated values are
-            produced for this cost sheet.
+            Rename built-in columns, set new-row defaults, remove columns from this sheet, and
+            control how calculated values are produced. Removed columns keep their underlying values
+            so dependent formulas remain safe.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
@@ -1331,7 +1581,22 @@ function ColumnRulesDialog({
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
               {inputKeys.map((key) => (
                 <div key={key} className="rounded-xl border p-4">
-                  <p className="mb-3 font-mono text-xs text-muted-foreground">{key}</p>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs text-muted-foreground">{key}</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={rules[key].enabled ? "secondary" : "outline"}
+                      onClick={() =>
+                        setRules((current) => ({
+                          ...current,
+                          [key]: { ...current[key], enabled: !current[key].enabled },
+                        }))
+                      }
+                    >
+                      {rules[key].enabled ? "Remove from sheet" : "Add to sheet"}
+                    </Button>
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Label">
                       <Input
@@ -1373,6 +1638,21 @@ function ColumnRulesDialog({
             <div className="mt-3 space-y-4">
               {formulaKeys.map((key) => (
                 <div key={key} className="rounded-xl border p-4">
+                  <div className="mb-3 flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={rules[key].enabled ? "secondary" : "outline"}
+                      onClick={() =>
+                        setRules((current) => ({
+                          ...current,
+                          [key]: { ...current[key], enabled: !current[key].enabled },
+                        }))
+                      }
+                    >
+                      {rules[key].enabled ? "Remove from sheet" : "Add to sheet"}
+                    </Button>
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
                     <Field label={`Label · ${key}`}>
                       <Input

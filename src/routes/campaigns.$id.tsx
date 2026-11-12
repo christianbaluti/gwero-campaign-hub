@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MetricValue } from "@/components/ui/metric-value";
 import {
   Select,
   SelectContent,
@@ -529,13 +530,13 @@ function CampaignDetail() {
 
         <TabsContent
           value="overview"
-          className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]"
+          className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]"
         >
           <Card>
             <CardHeader>
               <CardTitle>Campaign plan</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2">
+            <CardContent className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="campaign-name">Campaign name</Label>
                 <Input
@@ -692,7 +693,7 @@ function CampaignDetail() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Safety and tracking</CardTitle>
@@ -1083,7 +1084,7 @@ function CampaignDetail() {
           ))}
           {!steps.length ? (
             <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
+              <CardContent className="py-8 text-center text-muted-foreground">
                 Add the first email or internal task to build this sequence.
               </CardContent>
             </Card>
@@ -1098,7 +1099,7 @@ function CampaignDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="audience" className="mt-6 space-y-6">
+        <TabsContent value="audience" className="mt-4 space-y-4">
           <Tabs defaultValue="eligible" className="space-y-4">
             <TabsList className="grid w-full max-w-xl grid-cols-2">
               <TabsTrigger value="eligible">
@@ -1351,7 +1352,7 @@ function CampaignDetail() {
                       </div>
                     ))}
                     {!recipients.length ? (
-                      <div className="py-10 text-center text-sm text-muted-foreground">
+                      <div className="py-6 text-center text-sm text-muted-foreground">
                         No contact people have been enrolled yet.
                       </div>
                     ) : null}
@@ -1364,7 +1365,7 @@ function CampaignDetail() {
 
         <TabsContent
           value="review"
-          className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]"
+          className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]"
         >
           <Card>
             <CardHeader>
@@ -1425,7 +1426,7 @@ function CampaignDetail() {
               ))}
             </CardContent>
           </Card>
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Campaign controls</CardTitle>
@@ -1531,7 +1532,7 @@ function CampaignDetail() {
           </div>
         </TabsContent>
 
-        <TabsContent value="results" className="mt-6 space-y-6">
+        <TabsContent value="results" className="mt-4 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
             {(
               [
@@ -1549,7 +1550,7 @@ function CampaignDetail() {
                   <p className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
                     {String(label)}
                   </p>
-                  <p className="font-display text-2xl font-semibold">{String(value)}</p>
+                  <MetricValue className="font-display" value={value} maxSize={1.5} />
                 </CardContent>
               </Card>
             ))}
